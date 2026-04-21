@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · pretext float</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font: 15px/1.55 -apple-system, system-ui, sans-serif; margin: 2rem; }
+    .controls { margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    .stage { position: relative; background: #fafafa; border: 1px solid #eee; padding: 1.25rem; }
+    .column { position: relative; }
+    .col-line { position: absolute; white-space: pre; font: 17px/26px Inter, -apple-system, system-ui, sans-serif; color: #111; }
+    .col-float img { position: absolute; border-radius: 4px; display: block; }
+    .stats { font-size: 12px; color: #555; margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <h1>Pretext float — text flows around a measured image</h1>
+  <p>Preimage's <code>flowColumnWithFloats</code> drives pretext's <code>layoutNextLineRange</code> cursor loop, narrowing the available line width while a floated figure is active.</p>
+  <div class="controls">
+    <label>Column width
+      <input id="width" type="range" min="320" max="900" value="640" />
+      <span id="widthVal">640</span>px
+    </label>
+    <label>Float side
+      <select id="side">
+        <option value="right" selected>right</option>
+        <option value="left">left</option>
+      </select>
+    </label>
+    <label>Float top
+      <input id="top" type="range" min="0" max="200" value="26" />
+      <span id="topVal">26</span>px
+    </label>
+  </div>
+  <div class="stage">
+    <div id="column" class="column"></div>
+    <div class="stats" id="stats">—</div>
+  </div>
+  <script type="module" src="./pretext-float.ts"></script>
+</body>
+</html>

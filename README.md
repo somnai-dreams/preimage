@@ -1,301 +1,195 @@
 # Preimage
 
-Pure JavaScript/TypeScript library for loading, measuring & laying out arbitrary images in the browser. Fast, accurate & supports every format the browser can decode. Allows rendering to `<img>`, canvas, SVG, and — given server-side decoding — eventually SSR.
+Measured images for [pretext](https://github.com/chenglou/pretext): float figures and inline images in pretext-flowed text, without triggering DOM reflow.
 
-Preimage side-steps the need for DOM measurements (e.g. `img.getBoundingClientRect`, forcing `naturalWidth` reads after layout), which trigger layout reflow, one of the most expensive operations in the browser. It implements its own measurement & layout logic, using the browser's own `HTMLImageElement.decode()` pipeline as ground truth.
+Pretext's variable-width cursor loop — its `layoutNextLineRange(prepared, cursor, maxWidth)` API — is built for exactly the scenarios where a figure sits beside a column of text and each line has to know how wide it's allowed to be. Pretext deliberately stops short of computing the figure: it takes `{ width, height, bottom }` as input and leaves the question of *how you got those numbers* to the caller.
 
-It is a structural port of [`@chenglou/pretext`](https://github.com/chenglou/pretext) to the image domain: every module there has an image-equivalent module here, and every API has the same shape.
+Preimage answers that question. It loads and decodes images once (via `HTMLImageElement.decode()`), caches their intrinsic size and aspect ratio, and provides two adapters that plug straight into pretext:
+
+- **`flowColumnWithFloats`** — drives pretext's cursor loop, reserves horizontal space for a floated image, yields a stream of placed lines + placed images with absolute `(x, y, w, h)`.
+- **`inlineImage` / `resolveMixedInlineItems`** — return pretext `RichInlineItem` values whose `extraWidth` reserves the measured image's rendered width, so pretext's rich-inline walker treats it as an atomic pill that wraps naturally with surrounding text.
+
+Plus the primitives those adapters are built on (`prepare`, `layout`, `fitRect`, EXIF orientation, SVG viewBox extraction), plus a standalone justified-gallery row packer for pure image grids.
 
 ## Installation
 
 ```sh
-npm install @somnai-dreams/preimage
+npm install @somnai-dreams/preimage @chenglou/pretext
 ```
 
-## API
+Pretext is a `peerDependency` — the main entry (`@somnai-dreams/preimage`) does not import it, but the `@somnai-dreams/preimage/pretext` subpath does.
 
-Preimage serves 2 use cases:
+## The pretext integration
 
-### 1. Measure a single image's rendered size _without ever touching DOM_
-
-```ts
-import { prepare, layout } from '@somnai-dreams/preimage'
-
-const prepared = await prepare('https://example.com/photo.jpg')
-const { width, height, offsetX, offsetY } = layout(prepared, containerWidth, containerHeight, 'contain')
-// pure arithmetics. No DOM layout & reflow!
-```
-
-`prepare()` does the one-time work: kick off the browser fetch + decode, normalize the source string, cache the intrinsic dimensions, apply EXIF orientation, and return an opaque handle. `layout()` is the cheap hot path: pure arithmetic over the cached aspect ratio. Do not rerun `prepare()` for the same src; that'd defeat its precomputation. For example, on resize, only rerun `layout()`.
-
-If your server already reports intrinsic dimensions (HTML attributes, a manifest JSON, CDN headers), skip the load entirely:
+### 1. Float a figure beside a pretext text column
 
 ```ts
-import { prepareSync, layout } from '@somnai-dreams/preimage'
+import { prepareWithSegments, materializeLineRange } from '@chenglou/pretext'
+import { prepare } from '@somnai-dreams/preimage'
+import { flowColumnWithFloats } from '@somnai-dreams/preimage/pretext'
 
-const prepared = prepareSync('/photo.jpg', 2400, 1600)
-const { width, height } = layout(prepared, columnWidth) // synchronous, fits 'contain' by default
-```
+const image = await prepare('/figure.jpg')        // one decode, aspect cached
+const text = prepareWithSegments(article, FONT)   // pretext's one-time pass
 
-If your image carries a known EXIF orientation, pass it so axis-swapped sources render with the correct aspect ratio:
+const { items, totalHeight } = flowColumnWithFloats({
+  text,
+  columnWidth,
+  lineHeight: 26,
+  floats: [
+    { image, side: 'right', top: 26, maxWidth: 280, maxHeight: 220, gapX: 16 },
+  ],
+})
 
-```ts
-const prepared = await prepare(src, { orientation: 6 }) // 90° CW rotation
-```
-
-The returned size is the crucial last piece for unlocking web UI's:
-- proper virtualization/occlusion without guesstimates & caching
-- fancy userland layouts: masonry, justified-grid, stacked-cover, etc.
-- _development time_ verification (especially now with AI) that images fit inside their chrome without overflowing, browser-free
-- prevent layout shift when new images load and you wanna re-anchor the scroll position
-
-### 2. Lay out a gallery manually yourself
-
-Switch out `prepare` with `prepareWithBoxes`, then:
-
-- `layoutWithRows()` gives you every row at a fixed width:
-
-```ts
-import { prepareWithBoxes, layoutWithRows } from '@somnai-dreams/preimage'
-
-const prepared = await prepareWithBoxes([
-  'a.jpg',
-  'b.jpg',
-  { src: 'c.jpg', break: 'after' }, // hard row break after this image
-  'd.png',
-])
-const { rows } = layoutWithRows(prepared, 960, 180) // 960px max width, 180px row height
-for (const row of rows) {
-  for (const p of row.placements) ctx.drawImage(bitmaps[p.itemIndex], p.x, y + p.y, p.width, p.height)
+for (const item of items) {
+  if (item.kind === 'line') {
+    const line = materializeLineRange(text, item.range)
+    ctx.fillText(line.text, item.x, item.y)
+  } else {
+    ctx.drawImage(bitmap, item.x, item.y, item.width, item.height)
+  }
 }
 ```
 
-- `measureRowStats()` and `walkRowRanges()` give you row counts, widths and cursors without building the placement arrays:
+The driver solves each float's rect against the column width, tracks which floats are active at each `y`, narrows pretext's `maxWidth` when one is, and emits placed lines that skip past the float's horizontal footprint. `totalHeight` is the greater of the last line's baseline and the lowest float's bottom. No DOM reads, no reflow, same data on every resize.
 
-```ts
-import { measureRowStats, walkRowRanges } from '@somnai-dreams/preimage'
+`solveFloat(spec, columnWidth)` is the low-level version — just the `{ width, height }` for one floated image, for callers that want to drive pretext's loop themselves.
 
-const { rowCount, maxRowWidth } = measureRowStats(prepared, 960, 180)
-let maxW = 0
-walkRowRanges(prepared, 960, 180, row => { if (row.width > maxW) maxW = row.width })
-// maxW is the widest row — the tightest container width that still fits the gallery!
-```
-
-- `layoutNextRowRange()` lets you route images one row at a time when the available width changes as you go. If you want the placements too, `materializeRowRange()` turns that one range back into a full row:
+### 2. Inline a measured image inside pretext's rich-inline flow
 
 ```ts
 import {
-  layoutNextRowRange,
-  materializeRowRange,
-  prepareWithBoxes,
-  type RowCursor,
-} from '@somnai-dreams/preimage'
-
-const prepared = await prepareWithBoxes(items)
-let cursor: RowCursor = { itemIndex: 0 }
-let y = 0
-
-// Flow images around a floated sidebar: rows beside the sidebar are narrower
-while (true) {
-  const width = y < sidebar.bottom ? columnWidth - sidebar.width : columnWidth
-  const range = layoutNextRowRange(prepared, cursor, width, 180)
-  if (range === null) break
-
-  const row = materializeRowRange(prepared, range, 180)
-  for (const p of row.placements) ctx.drawImage(imgs[p.itemIndex], p.x, y + p.y, p.width, p.height)
-  cursor = range.end
-  y += row.height + 8
-}
-```
-
-This usage allows rendering to canvas, SVG, WebGL and (given decoded bitmaps) server-side. See the `/demos/justified-gallery` demo for a richer example.
-
-If your manual layout needs a small helper for rich image inline flow with captions, chrome, and browser-like boundary gap collapse, there is a helper at `@somnai-dreams/preimage/rich-gallery`. It stays row-only on purpose:
-
-```ts
+  prepareRichInline,
+  walkRichInlineLineRanges,
+  materializeRichInlineLineRange,
+} from '@chenglou/pretext/rich-inline'
 import {
-  materializeRichGalleryRowRange,
-  prepareRichGallery,
-  walkRichGalleryRowRanges,
-} from '@somnai-dreams/preimage/rich-gallery'
+  resolveMixedInlineItems,
+  isInlineImageItem,
+} from '@somnai-dreams/preimage/pretext'
 
-const prepared = await prepareRichGallery([
-  { src: 'hero.jpg' },
-  { src: 'avatar.png', aspectRatio: 1, break: 'never', extraWidth: 12 },
-  { src: 'detail.webp' },
+const items = await resolveMixedInlineItems([
+  { text: 'Pushed a fix to ', font: FONT },
+  { kind: 'image', src: iconSrc, options: { font: FONT, height: 20, extraWidth: 6 } },
+  { text: ' preimage', font: FONT },
 ])
+const prepared = prepareRichInline(items)
 
-walkRichGalleryRowRanges(prepared, 320, row => {
-  const mat = materializeRichGalleryRowRange(prepared, row)
-  // each fragment keeps its source item index, display size, gapBefore, and cursors
+walkRichInlineLineRanges(prepared, maxWidth, (range) => {
+  const line = materializeRichInlineLineRange(prepared, range)
+  for (const frag of line.fragments) {
+    const item = items[frag.itemIndex]
+    if (isInlineImageItem(item)) drawInlineImage(item, frag)
+    else drawInlineText(item, frag)
+  }
 })
 ```
 
-It is intentionally narrow:
-- raw image items in, including leading/trailing gap positions
-- caller-owned `extraWidth` for chrome (padding + border)
-- `break: 'never'` for atomic pairs like image + caption chip
-- row-only flow
-- not a masonry engine and not a general CSS grid replacement
+`inlineImage(src, options)` returns a `RichInlineItem` whose `text` is a single zero-width space (survives pretext's `[ \t\n\f\r]+` trim, measures 0px in every font we tested) and whose `extraWidth` is the measured image's rendered width plus any caller-supplied chrome. Pretext packs it as an atomic pill with `break: 'never'` by default.
 
-### API Glossary
+The returned item also carries `imageDisplayWidth`, `imageDisplayHeight`, and a reference to the `PreparedImage`, so the caller has everything it needs to render the image at the fragment's computed position.
 
-Use-case 1 APIs:
+`inlineImageItem(preparedImage, options)` is the sync version for callers that already have the image measured (useful when the whole rich-inline flow is being rebuilt on every keystroke, but the images were prepared once).
+
+## API glossary
+
+### Core primitives (`@somnai-dreams/preimage`)
 
 ```ts
 prepare(src: string, options?: PrepareOptions): Promise<PreparedImage>
-  // one-time load + decode + measurement pass, returns an opaque value to pass
-  // to `layout()`. Make sure `orientation` (if provided) is synced with your
-  // upload pipeline — most modern pipelines strip EXIF after server-side
-  // rotation, in which case the default `orientation: 1` is correct.
+  // one-time load + decode + measurement pass, returns an opaque handle.
 
-prepareSync(src: string, width: number, height: number, options?: { orientation?: OrientationCode }): PreparedImage
-  // skip the network and decode entirely when your server has already
-  // reported intrinsic dimensions (HTML attrs, manifest, CDN header)
+prepareSync(src, width, height, { orientation? }?): PreparedImage
+  // skip the network when your server already reports intrinsic dimensions.
 
-layout(prepared: PreparedImage, maxWidth: number, maxHeight?: number, fit?: ObjectFit): LayoutSize
-  // calculates rendered dimensions inside the given box. `fit` is any CSS
-  // object-fit value (`contain` | `cover` | `fill` | `scale-down` | `none`).
+layout(prepared, maxWidth, maxHeight?, fit?): FittedRect
+  // CSS object-fit math over the cached aspect ratio. No DOM reads.
+  // `fit` is 'contain' | 'cover' | 'fill' | 'scale-down' | 'none'.
 
-measureAspect(prepared: PreparedImage): number
-measureNaturalSize(prepared: PreparedImage): { width: number, height: number }
-layoutForWidth(prepared: PreparedImage, maxWidth: number): LayoutSize
-layoutForHeight(prepared: PreparedImage, maxHeight: number): LayoutSize
-```
+measureAspect(prepared): number
+measureNaturalSize(prepared): { width: number, height: number }
+getMeasurement(prepared): ImageMeasurement  // full record (EXIF, format, …)
 
-Use-case 2 APIs:
+fitRect(natW, natH, boxW, boxH, fit?): FittedRect
+  // the object-fit math as a standalone pure function. Used internally by
+  // `layout()` and `solveFloat()`; exposed because it's handy.
 
-```ts
-prepareWithBoxes(items: GalleryItemInput[], options?: PrepareGalleryOptions): Promise<PreparedGalleryWithBoxes>
-  // same as `prepare()`, but produces a richer handle wired to the row packer
-
-layoutWithRows(prepared, maxWidth, rowHeight, options?): LayoutRowsResult
-  // high-level API for manual layout. Accepts a fixed max width for all rows.
-
-walkRowRanges(prepared, maxWidth, rowHeight, onRow, options?): number
-  // low-level API. Calls `onRow` once per row with its start/end cursors and
-  // measured width, without building placements.
-
-measureRowStats(prepared, maxWidth, rowHeight, options?): RowStats
-  // returns only how many rows this width produces, and how wide the widest is.
-
-measureNaturalWidth(prepared, rowHeight): number
-  // the widest forced row when width isn't the thing forcing wraps
-
-layoutNextRowRange(prepared, start, maxWidth, rowHeight, options?): LayoutRowRange | null
-  // iterator-like API for variable-width layouts without building placements
-
-layoutNextRow(prepared, start, maxWidth, rowHeight, options?): LayoutRow | null
-  // iterator-like API for laying out each row with a different width
-
-materializeRowRange(prepared, range, rowHeight, options?): LayoutRow
-  // turns one previously computed row range back into a full row with placements
-```
-
-```ts
-type RowStats = {
-  rowCount: number
-  maxRowWidth: number
-}
-type LayoutRow = {
-  placements: RowPlacement[]
-  width: number
-  height: number
-  start: RowCursor
-  end: RowCursor
-  scale: number
-}
-type LayoutRowRange = {
-  width: number
-  height: number
-  start: RowCursor
-  end: RowCursor
-  scale: number
-}
-type RowCursor = { itemIndex: number }
-type RowPlacement = { itemIndex: number, x: number, y: number, width: number, height: number }
-type ObjectFit = 'contain' | 'cover' | 'fill' | 'scale-down' | 'none'
-```
-
-Helper for rich-gallery flow:
-
-```ts
-prepareRichGallery(items, options?): Promise<PreparedRichGallery>
-layoutNextRichGalleryRowRange(prepared, maxWidth, start?, rowHeight?): RichGalleryRowRange | null
-walkRichGalleryRowRanges(prepared, maxWidth, onRow, rowHeight?): number
-materializeRichGalleryRowRange(prepared, row): RichGalleryRow
-measureRichGalleryStats(prepared, maxWidth, rowHeight?): RichGalleryStats
-```
-
-```ts
-type RichGalleryItem = {
-  src: string
-  aspectRatio?: number
-  break?: 'normal' | 'never' | 'before' | 'after'
-  extraWidth?: number
-  minWidth?: number
-  orientation?: OrientationCode
-  caption?: string
-}
-type RichGalleryCursor = { itemIndex: number, graphemeIndex: 0 }
-type RichGalleryFragment = {
-  itemIndex: number
-  gapBefore: number
-  occupiedWidth: number
-  displayWidth: number
-  displayHeight: number
-  start: RichGalleryCursor
-  end: RichGalleryCursor
-}
-type RichGalleryRow = {
-  fragments: RichGalleryFragment[]
-  width: number
-  height: number
-  end: RichGalleryCursor
-}
-```
-
-Other helpers:
-
-```ts
-clearCache(): void
-  // clears preimage's shared internal caches. Useful if your app cycles
-  // through many different sources and wants to release the accumulated cache.
-
-recordKnownMeasurement(src, width, height, options?): ImageMeasurement
-  // records a measurement without loading. Useful for SSR hydration.
-
-getEngineProfile(): EngineProfile
-  // exposes whether this browser has `HTMLImageElement.decode()` and
-  // `createImageBitmap`. Read by consumers that want to predict behavior.
-
+measureImage(src, options?): Promise<ImageMeasurement>
+recordKnownMeasurement(src, w, h, { orientation?, decoded? }?): ImageMeasurement
+measureFromSvgText(svgText): { width, height } | null
 readExifOrientation(buffer): OrientationCode | null
-  // reads the EXIF orientation tag from a raw JPEG byte buffer
+clearCache(): void
 ```
 
-Notes:
-- `PreparedImage` is the opaque fast-path handle. `PreparedGalleryWithBoxes` is the richer gallery handle.
-- `RowCursor` is an item-index cursor, not a raw array offset. Item indices refer to the input passed to `prepareWithBoxes`.
-- The richer handle also includes `orientationLevels` for custom-transform rendering. The row packer does not read it.
-- Placement widths/heights are after EXIF orientation and row scaling, not raw intrinsic data.
-- If a cover/contain fit has no `maxHeight`, the box is treated as infinitely tall and the image fits to `maxWidth`.
-- `prepare()` and `prepareWithBoxes()` do horizontal-direction-only work; `rowHeight` is a layout-time input.
+### Pretext integration (`@somnai-dreams/preimage/pretext`)
+
+```ts
+solveFloat(spec, columnWidth): { width, height }
+flowColumnWithFloats({ text, columnWidth, lineHeight, floats }): ColumnFlowResult
+measureColumnFlow(opts): { totalHeight, lineCount }
+
+inlineImage(src, options): Promise<InlineImageItem>
+inlineImageItem(preparedImage, options): InlineImageItem
+resolveMixedInlineItems(items): Promise<RichInlineItem[]>
+isInlineImageItem(item): item is InlineImageItem
+```
+
+Shapes:
+
+```ts
+type FloatSpec = {
+  image: PreparedImage
+  side: 'left' | 'right'
+  top: number          // measured from column y=0
+  maxWidth: number
+  maxHeight?: number
+  gapX?: number        // horizontal gap between float and flowing text (default 12)
+  gapY?: number        // vertical gap above/below the float for line overlap (default 0)
+}
+
+type ColumnFlowItem =
+  | { kind: 'line'; y, x, width; range: LayoutLineRange }   // pretext's LayoutLineRange
+  | { kind: 'float'; y, x, width, height; image; itemIndex; side }
+
+type InlineImageItem = RichInlineItem & {
+  __preimageInline: true
+  image: PreparedImage
+  imageDisplayWidth: number   // aspectRatio * options.height
+  imageDisplayHeight: number  // options.height
+  chromeWidth: number         // non-image extraWidth
+}
+```
+
+### Standalone gallery (`@somnai-dreams/preimage/gallery`)
+
+```ts
+packGallery(items, options): GalleryRow[]
+measureGalleryHeight(items, options): { rowCount, height, maxRowWidth }
+```
+
+Not part of the pretext integration — a justified / fixed-height row packer that happens to share the same prepared measurements, for callers who want a Flickr-style image grid alongside their pretext columns.
+
+## Why these two integrations, and nothing else
+
+Pretext solves a sharp problem: "measure text without triggering reflow, then do line breaking with pure arithmetic." Preimage's job is to deliver the *one other input* pretext needs to cover the scenarios its own README describes:
+
+- editorial article layout with floated figures
+- markdown / rich-note with inline icon images
+- chat bubbles with inline image attachments
+- masonry / column layouts that mix text and image cards
+
+For anything else images can do in a browser, CSS and the platform already have better answers: `aspect-ratio` handles CLS, `object-fit` handles single-image fitting inside a CSS box, `<picture>` handles responsive sources. Preimage does not try to reinvent any of those. It fills the specific gap where a JS layout engine — pretext — needs numeric dimensions *before* paint to decide how text wraps around an image.
 
 ## Caveats
 
-Preimage doesn't try to be a full rendering engine (yet?). It currently targets the common image setup:
-
-- Row-based packing: justified rows with per-row uniform height, and fixed-height rows that break on overflow.
-- Object-fit modes: `contain`, `cover`, `fill`, `scale-down`, `none`. `object-position` defaults to `center center`; callers can shift placements manually.
-- EXIF orientations 1–8. Browser CSS `image-orientation: from-image` is assumed.
-- SVG without intrinsic dimensions falls back to `300×150`. Use `measureFromSvgText` if you want the viewBox.
-- Animated GIF / APNG / animated WebP report the size of the first frame.
-- Color space, CMYK, and 16-bit HDR inputs are decoded by the browser; preimage only reads dimensions.
+- The inline adapter's zero-width-space sentinel measures 0px in every font we've tested. If you hit a font that gives `​` a non-zero glyph width, the reserved width will be off by that amount. Report it.
+- `flowColumnWithFloats` currently handles any number of floats, but a line's available width is always calculated as `columnWidth - (widest active left float) - (widest active right float) - gaps`. Side-by-side floats on the same side stack to the full width of the larger one, not sum to both — matching how CSS floats behave.
+- EXIF orientations 1–8 are respected for measurement axes; canvas rendering still needs to apply the transform manually. Browser `<img>` rendering applies it automatically.
+- SVG without an intrinsic size falls back to `300 × 150` (CSS default). Use `measureFromSvgText` for the viewBox if that matters.
 
 ## Develop
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for the dev setup and commands.
+See [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Credits
 
-Chenglou's [pretext](https://github.com/chenglou/pretext) established the prepare/layout split and the rich-path streaming cursor approach we kept here. If you measure text and images in the same codebase, mount preimage and pretext side by side — they are designed to share a mental model.
+Built on top of Chenglou's [pretext](https://github.com/chenglou/pretext). The two-phase prepare/layout split, the opaque prepared handle, and the cursor-driven streaming API are all pretext's design; preimage just follows its shape for the image side of the same problems.

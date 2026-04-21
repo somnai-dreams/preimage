@@ -12,15 +12,28 @@
     ul { padding-left: 1.1rem; }
     li { margin-bottom: 0.3rem; }
     code { background: #f3f3f3; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em; }
+    .section { margin-top: 1.5rem; }
+    .section h2 { font-size: 1rem; margin-bottom: 0.4rem; }
   </style>
 </head>
 <body>
   <h1>Preimage demos</h1>
-  <p>Structural port of <code>@chenglou/pretext</code> to arbitrary images.</p>
-  <ul>
-    <li><a href="/demos/object-fit.html">Single-image object-fit</a></li>
-    <li><a href="/demos/justified-gallery.html">Justified gallery (row packer)</a></li>
-    <li><a href="/demos/rich-gallery.html">Rich-gallery inline flow</a></li>
-  </ul>
+  <p>Measured images for <a href="https://github.com/chenglou/pretext"><code>@chenglou/pretext</code></a>: float figures beside flowing text, and inline images inside rich-inline runs — all without triggering DOM reflow.</p>
+
+  <div class="section">
+    <h2>Pretext integration (the headline)</h2>
+    <ul>
+      <li><a href="/demos/pretext-float.html">Float a figure beside a pretext column</a></li>
+      <li><a href="/demos/pretext-inline.html">Inline images in a rich-inline chat bubble</a></li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Standalone primitives</h2>
+    <ul>
+      <li><a href="/demos/object-fit.html">Single-image <code>object-fit</code> math</a></li>
+      <li><a href="/demos/justified-gallery.html">Justified image gallery</a></li>
+    </ul>
+  </div>
 </body>
 </html>

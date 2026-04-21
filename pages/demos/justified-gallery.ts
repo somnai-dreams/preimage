@@ -1,4 +1,5 @@
-import { prepareWithBoxes, layoutWithRows } from '../../src/layout.js'
+import { prepare } from '../../src/index.js'
+import { packGallery, type GalleryItem } from '../../src/gallery.js'
 
 const SEEDS = [
   'palermo', 'kyoto', 'lisbon', 'reykjavik', 'marrakech',
@@ -20,7 +21,8 @@ const galleryEl = document.getElementById('gallery')!
 
 async function boot(): Promise<void> {
   galleryEl.textContent = 'Loading…'
-  const prepared = await prepareWithBoxes(sources, { defaults: { gap: 8 } })
+  const prepared = await Promise.all(sources.map((s) => prepare(s)))
+  const items: GalleryItem[] = prepared.map((image) => ({ image }))
 
   function paint(): void {
     const rowHeight = Number(rowHeightInput.value)
@@ -28,10 +30,9 @@ async function boot(): Promise<void> {
     rowHeightValue.textContent = String(rowHeight)
     maxWidthValue.textContent = String(maxWidth)
 
-    const { rows } = layoutWithRows(prepared, maxWidth, rowHeight)
+    const rows = packGallery(items, { maxWidth, targetRowHeight: rowHeight, gap: 8 })
     galleryEl.style.width = `${maxWidth}px`
     galleryEl.textContent = ''
-    let y = 0
     for (const row of rows) {
       const rowEl = document.createElement('div')
       rowEl.className = 'row'
@@ -49,9 +50,7 @@ async function boot(): Promise<void> {
         rowEl.appendChild(item)
       }
       galleryEl.appendChild(rowEl)
-      y += row.height + 8
     }
-    void y
   }
 
   paint()

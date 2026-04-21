@@ -1,4 +1,4 @@
-import { prepare, layout, type ObjectFit } from '../../src/layout.js'
+import { prepare, layout, measureNaturalSize, type ObjectFit } from '../../src/index.js'
 
 const BOX_W = 320
 const BOX_H = 180
@@ -13,7 +13,8 @@ async function render(src: string): Promise<void> {
   grid.textContent = 'Loading…'
   try {
     const prepared = await prepare(src)
-    naturalEl.textContent = `natural size: ${Math.round((prepared as any).measurement.naturalWidth)} × ${Math.round((prepared as any).measurement.naturalHeight)}`
+    const nat = measureNaturalSize(prepared)
+    naturalEl.textContent = `natural size: ${Math.round(nat.width)} × ${Math.round(nat.height)}`
     grid.textContent = ''
     for (const fit of FITS) {
       const size = layout(prepared, BOX_W, BOX_H, fit)

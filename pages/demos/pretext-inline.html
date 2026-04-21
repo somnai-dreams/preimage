@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · pretext rich-inline</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font: 14px/1.55 -apple-system, system-ui, sans-serif; margin: 2rem; }
+    .bubble { background: #eef4ff; border-radius: 18px; padding: 14px 18px; max-width: 520px; position: relative; }
+    .row { position: relative; white-space: nowrap; }
+    .row span { position: absolute; font: 17px/24px Inter, -apple-system, system-ui, sans-serif; color: #111; }
+    .row img { position: absolute; border-radius: 4px; display: block; vertical-align: middle; }
+    .controls { margin-bottom: 1rem; }
+    #widthVal { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <h1>Pretext rich-inline — inline measured images in a chat bubble</h1>
+  <p>Preimage's <code>inlineImage()</code> returns a pretext <code>RichInlineItem</code> whose <code>extraWidth</code> reserves the measured image's rendered width. Pretext's rich-inline line walker treats it as an atomic pill and wraps around it naturally.</p>
+  <div class="controls">
+    <label>Bubble width
+      <input id="width" type="range" min="200" max="700" value="420" />
+      <span id="widthVal">420</span>px
+    </label>
+  </div>
+  <div class="bubble" id="bubble"></div>
+  <script type="module" src="./pretext-inline.ts"></script>
+</body>
+</html>
