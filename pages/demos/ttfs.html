@@ -5,70 +5,83 @@
   <title>Preimage · time-to-first-sizing</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root { --bg: #fafafa; --border: #e5e5e5; --muted: #666; }
-    body { font: 15px/1.55 -apple-system, system-ui, sans-serif; margin: 2rem; color: #111; }
-    main { display: grid; grid-template-columns: 1fr 360px; gap: 2rem; align-items: start; }
-    h1 { margin: 0 0 0.25rem; font-size: 1.4rem; }
-    h2 { font-size: 0.95rem; margin: 1.25rem 0 0.3rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-    p { margin: 0.4rem 0; }
-    code, pre { font-family: ui-monospace, Menlo, Consolas, monospace; background: #f0f0f0; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.92em; }
-    pre { padding: 0.6rem 0.75rem; font-size: 12px; line-height: 1.5; }
+    :root { --bg: #fafafa; --border: #e5e5e5; --muted: #666; --frame: #0063ff; --shift: #d9534f; }
+    body { font: 14px/1.5 -apple-system, system-ui, sans-serif; margin: 1.5rem; color: #111; }
+    h1 { margin: 0 0 0.25rem; font-size: 1.35rem; }
+    p { margin: 0.35rem 0; }
+    code { background: #f0f0f0; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em; }
     .controls { margin: 1rem 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-    button { font: inherit; padding: 6px 12px; background: #0063ff; color: #fff; border: 0; border-radius: 3px; cursor: pointer; }
-    button:disabled { background: #ccc; cursor: not-allowed; }
-    .results { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-    .card { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.25rem; }
-    .card h3 { margin: 0 0 0.5rem; font-size: 1rem; }
-    .timing { font-variant-numeric: tabular-nums; font-size: 1.35rem; font-weight: 600; color: #222; }
-    .ratio { color: #0a7f3f; font-size: 1rem; font-weight: 500; margin-left: 0.5rem; }
-    .meta { font-size: 12px; color: var(--muted); margin-top: 0.3rem; }
-    aside { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.25rem; font-size: 13.5px; line-height: 1.5; }
-    aside h2 { margin-top: 0; }
+    button { font: inherit; padding: 6px 14px; background: #0063ff; color: #fff; border: 0; border-radius: 3px; cursor: pointer; }
+    button:disabled { background: #bbb; cursor: not-allowed; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 0.5rem; }
+    .panel { border: 1px solid var(--border); border-radius: 6px; padding: 0.85rem; background: #fff; min-height: 460px; display: flex; flex-direction: column; }
+    .panel h2 { margin: 0; font-size: 0.9rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .panel .sub { font-size: 11.5px; color: var(--muted); margin-bottom: 0.6rem; min-height: 1.1em; }
+    .tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10.5px; letter-spacing: 0.02em; margin-left: 0.5rem; vertical-align: 1px; }
+    .tag.shift { background: #fdeaea; border: 1px solid #f5b7b1; color: #a93226; }
+    .tag.stable { background: #e8f4ea; border: 1px solid #a3d3ab; color: #1e6b33; }
+    .stage { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: flex-start; }
+    .frame-host { position: relative; margin-bottom: 0.5rem; }
+    .image-frame { position: relative; border: 2px dashed var(--frame); border-radius: 4px; background: #f3f7ff; transition: background-color 120ms; display: flex; align-items: center; justify-content: center; color: var(--frame); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; overflow: hidden; }
+    .image-frame.unframed { border: 2px dashed transparent; background: transparent; }
+    .image-frame img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 160ms ease-out; }
+    .image-frame img.loaded { opacity: 1; }
+    .below { font-size: 13px; line-height: 1.45; color: #333; }
+    .events { margin-top: 0.6rem; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; flex-direction: column; gap: 2px; }
+    .events .event { display: flex; justify-content: space-between; }
+    .events .event b { color: #111; font-weight: 600; }
+    .shift-marker { color: var(--shift); font-weight: 600; }
   </style>
 </head>
 <body>
-  <main>
-    <section>
-      <h1>Time-to-first-sizing — <code>image-element</code> vs <code>auto</code> strategy</h1>
-      <p>Generates a large PNG (4000×3000 as a <code>Blob</code>), then calls <code>prepare()</code> with each strategy and measures how long it takes to return dimensions. The <code>auto</code> strategy (default) byte-probes the first ~24 bytes and returns; <code>image-element</code> waits for a full decode.</p>
+  <h1>Time-to-first-sizing — what does measuring earlier actually look like?</h1>
+  <p>Three panels load the same image at the same instant. Each uses a different strategy for knowing the image's dimensions. The blue dashed frame appears the moment each panel <em>knows</em> the image's aspect ratio — watch how much later it appears on the left panel. The image fades in when the browser fully decodes it.</p>
 
-      <div class="controls">
-        <button id="run">Run</button>
-        <span id="blobInfo" class="meta"></span>
-      </div>
+  <div class="controls">
+    <button id="run">Run</button>
+    <span id="meta" class="sub"></span>
+  </div>
 
-      <div class="results">
-        <div class="card">
-          <h3><code>prepare(url, { strategy: 'image-element' })</code></h3>
-          <div class="timing" id="slowTime">—</div>
-          <div class="meta" id="slowMeta">waiting…</div>
+  <div class="grid">
+    <!-- Panel 1: naive, no declared dims -->
+    <div class="panel">
+      <h2>Naive <code>&lt;img src&gt;</code> <span class="tag shift">reflow</span></h2>
+      <div class="sub">No dimensions declared. Layout reserves 0 space until the image fully loads.</div>
+      <div class="stage">
+        <div class="frame-host" id="f1"></div>
+        <div class="below">
+          This paragraph sits below the image. With no declared dimensions, the naive <code>&lt;img&gt;</code> starts at zero height and this text jumps down when the real size arrives.
         </div>
-        <div class="card">
-          <h3><code>prepare(blob)</code> <span class="meta">— default strategy</span></h3>
-          <div class="timing" id="fastTime">— <span class="ratio" id="ratio"></span></div>
-          <div class="meta" id="fastMeta">waiting…</div>
-        </div>
+        <div class="events" id="e1"></div>
       </div>
-    </section>
+    </div>
 
-    <aside>
-      <h2>What this shows</h2>
-      <p>Both API calls return the same <code>{width, height}</code>. Only the pipeline differs. Here the image lives in-memory as a Blob, so the network term is zero; the delta is pure decode vs byte-parse.</p>
-      <p>For remote URLs the default strategy also streams the fetch — dimensions are returned after the first ~2KB arrive, so the full transfer doesn't have to complete before layout can proceed.</p>
+    <!-- Panel 2: native <img width height> -->
+    <div class="panel">
+      <h2>Native <code>&lt;img width height&gt;</code> <span class="tag stable">stable</span></h2>
+      <div class="sub">Author declared the aspect ratio. Browser reserves the frame from t=0 — but you had to know the dimensions ahead of time.</div>
+      <div class="stage">
+        <div class="frame-host" id="f2"></div>
+        <div class="below">
+          This paragraph sits below the image. The browser uses the <code>width</code> and <code>height</code> HTML attributes to reserve the aspect-ratio box at first paint.
+        </div>
+        <div class="events" id="e2"></div>
+      </div>
+    </div>
 
-      <h2>Headline numbers</h2>
-      <pre><code>5MB JPEG over 10 Mbps:
-  image-element strategy:  ~4000ms
-  default (auto):          ~150ms
-
-4000×3000 PNG Blob:
-  image-element strategy:  ~80ms  (decode only)
-  default (auto):          ~5ms   (probe IHDR)</code></pre>
-
-      <h2>When the probe path yields</h2>
-      <p>AVIF, HEIC, or truncated bytes trigger a transparent <code>createImageBitmap</code> fallback on the bytes we already streamed — still faster than a round trip because the bytes are buffered, just without the first-2KB shortcut.</p>
-    </aside>
-  </main>
+    <!-- Panel 3: preimage prepare() -->
+    <div class="panel">
+      <h2><code>await prepare(src)</code> <span class="tag stable">stable</span></h2>
+      <div class="sub">Preimage streams the first bytes and probes the header. Dimensions arrive fast; you never had to know them in advance.</div>
+      <div class="stage">
+        <div class="frame-host" id="f3"></div>
+        <div class="below">
+          This paragraph sits below the image. The measured frame appears as soon as <code>prepare()</code> resolves, long before the full image has been transferred or decoded.
+        </div>
+        <div class="events" id="e3"></div>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="./ttfs.ts"></script>
 </body>

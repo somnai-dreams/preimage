@@ -1,100 +1,47 @@
 import { prepare, getMeasurement } from '../../src/index.js'
 import { packGallery, type GalleryItem } from '../../src/gallery.js'
+import { loadPhotos, UNSPLASH_PHOTOS, type PhotoDescriptor } from './photo-source.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
-const genInfo = document.getElementById('genInfo')!
+const metaEl = document.getElementById('meta')!
 const naivePanel = document.getElementById('naive')!
+const nativePanel = document.getElementById('native')!
 const measuredPanel = document.getElementById('measured')!
 const naiveStat = document.getElementById('naiveStat')!
+const nativeStat = document.getElementById('nativeStat')!
 const measuredStat = document.getElementById('measuredStat')!
 
-const COUNT = 24
-const PANEL_WIDTH = 520
-const ROW_HEIGHT = 140
+const PANEL_WIDTH = 280
+const ROW_HEIGHT = 110
 const GAP = 6
 
-// A spread of aspect ratios so the masonry layout has real variation.
-const ASPECTS: Array<[number, number]> = [
-  [1600, 900], [1200, 900], [800, 1200], [1000, 1000],
-  [1800, 1200], [900, 1600], [1400, 700], [1000, 1400],
-]
-
-async function generateImage(w: number, h: number, hue: number): Promise<Blob> {
-  const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
-  const ctx = canvas.getContext('2d')!
-  const grad = ctx.createLinearGradient(0, 0, w, h)
-  grad.addColorStop(0, `hsl(${hue} 70% 55%)`)
-  grad.addColorStop(1, `hsl(${(hue + 35) % 360} 70% 35%)`)
-  ctx.fillStyle = grad
-  ctx.fillRect(0, 0, w, h)
-  // Add a bit of content so PNG compression doesn't shrink these to nothing.
-  for (let i = 0; i < 40; i++) {
-    ctx.fillStyle = `hsla(${(hue + i * 11) % 360}, 70%, 60%, 0.35)`
-    ctx.beginPath()
-    ctx.arc(Math.random() * w, Math.random() * h, 30 + Math.random() * 140, 0, Math.PI * 2)
-    ctx.fill()
-  }
-  ctx.fillStyle = 'rgba(255,255,255,0.85)'
-  ctx.font = `${Math.round(Math.min(w, h) / 6)}px system-ui`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(`${w}×${h}`, w / 2, h / 2)
-  return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((b) => (b !== null ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png')
+function observeShifts(panel: HTMLElement): { shifts: () => number; stop: () => void } {
+  let shifts = 0
+  let lastHeight = panel.getBoundingClientRect().height
+  const observer = new ResizeObserver(() => {
+    const h = panel.getBoundingClientRect().height
+    if (Math.abs(h - lastHeight) > 0.5) {
+      shifts++
+      lastHeight = h
+    }
   })
+  observer.observe(panel)
+  return { shifts: () => shifts, stop: () => observer.disconnect() }
 }
 
-async function run(): Promise<void> {
-  runButton.disabled = true
-  runButton.textContent = 'Generating…'
+async function renderNaive(blobs: Blob[]): Promise<{ ms: number; shifts: number }> {
+  const t0 = performance.now()
   naivePanel.innerHTML = ''
-  measuredPanel.innerHTML = ''
-  naivePanel.style.minHeight = '520px'
-  measuredPanel.style.minHeight = '520px'
-  naiveStat.textContent = 'generating 24 images…'
-  measuredStat.textContent = 'generating 24 images…'
-  genInfo.textContent = ''
-
-  const blobs: Blob[] = []
-  for (let i = 0; i < COUNT; i++) {
-    const [w, h] = ASPECTS[i % ASPECTS.length]!
-    blobs.push(await generateImage(w, h, (i * 43) % 360))
-  }
-  const totalMB = blobs.reduce((a, b) => a + b.size, 0) / 1024 / 1024
-  genInfo.textContent = `${COUNT} PNG Blobs · ${totalMB.toFixed(1)} MB total`
-
-  runButton.textContent = 'Rendering…'
-
-  // --- Naive path: append <img> with no declared dimensions. ---
-  // Stagger the src assignments slightly so the browser decodes arrive out
-  // of order — closer to how real disk-cold fetches behave over a network.
-  const naiveStart = performance.now()
-  const naiveImgs: HTMLImageElement[] = []
-  for (let i = 0; i < COUNT; i++) {
+  const monitor = observeShifts(naivePanel)
+  const imgs = blobs.map(() => {
     const img = document.createElement('img')
     img.alt = ''
     naivePanel.appendChild(img)
-    naiveImgs.push(img)
-  }
-  const naiveShiftCount = { n: 0, lastHeight: naivePanel.getBoundingClientRect().height }
-  const naiveObserver = new ResizeObserver(() => {
-    const h = naivePanel.getBoundingClientRect().height
-    if (Math.abs(h - naiveShiftCount.lastHeight) > 0.5) {
-      naiveShiftCount.n++
-      naiveShiftCount.lastHeight = h
-    }
+    return img
   })
-  naiveObserver.observe(naivePanel)
-
-  for (let i = 0; i < COUNT; i++) {
-    await new Promise<void>((r) => setTimeout(r, 30 + Math.random() * 70))
-    const url = URL.createObjectURL(blobs[i]!)
-    naiveImgs[i]!.src = url
-  }
+  for (let i = 0; i < blobs.length; i++) imgs[i]!.src = URL.createObjectURL(blobs[i]!)
   await Promise.all(
-    naiveImgs.map(
+    imgs.map(
       (img) =>
         new Promise<void>((resolve) => {
           if (img.complete && img.naturalWidth > 0) resolve()
@@ -102,22 +49,68 @@ async function run(): Promise<void> {
         }),
     ),
   )
-  const naiveEnd = performance.now()
-  naiveObserver.disconnect()
-  naiveStat.textContent = `final height in ${(naiveEnd - naiveStart).toFixed(0)}ms · ${naiveShiftCount.n} layout shifts during load`
+  monitor.stop()
+  return { ms: performance.now() - t0, shifts: monitor.shifts() }
+}
 
-  // --- Preimage path: await all prepare(), then render at known dims. ---
-  const measuredStart = performance.now()
+async function renderNative(
+  blobs: Blob[],
+  photos: readonly PhotoDescriptor[],
+): Promise<{ ms: number; shifts: number; frameReadyAt: number }> {
+  const t0 = performance.now()
+  nativePanel.innerHTML = ''
+  const monitor = observeShifts(nativePanel)
+  // Build all the frames first so the caller-declared aspects reserve
+  // space immediately — this is what <img width height> is designed for.
+  const imgs: HTMLImageElement[] = []
+  for (let i = 0; i < blobs.length; i++) {
+    const p = photos[i]!
+    const frame = document.createElement('span')
+    frame.className = 'frame'
+    frame.style.aspectRatio = `${p.width} / ${p.height}`
+    const img = document.createElement('img')
+    img.width = p.width
+    img.height = p.height
+    img.alt = ''
+    frame.appendChild(img)
+    nativePanel.appendChild(frame)
+    imgs.push(img)
+  }
+  // Reserve-at-t=0 is the whole point of the native strategy.
+  const frameReadyAt = performance.now() - t0
+  for (let i = 0; i < blobs.length; i++) imgs[i]!.src = URL.createObjectURL(blobs[i]!)
+  await Promise.all(
+    imgs.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          const done = (): void => {
+            img.classList.add('loaded')
+            resolve()
+          }
+          if (img.complete && img.naturalWidth > 0) done()
+          else img.onload = done
+        }),
+    ),
+  )
+  monitor.stop()
+  return { ms: performance.now() - t0, shifts: monitor.shifts(), frameReadyAt }
+}
+
+async function renderMeasured(blobs: Blob[]): Promise<{ ms: number; shifts: number; prepareMs: number }> {
+  const t0 = performance.now()
+  measuredPanel.innerHTML = ''
+  const monitor = observeShifts(measuredPanel)
   const prepared = await Promise.all(blobs.map((b) => prepare(b)))
-  const measuredAfterPrepare = performance.now()
+  const prepareMs = performance.now() - t0
+
   const items: GalleryItem[] = prepared.map((image) => ({ image }))
   const rows = packGallery(items, {
-    maxWidth: PANEL_WIDTH - 24,
+    maxWidth: PANEL_WIDTH - 20,
     targetRowHeight: ROW_HEIGHT,
     gap: GAP,
   })
-  measuredPanel.innerHTML = ''
-  measuredPanel.style.minHeight = ''
+
+  const imgs: HTMLImageElement[] = []
   for (const row of rows) {
     const rowEl = document.createElement('div')
     rowEl.className = 'row'
@@ -131,14 +124,69 @@ async function run(): Promise<void> {
       item.style.height = `${p.height}px`
       const img = document.createElement('img')
       img.src = url
-      img.loading = 'lazy'
       item.appendChild(img)
       rowEl.appendChild(item)
+      imgs.push(img)
     }
     measuredPanel.appendChild(rowEl)
   }
-  const measuredEnd = performance.now()
-  measuredStat.textContent = `measured ${COUNT} images in ${(measuredAfterPrepare - measuredStart).toFixed(0)}ms · rendered in ${(measuredEnd - measuredAfterPrepare).toFixed(0)}ms · 0 layout shifts`
+
+  // Fade the photos in when the browser finishes decoding each, so the
+  // frames visibly precede the filled imagery.
+  await Promise.all(
+    imgs.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          const done = (): void => {
+            img.classList.add('loaded')
+            resolve()
+          }
+          if (img.complete && img.naturalWidth > 0) done()
+          else img.onload = done
+        }),
+    ),
+  )
+  monitor.stop()
+  return { ms: performance.now() - t0, shifts: monitor.shifts(), prepareMs }
+}
+
+async function run(): Promise<void> {
+  runButton.disabled = true
+  runButton.textContent = 'Loading photos…'
+  naivePanel.innerHTML = ''
+  nativePanel.innerHTML = ''
+  measuredPanel.innerHTML = ''
+  naivePanel.style.minHeight = '500px'
+  nativePanel.style.minHeight = '500px'
+  measuredPanel.style.minHeight = '500px'
+  naiveStat.textContent = 'loading…'
+  nativeStat.textContent = 'loading…'
+  measuredStat.textContent = 'loading…'
+
+  const loaded = await loadPhotos(UNSPLASH_PHOTOS, 800)
+  const blobs = loaded.map((l) => l.blob)
+  const origins = loaded.map((l) => l.origin)
+  const unsplashCount = origins.filter((o) => o === 'unsplash').length
+  const totalMB = blobs.reduce((a, b) => a + b.size, 0) / 1024 / 1024
+  metaEl.textContent = `${UNSPLASH_PHOTOS.length} photos · ${totalMB.toFixed(1)} MB · ${unsplashCount > 0 ? `${unsplashCount}/${blobs.length} from Unsplash` : 'Unsplash offline — using canvas fallbacks at the same aspects'}`
+
+  runButton.textContent = 'Rendering…'
+  naiveStat.textContent = 'rendering…'
+  nativeStat.textContent = 'rendering…'
+  measuredStat.textContent = 'rendering…'
+
+  const [naive, native, measured] = await Promise.all([
+    renderNaive(blobs),
+    renderNative(blobs, UNSPLASH_PHOTOS),
+    renderMeasured(blobs),
+  ])
+
+  naivePanel.style.minHeight = ''
+  nativePanel.style.minHeight = ''
+  measuredPanel.style.minHeight = ''
+  naiveStat.textContent = `fully loaded in ${naive.ms.toFixed(0)}ms · ${naive.shifts} layout shifts`
+  nativeStat.textContent = `frames reserved at t=${native.frameReadyAt.toFixed(0)}ms · fully loaded at ${native.ms.toFixed(0)}ms · ${native.shifts} layout shifts`
+  measuredStat.textContent = `measured in ${measured.prepareMs.toFixed(0)}ms · fully loaded at ${measured.ms.toFixed(0)}ms · ${measured.shifts} layout shifts`
 
   runButton.textContent = 'Run again'
   runButton.disabled = false

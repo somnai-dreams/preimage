@@ -1,92 +1,198 @@
-import {
-  prepare,
-  getMeasurement,
-  clearMeasurementCaches,
-} from '../../src/index.js'
+import { prepare, getMeasurement } from '../../src/index.js'
+import { loadPhoto, UNSPLASH_PHOTOS } from './photo-source.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
-const blobInfo = document.getElementById('blobInfo')!
-const slowTime = document.getElementById('slowTime')!
-const slowMeta = document.getElementById('slowMeta')!
-const fastTime = document.getElementById('fastTime')!
-const fastMeta = document.getElementById('fastMeta')!
-const ratio = document.getElementById('ratio')!
+const metaEl = document.getElementById('meta')!
+const f1 = document.getElementById('f1')!
+const f2 = document.getElementById('f2')!
+const f3 = document.getElementById('f3')!
+const e1 = document.getElementById('e1')!
+const e2 = document.getElementById('e2')!
+const e3 = document.getElementById('e3')!
 
-async function makeLargePng(width: number, height: number): Promise<Blob> {
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext('2d')!
-  const grad = ctx.createLinearGradient(0, 0, width, height)
-  grad.addColorStop(0, '#0052cc')
-  grad.addColorStop(1, '#ffb600')
-  ctx.fillStyle = grad
-  ctx.fillRect(0, 0, width, height)
-  for (let i = 0; i < 400; i++) {
-    ctx.fillStyle = `hsla(${(i * 37) % 360}, 70%, 55%, 0.4)`
-    ctx.beginPath()
-    ctx.arc(Math.random() * width, Math.random() * height, 20 + Math.random() * 120, 0, Math.PI * 2)
-    ctx.fill()
-  }
-  return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((b) => (b !== null ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png')
-  })
+const PANEL_WIDTH = 280
+const MAX_FRAME_HEIGHT = 220
+
+type Event = { label: string; t: number; note?: string }
+
+function setFrame(host: HTMLElement, width: number, height: number, label: string, framed: boolean): HTMLElement {
+  host.innerHTML = ''
+  const frame = document.createElement('div')
+  frame.className = 'image-frame' + (framed ? '' : ' unframed')
+  frame.style.width = `${width}px`
+  frame.style.height = `${height}px`
+  if (framed) frame.textContent = label
+  host.appendChild(frame)
+  return frame
 }
 
-function fmt(ms: number): string {
-  if (ms >= 1) return `${ms.toFixed(1)}ms`
-  return `${(ms * 1000).toFixed(0)}µs`
+function renderEvents(host: HTMLElement, events: Event[], shifts: number): void {
+  host.innerHTML = ''
+  for (const ev of events) {
+    const row = document.createElement('div')
+    row.className = 'event'
+    const label = document.createElement('span')
+    label.textContent = ev.label
+    const time = document.createElement('span')
+    time.innerHTML = `<b>${ev.t.toFixed(1)}ms</b>${ev.note ? ` · ${ev.note}` : ''}`
+    row.appendChild(label)
+    row.appendChild(time)
+    host.appendChild(row)
+  }
+  if (shifts > 0) {
+    const row = document.createElement('div')
+    row.className = 'event'
+    const label = document.createElement('span')
+    label.textContent = 'layout shifts observed'
+    const time = document.createElement('span')
+    time.innerHTML = `<span class="shift-marker">${shifts}</span>`
+    row.appendChild(label)
+    row.appendChild(time)
+    host.appendChild(row)
+  }
+}
+
+function observePanel(panel: HTMLElement): { shifts: () => number; stop: () => void } {
+  let shifts = 0
+  let lastHeight = panel.getBoundingClientRect().height
+  const observer = new ResizeObserver(() => {
+    const h = panel.getBoundingClientRect().height
+    if (Math.abs(h - lastHeight) > 0.5) {
+      shifts++
+      lastHeight = h
+    }
+  })
+  observer.observe(panel)
+  return { shifts: () => shifts, stop: () => observer.disconnect() }
+}
+
+// Each strategy takes a Blob (so the byte-arrival time is identical across
+// panels) and reports back when the dims become known + when the image is
+// fully painted. They all run concurrently.
+async function runNaive(blob: Blob, width: number): Promise<{ events: Event[]; shifts: number }> {
+  const host = f1
+  host.innerHTML = ''
+  const stage = host.parentElement!
+  const monitor = observePanel(stage)
+  const t0 = performance.now()
+  const img = document.createElement('img')
+  img.style.maxWidth = `${width}px`
+  img.style.display = 'block'
+  host.appendChild(img)
+  const events: Event[] = []
+  await new Promise<void>((resolve) => {
+    img.onload = () => {
+      events.push({ label: 'dims known (onload)', t: performance.now() - t0 })
+      events.push({ label: 'image painted', t: performance.now() - t0 })
+      resolve()
+    }
+    img.src = URL.createObjectURL(blob)
+  })
+  monitor.stop()
+  return { events, shifts: monitor.shifts() }
+}
+
+async function runNative(
+  blob: Blob,
+  declaredWidth: number,
+  declaredHeight: number,
+  displayWidth: number,
+): Promise<{ events: Event[]; shifts: number }> {
+  const host = f2
+  host.innerHTML = ''
+  const stage = host.parentElement!
+  const monitor = observePanel(stage)
+  const t0 = performance.now()
+  const scale = displayWidth / declaredWidth
+  const frameH = Math.min(declaredHeight * scale, MAX_FRAME_HEIGHT)
+  const frameW = frameH * (declaredWidth / declaredHeight)
+  const frame = setFrame(host, frameW, frameH, `reserved ${declaredWidth}×${declaredHeight}`, true)
+  const events: Event[] = [{ label: 'dims known (from attrs)', t: performance.now() - t0 }]
+  const img = document.createElement('img')
+  img.width = declaredWidth
+  img.height = declaredHeight
+  frame.appendChild(img)
+  await new Promise<void>((resolve) => {
+    img.onload = () => {
+      img.classList.add('loaded')
+      events.push({ label: 'image painted', t: performance.now() - t0 })
+      resolve()
+    }
+    img.src = URL.createObjectURL(blob)
+  })
+  monitor.stop()
+  return { events, shifts: monitor.shifts() }
+}
+
+async function runPreimage(
+  blob: Blob,
+  displayWidth: number,
+): Promise<{ events: Event[]; shifts: number }> {
+  const host = f3
+  host.innerHTML = ''
+  const stage = host.parentElement!
+  const monitor = observePanel(stage)
+  const t0 = performance.now()
+  const prepared = await prepare(blob)
+  const m = getMeasurement(prepared)
+  const dimsKnownAt = performance.now() - t0
+  const scale = displayWidth / m.naturalWidth
+  const frameH = Math.min(m.naturalHeight * scale, MAX_FRAME_HEIGHT)
+  const frameW = frameH * (m.naturalWidth / m.naturalHeight)
+  const frame = setFrame(host, frameW, frameH, `measured ${m.naturalWidth}×${m.naturalHeight}`, true)
+  const events: Event[] = [
+    { label: 'dims known (prepare)', t: dimsKnownAt, note: `${m.naturalWidth}×${m.naturalHeight}` },
+  ]
+  const img = document.createElement('img')
+  img.src = m.blobUrl ?? URL.createObjectURL(blob)
+  frame.appendChild(img)
+  await new Promise<void>((resolve) => {
+    if (img.complete && img.naturalWidth > 0) {
+      img.classList.add('loaded')
+      events.push({ label: 'image painted', t: performance.now() - t0 })
+      resolve()
+    } else {
+      img.onload = () => {
+        img.classList.add('loaded')
+        events.push({ label: 'image painted', t: performance.now() - t0 })
+        resolve()
+      }
+    }
+  })
+  monitor.stop()
+  return { events, shifts: monitor.shifts() }
 }
 
 async function run(): Promise<void> {
   runButton.disabled = true
-  runButton.textContent = 'Generating PNG…'
-  slowTime.textContent = '—'
-  fastTime.textContent = '—'
-  ratio.textContent = ''
-  slowMeta.textContent = 'waiting…'
-  fastMeta.textContent = 'waiting…'
+  runButton.textContent = 'Loading photo…'
+  metaEl.textContent = ''
+  // Reset panels.
+  f1.innerHTML = ''
+  f2.innerHTML = ''
+  f3.innerHTML = ''
+  e1.innerHTML = ''
+  e2.innerHTML = ''
+  e3.innerHTML = ''
 
-  const blob = await makeLargePng(4000, 3000)
-  blobInfo.textContent = `Blob: ${(blob.size / 1024 / 1024).toFixed(2)} MB PNG, 4000×3000`
+  const photo = UNSPLASH_PHOTOS[0]!
+  const { blob, origin } = await loadPhoto(photo, 1600, 200)
+  metaEl.textContent = `${photo.caption ?? photo.slug} · ${photo.width}×${photo.height} · ${(blob.size / 1024 / 1024).toFixed(2)} MB · ${origin === 'unsplash' ? 'Unsplash (live)' : 'Unsplash offline — canvas fallback at same aspect'}`
 
-  runButton.textContent = 'Measuring…'
+  runButton.textContent = 'Running…'
 
-  // The default strategy ('auto') uses byte-probing. 'image-element'
-  // forces the classic HTMLImageElement.decode() path. Same API, just
-  // different pipelines under the hood.
-  async function time(strategy: 'image-element' | 'auto'): Promise<{ ms: number; w: number; h: number }> {
-    clearMeasurementCaches()
-    const url = URL.createObjectURL(blob)
-    const t0 = performance.now()
-    const prepared =
-      strategy === 'image-element'
-        ? await prepare(url, { strategy: 'image-element' })
-        : await prepare(blob) // Blob path probes directly, no URL indirection
-    const t1 = performance.now()
-    const m = getMeasurement(prepared)
-    URL.revokeObjectURL(url)
-    return { ms: t1 - t0, w: m.naturalWidth, h: m.naturalHeight }
-  }
+  // All three pipelines start from the SAME Blob at the SAME tick, so any
+  // timing differences are strategy differences, not input-arrival
+  // differences.
+  const [naive, native, preimaged] = await Promise.all([
+    runNaive(blob, PANEL_WIDTH),
+    runNative(blob, photo.width, photo.height, PANEL_WIDTH),
+    runPreimage(blob, PANEL_WIDTH),
+  ])
 
-  await time('image-element') // warmup
-  const slow1 = await time('image-element')
-  const slow2 = await time('image-element')
-  const slowMs = Math.min(slow1.ms, slow2.ms)
-
-  await time('auto') // warmup
-  const fast1 = await time('auto')
-  const fast2 = await time('auto')
-  const fastMs = Math.min(fast1.ms, fast2.ms)
-
-  slowTime.textContent = fmt(slowMs)
-  slowMeta.textContent = `${slow1.w}×${slow1.h} · best of 2 (ignoring warmup)`
-
-  fastTime.textContent = fmt(fastMs)
-  fastMeta.textContent = `${fast1.w}×${fast1.h} · best of 2 (ignoring warmup)`
-
-  const r = slowMs / fastMs
-  ratio.textContent = r >= 1 ? `${r.toFixed(1)}× faster` : `${(1 / r).toFixed(1)}× slower`
+  renderEvents(e1, naive.events, naive.shifts)
+  renderEvents(e2, native.events, native.shifts)
+  renderEvents(e3, preimaged.events, preimaged.shifts)
 
   runButton.textContent = 'Run again'
   runButton.disabled = false

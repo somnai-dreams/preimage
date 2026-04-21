@@ -24,16 +24,21 @@
   <p>The demos below are grouped the same way.</p>
 
   <h2>Reflow comparisons — cache-cold first loads</h2>
-  <p>Fresh blob URLs per run, browser has never seen them. Shows the layout behavior difference between a naive approach that discovers dimensions as images arrive, and preimage + pretext laying out once with measured inputs.</p>
+  <p>Fresh photos per run (Unsplash when online, canvas fallback otherwise). Each demo runs three panels in parallel at the same start time: a naive baseline, a <em>native</em> declared-dimensions baseline (what modern HTML gives you for free if the author knew the dimensions), and the preimage/pretext path. Blue dashed frames appear the moment each panel <em>knows</em> the image's dimensions; photos fade in when decode completes.</p>
+
+  <div class="demo">
+    <h3><a href="./ttfs">Time-to-first-sizing — one photo, three strategies</a></h3>
+    <p>The simplest visualization: one photo, side-by-side panels. Timestamps show when each strategy knows the dimensions and when the image finishes loading.</p>
+  </div>
 
   <div class="demo">
     <h3><a href="./masonry">Masonry grid</a></h3>
-    <p>24 fresh images, varied aspect ratios, dropped into a 2-up side-by-side comparison. Left: naive <code>&lt;img&gt;</code>s — layout shifts as each one decodes. Right: <code>prepare()</code> → <code>packGallery()</code> — grid paints once at final dimensions.</p>
+    <p>Eight photos into a grid. Left: naive <code>&lt;img&gt;</code>s, layout shifts as each one decodes. Middle: <code>&lt;img width height&gt;</code> — reserves frames from t=0 if you knew the dimensions ahead of time. Right: <code>prepare()</code> + <code>packGallery()</code> — measured rects, no author attributes required.</p>
   </div>
 
   <div class="demo">
     <h3><a href="./editorial">Editorial article with floats</a></h3>
-    <p>An article with 3 floated figures. Left: naive HTML — text reflows as each figure loads. Right: pretext measures the text, preimage measures the figures, <code>flowColumnWithFloats</code> lays out the column in one synchronous pass.</p>
+    <p>An article with 3 floated figures. Left: naive HTML. Middle: HTML floats with declared <code>width</code>/<code>height</code>. Right: pretext measures the text, preimage measures the figures, <code>flowColumnWithFloats</code> lays out the column in one synchronous pass.</p>
   </div>
 
   <h2>Without pretext</h2>
@@ -42,11 +47,6 @@
   <div class="demo">
     <h3><a href="./canvas-fit">Canvas fit</a></h3>
     <p>Draws an image to a canvas at the correct object-fit rect. Compares a naive <code>drawImage(img, 0, 0, w, h)</code> (stretched) against <code>layout(prepared, w, h, fit)</code> + <code>drawImage(img, r.x, r.y, r.w, r.h)</code> (correctly fit).</p>
-  </div>
-
-  <div class="demo">
-    <h3><a href="./ttfs">Time-to-first-sizing — default <code>prepare</code> vs <code>image-element</code> strategy</a></h3>
-    <p>Generates a 4000×3000 PNG Blob and measures how fast each pipeline returns dimensions. The default byte-probe path returns in ~700µs; the <code>image-element</code> strategy waits for a full decode.</p>
   </div>
 
   <h2>With pretext</h2>
