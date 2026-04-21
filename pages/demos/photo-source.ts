@@ -1,38 +1,44 @@
 // Shared helper for the reflow-comparison demos: load a real photo from
-// Unsplash (when the network allows it) or fall back to a locally-generated
-// canvas Blob that mimics the same aspect ratio. All demos use this so
-// every panel starts from the same Blob set — the comparison stays fair
-// even when the network isn't available.
+// picsum.photos (when the network allows) or fall back to a locally-
+// generated canvas Blob at the same aspect ratio. Every demo uses this
+// so all panels start from the same Blob set — the comparison stays
+// fair even when the network isn't available.
+//
+// We use picsum.photos rather than images.unsplash.com directly because
+// picsum serves photos with open CORS, exact-dimension URLs, and stable
+// seeded results. (Direct Unsplash URLs require an API key and don't
+// always honor requested dimensions.)
 
 export type PhotoDescriptor = {
-  slug: string // Unsplash photo id
+  seed: string // picsum seed — same seed always returns the same photo
   width: number
   height: number
   caption?: string
 }
 
-// Curated Unsplash photos with stable IDs. Each aspect ratio is distinct
-// so the masonry packer has variety to work with. Using fixed IDs means
-// demos look the same across runs when online.
-export const UNSPLASH_PHOTOS: PhotoDescriptor[] = [
-  { slug: 'JmVaNyemtN8', width: 1600, height: 1067, caption: 'mountain lake' },
-  { slug: 'sNr_MitXwQY', width: 1200, height: 1600, caption: 'portrait figure' },
-  { slug: 'FV3GConVSss', width: 1800, height: 1200, caption: 'autumn forest' },
-  { slug: 'DqgMHzeio7Q', width: 1600, height: 900, caption: 'cityscape' },
-  { slug: 'T87DV5FvtEE', width: 1000, height: 1400, caption: 'architecture' },
-  { slug: 'B8A7wFrGCIY', width: 1500, height: 1000, caption: 'ocean shore' },
-  { slug: 'gKXKBY-C-Dk', width: 1400, height: 1400, caption: 'square still' },
-  { slug: '4hbJ-eymZ1o', width: 1800, height: 1200, caption: 'desert' },
+// Curated seeds with distinct aspect ratios so the masonry packer has
+// variety to work with. Seeds are stable: reloading the demo returns
+// the same photos.
+export const PICSUM_PHOTOS: PhotoDescriptor[] = [
+  { seed: 'preimage-mountain', width: 1600, height: 1067, caption: 'landscape' },
+  { seed: 'preimage-portrait', width: 1200, height: 1600, caption: 'portrait' },
+  { seed: 'preimage-forest', width: 1800, height: 1200, caption: 'forest' },
+  { seed: 'preimage-city', width: 1600, height: 900, caption: 'cityscape' },
+  { seed: 'preimage-arch', width: 1000, height: 1400, caption: 'architecture' },
+  { seed: 'preimage-shore', width: 1500, height: 1000, caption: 'shore' },
+  { seed: 'preimage-square', width: 1400, height: 1400, caption: 'square' },
+  { seed: 'preimage-desert', width: 1800, height: 1200, caption: 'desert' },
 ]
 
-function unsplashUrl(slug: string, width: number): string {
-  // `&q=80` keeps the file small enough to stream quickly while still
-  // looking like a real photo on the screen.
-  return `https://images.unsplash.com/photo-${slug}?w=${width}&q=80&auto=format&fit=crop`
+// Back-compat alias for any older demo still importing the Unsplash name.
+export const UNSPLASH_PHOTOS = PICSUM_PHOTOS
+
+function picsumUrl(p: PhotoDescriptor): string {
+  return `https://picsum.photos/seed/${encodeURIComponent(p.seed)}/${p.width}/${p.height}`
 }
 
-// Canvas fallback: paint something photo-like (gradient + noise + vignette)
-// that keeps the exact aspect ratio. Used when Unsplash isn't reachable.
+// Canvas fallback: paint something photo-like (gradient + bokeh + vignette)
+// at the exact aspect ratio. Used when picsum isn't reachable.
 async function generateFallback(
   width: number,
   height: number,
@@ -49,14 +55,12 @@ async function generateFallback(
   grad.addColorStop(1, `hsl(${(hue + 200) % 360} 45% 18%)`)
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, width, height)
-  // Large soft blobs to feel like bokeh.
   for (let i = 0; i < 30; i++) {
     ctx.fillStyle = `hsla(${(hue + i * 17) % 360}, 55%, 65%, 0.12)`
     ctx.beginPath()
     ctx.arc(Math.random() * width, Math.random() * height, 80 + Math.random() * 240, 0, Math.PI * 2)
     ctx.fill()
   }
-  // Vignette.
   const vign = ctx.createRadialGradient(
     width / 2, height / 2, Math.min(width, height) / 3,
     width / 2, height / 2, Math.max(width, height) * 0.7,
@@ -65,7 +69,6 @@ async function generateFallback(
   vign.addColorStop(1, 'rgba(0,0,0,0.45)')
   ctx.fillStyle = vign
   ctx.fillRect(0, 0, width, height)
-  // Caption stamp.
   ctx.fillStyle = 'rgba(255,255,255,0.75)'
   ctx.font = `${Math.round(Math.min(width, height) / 14)}px system-ui`
   ctx.textAlign = 'center'
@@ -73,7 +76,7 @@ async function generateFallback(
   ctx.fillText(caption, width / 2, height / 2)
   ctx.font = `${Math.round(Math.min(width, height) / 28)}px system-ui`
   ctx.fillStyle = 'rgba(255,255,255,0.5)'
-  ctx.fillText('(Unsplash offline fallback)', width / 2, height / 2 + Math.min(width, height) / 10)
+  ctx.fillText('(picsum offline — canvas fallback)', width / 2, height / 2 + Math.min(width, height) / 10)
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (b) => (b !== null ? resolve(b) : reject(new Error('toBlob failed'))),
@@ -83,19 +86,15 @@ async function generateFallback(
   })
 }
 
-// Load one photo. Tries Unsplash first; if the fetch fails (CORS, offline,
-// host_not_allowed in sandboxed contexts), generates a canvas-based
-// fallback at the same aspect ratio.
 export async function loadPhoto(
   p: PhotoDescriptor,
-  renderWidth: number,
   fallbackHue: number,
-): Promise<{ blob: Blob; origin: 'unsplash' | 'fallback' }> {
+): Promise<{ blob: Blob; origin: 'picsum' | 'fallback' }> {
   try {
-    const res = await fetch(unsplashUrl(p.slug, renderWidth), { mode: 'cors' })
+    const res = await fetch(picsumUrl(p), { mode: 'cors' })
     if (!res.ok) throw new Error(`status ${res.status}`)
     const blob = await res.blob()
-    return { blob, origin: 'unsplash' }
+    return { blob, origin: 'picsum' }
   } catch {
     const blob = await generateFallback(
       p.width,
@@ -109,9 +108,8 @@ export async function loadPhoto(
 
 export async function loadPhotos(
   photos: readonly PhotoDescriptor[],
-  renderWidth: number,
-): Promise<Array<{ blob: Blob; origin: 'unsplash' | 'fallback' }>> {
+): Promise<Array<{ blob: Blob; origin: 'picsum' | 'fallback' }>> {
   return await Promise.all(
-    photos.map((p, i) => loadPhoto(p, renderWidth, (i * 43) % 360)),
+    photos.map((p, i) => loadPhoto(p, (i * 43) % 360)),
   )
 }

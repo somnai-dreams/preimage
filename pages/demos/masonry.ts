@@ -1,6 +1,6 @@
 import { prepare, getMeasurement } from '../../src/index.js'
 import { packGallery, type GalleryItem } from '../../src/gallery.js'
-import { loadPhotos, UNSPLASH_PHOTOS, type PhotoDescriptor } from './photo-source.js'
+import { loadPhotos, PICSUM_PHOTOS, type PhotoDescriptor } from './photo-source.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -163,12 +163,12 @@ async function run(): Promise<void> {
   nativeStat.textContent = 'loading…'
   measuredStat.textContent = 'loading…'
 
-  const loaded = await loadPhotos(UNSPLASH_PHOTOS, 800)
+  const loaded = await loadPhotos(PICSUM_PHOTOS)
   const blobs = loaded.map((l) => l.blob)
   const origins = loaded.map((l) => l.origin)
-  const unsplashCount = origins.filter((o) => o === 'unsplash').length
+  const picsumCount = origins.filter((o) => o === 'picsum').length
   const totalMB = blobs.reduce((a, b) => a + b.size, 0) / 1024 / 1024
-  metaEl.textContent = `${UNSPLASH_PHOTOS.length} photos · ${totalMB.toFixed(1)} MB · ${unsplashCount > 0 ? `${unsplashCount}/${blobs.length} from Unsplash` : 'Unsplash offline — using canvas fallbacks at the same aspects'}`
+  metaEl.textContent = `${PICSUM_PHOTOS.length} photos · ${totalMB.toFixed(1)} MB · ${picsumCount > 0 ? `${picsumCount}/${blobs.length} from picsum.photos` : 'picsum offline — using canvas fallbacks at the same aspects'}`
 
   runButton.textContent = 'Rendering…'
   naiveStat.textContent = 'rendering…'
@@ -177,7 +177,7 @@ async function run(): Promise<void> {
 
   const [naive, native, measured] = await Promise.all([
     renderNaive(blobs),
-    renderNative(blobs, UNSPLASH_PHOTOS),
+    renderNative(blobs, PICSUM_PHOTOS),
     renderMeasured(blobs),
   ])
 

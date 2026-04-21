@@ -1,5 +1,5 @@
 import { prepare, getMeasurement } from '../../src/index.js'
-import { loadPhoto, UNSPLASH_PHOTOS } from './photo-source.js'
+import { loadPhoto, PICSUM_PHOTOS } from './photo-source.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -175,9 +175,9 @@ async function run(): Promise<void> {
   e2.innerHTML = ''
   e3.innerHTML = ''
 
-  const photo = UNSPLASH_PHOTOS[0]!
-  const { blob, origin } = await loadPhoto(photo, 1600, 200)
-  metaEl.textContent = `${photo.caption ?? photo.slug} · ${photo.width}×${photo.height} · ${(blob.size / 1024 / 1024).toFixed(2)} MB · ${origin === 'unsplash' ? 'Unsplash (live)' : 'Unsplash offline — canvas fallback at same aspect'}`
+  const photo = PICSUM_PHOTOS[0]!
+  const { blob, origin } = await loadPhoto(photo, 200)
+  metaEl.textContent = `${photo.caption ?? photo.seed} · ${photo.width}×${photo.height} · ${(blob.size / 1024 / 1024).toFixed(2)} MB · ${origin === 'picsum' ? 'picsum.photos (live)' : 'picsum offline — canvas fallback at same aspect'}`
 
   runButton.textContent = 'Running…'
 

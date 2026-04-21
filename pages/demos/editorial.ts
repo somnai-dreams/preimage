@@ -24,9 +24,9 @@ The middle panel shows the simplest modern answer: declare the image width and h
 The right panel uses preimage plus pretext. Preimage measures each figure in a pre-layout pass, streaming the first kilobytes of each file's bytes via a header probe. Pretext lays out the text around those measured rects synchronously. No shift, no skeleton swap, no author-declared attributes — and nothing that depends on the server cooperating.`
 
 const FIGURES: readonly PhotoDescriptor[] = [
-  { slug: 'JmVaNyemtN8', width: 1600, height: 1067, caption: 'mountain lake' },
-  { slug: 'DqgMHzeio7Q', width: 1600, height: 900, caption: 'cityscape' },
-  { slug: 'T87DV5FvtEE', width: 1000, height: 1400, caption: 'architecture' },
+  { seed: 'preimage-editorial-1', width: 1600, height: 1067, caption: 'landscape' },
+  { seed: 'preimage-editorial-2', width: 1600, height: 900, caption: 'cityscape' },
+  { seed: 'preimage-editorial-3', width: 1000, height: 1400, caption: 'portrait' },
 ]
 
 const FIGURE_TOPS = [0, 170, 330]
@@ -202,12 +202,12 @@ async function run(): Promise<void> {
   nativeStat.textContent = 'loading…'
   measuredStat.textContent = 'loading…'
 
-  const loaded = await loadPhotos(FIGURES, 900)
+  const loaded = await loadPhotos(FIGURES)
   const blobs = loaded.map((l) => l.blob)
   const origins = loaded.map((l) => l.origin)
-  const unsplashCount = origins.filter((o) => o === 'unsplash').length
+  const picsumCount = origins.filter((o) => o === 'picsum').length
   const totalMB = blobs.reduce((a, b) => a + b.size, 0) / 1024 / 1024
-  metaEl.textContent = `${FIGURES.length} photos · ${totalMB.toFixed(1)} MB · ${unsplashCount > 0 ? `${unsplashCount}/${blobs.length} from Unsplash` : 'Unsplash offline — using canvas fallbacks at the same aspects'}`
+  metaEl.textContent = `${FIGURES.length} photos · ${totalMB.toFixed(1)} MB · ${picsumCount > 0 ? `${picsumCount}/${blobs.length} from picsum.photos` : 'picsum offline — using canvas fallbacks at the same aspects'}`
 
   runButton.textContent = 'Rendering…'
   naiveStat.textContent = 'rendering…'
