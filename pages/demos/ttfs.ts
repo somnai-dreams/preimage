@@ -35,6 +35,38 @@ function renderEvents(host: HTMLElement, events: Event[], shifts: number): void 
   host.appendChild(shiftRow)
 }
 
+// Pre-render event row placeholders so the panel's final height is
+// reserved on page load — the real values drop in without a reflow
+// once the run completes.
+function renderEventsPlaceholder(host: HTMLElement, labels: readonly string[]): void {
+  host.innerHTML = ''
+  for (const label of labels) {
+    const row = document.createElement('div')
+    row.className = 'row'
+    row.innerHTML = `<span>${label}</span><span><b>—</b></span>`
+    host.appendChild(row)
+  }
+  const shiftRow = document.createElement('div')
+  shiftRow.className = 'row'
+  shiftRow.innerHTML = '<span>visible shifts</span><span><b>—</b></span>'
+  host.appendChild(shiftRow)
+}
+
+const NAIVE_EVENTS = ['dims known (onload)', 'image painted']
+const NATIVE_EVENTS = ['dims known (from attrs)', 'image painted']
+const PREIMAGE_EVENTS = ['dims known (prepare)', 'image painted']
+
+function renderAllPlaceholders(): void {
+  renderEventsPlaceholder(e1, NAIVE_EVENTS)
+  renderEventsPlaceholder(e2, NATIVE_EVENTS)
+  renderEventsPlaceholder(e3, PREIMAGE_EVENTS)
+}
+
+function getCacheBust(): string | null {
+  const checked = document.querySelector<HTMLInputElement>('input[name="cache"]:checked')
+  return checked?.value === 'off' ? null : newCacheBustToken()
+}
+
 function aspectFrame(
   host: HTMLElement,
   naturalW: number,
@@ -156,19 +188,19 @@ async function run(): Promise<void> {
   f1.innerHTML = ''
   f2.innerHTML = ''
   f3.innerHTML = ''
-  e1.innerHTML = ''
-  e2.innerHTML = ''
-  e3.innerHTML = ''
+  renderAllPlaceholders()
 
   const photo = PICSUM_PHOTOS[0]!
   const useLive = await picsumReachable()
-  const cacheBust = newCacheBustToken()
+  const cacheBust = getCacheBust()
   runButton.textContent = useLive ? 'Fetching from picsum…' : 'Generating fallback…'
   const resolved = await resolvePhotoUrl(photo, cacheBust, useLive, 200)
 
   metaEl.textContent =
     `${photo.caption ?? photo.seed} · ${photo.width}×${photo.height} · ` +
-    (useLive ? 'picsum.photos (cache-busted — real network)' : 'picsum offline — canvas fallback (same aspect, no network term)')
+    (useLive
+      ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
+      : 'picsum offline — canvas fallback (same aspect, no network term)')
 
   runButton.textContent = 'Running…'
 
@@ -192,4 +224,6 @@ async function run(): Promise<void> {
 runButton.addEventListener('click', () => {
   void run()
 })
+
+renderAllPlaceholders()
 void run()

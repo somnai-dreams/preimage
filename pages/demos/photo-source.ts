@@ -27,10 +27,13 @@ export const PICSUM_PHOTOS: PhotoDescriptor[] = [
 // Back-compat alias.
 export const UNSPLASH_PHOTOS = PICSUM_PHOTOS
 
-export function picsumUrl(p: PhotoDescriptor, cacheBust: string): string {
+export function picsumUrl(p: PhotoDescriptor, cacheBust: string | null): string {
   // picsum ignores unknown query params but the browser keys its cache on
-  // the full URL, so this forces a real network fetch each run.
-  return `https://picsum.photos/seed/${encodeURIComponent(p.seed)}/${p.width}/${p.height}?_=${cacheBust}`
+  // the full URL, so when `cacheBust` is set it forces a real network
+  // fetch each run. When null, the canonical URL is used and the
+  // browser's HTTP cache takes over on subsequent runs.
+  const base = `https://picsum.photos/seed/${encodeURIComponent(p.seed)}/${p.width}/${p.height}`
+  return cacheBust === null ? base : `${base}?_=${cacheBust}`
 }
 
 export function newCacheBustToken(): string {
@@ -114,7 +117,7 @@ export async function picsumReachable(): Promise<boolean> {
 // fallback that carries the same aspect ratio.
 export async function resolvePhotoUrl(
   p: PhotoDescriptor,
-  cacheBust: string,
+  cacheBust: string | null,
   useLive: boolean,
   hue: number,
 ): Promise<{ url: string; origin: 'picsum' | 'fallback' }> {
@@ -127,7 +130,7 @@ export async function resolvePhotoUrl(
 
 export async function resolvePhotoUrls(
   photos: readonly PhotoDescriptor[],
-  cacheBust: string,
+  cacheBust: string | null,
   useLive: boolean,
 ): Promise<Array<{ url: string; origin: 'picsum' | 'fallback' }>> {
   return await Promise.all(

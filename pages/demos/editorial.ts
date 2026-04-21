@@ -39,6 +39,19 @@ function metric(label: string, value: string, highlight: boolean = false): strin
   return `<span class="metric">${label} <b${highlight ? ' style="color:var(--reflow)"' : ''}>${value}</b></span>`
 }
 
+const NAIVE_LABELS = ['loaded at', 'visible shifts']
+const MEASURED_LABELS = ['frame placed at', 'lines placed', 'fully loaded at', 'visible shifts']
+
+function renderPlaceholderStats(): void {
+  naiveStat.innerHTML = NAIVE_LABELS.map((l) => metric(l, '—')).join('')
+  measuredStat.innerHTML = MEASURED_LABELS.map((l) => metric(l, '—')).join('')
+}
+
+function getCacheBust(): string | null {
+  const checked = document.querySelector<HTMLInputElement>('input[name="cache"]:checked')
+  return checked?.value === 'off' ? null : newCacheBustToken()
+}
+
 function buildArticle(panel: HTMLElement): HTMLImageElement[] {
   panel.innerHTML = ''
   const paragraphs = ARTICLE.split('\n\n')
@@ -175,17 +188,20 @@ async function run(): Promise<void> {
   runButton.textContent = 'Checking network…'
   naivePanel.innerHTML = ''
   measuredPanel.innerHTML = ''
-  naiveStat.innerHTML = ''
-  measuredStat.innerHTML = ''
+  renderPlaceholderStats()
   metaEl.textContent = ''
 
   const useLive = await picsumReachable()
-  const cacheBust = newCacheBustToken()
+  const cacheBust = getCacheBust()
   runButton.textContent = useLive ? 'Loading from picsum…' : 'Generating fallbacks…'
   const resolved = await resolvePhotoUrls(FIGURES, cacheBust, useLive)
   const urls = resolved.map((r) => r.url)
 
-  metaEl.textContent = `${FIGURES.length} figures · ${useLive ? 'picsum.photos (cache-busted)' : 'picsum offline — canvas fallbacks'}`
+  metaEl.textContent =
+    `${FIGURES.length} figures · ` +
+    (useLive
+      ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
+      : 'picsum offline — canvas fallbacks')
 
   runButton.textContent = 'Running…'
 
@@ -219,4 +235,6 @@ async function run(): Promise<void> {
 runButton.addEventListener('click', () => {
   void run()
 })
+
+renderPlaceholderStats()
 void run()

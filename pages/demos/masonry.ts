@@ -82,7 +82,7 @@ function layoutMasonry(
 
 type ResolvedPhoto = { url: string; origin: 'picsum' | 'fallback' }
 
-async function resolvePhotos(useLive: boolean, cacheBust: string): Promise<ResolvedPhoto[]> {
+async function resolvePhotos(useLive: boolean, cacheBust: string | null): Promise<ResolvedPhoto[]> {
   if (useLive) {
     return PHOTOS.map((p) => ({ url: picsumUrl(p, cacheBust), origin: 'picsum' as const }))
   }
@@ -142,6 +142,21 @@ type ProgressiveResult = {
 function getMode(): Mode {
   const checked = document.querySelector<HTMLInputElement>('input[name="mode"]:checked')
   return (checked?.value === 'batch' ? 'batch' : 'progressive')
+}
+
+function getCacheBust(): string | null {
+  const checked = document.querySelector<HTMLInputElement>('input[name="cache"]:checked')
+  return checked?.value === 'off' ? null : newCacheBustToken()
+}
+
+const NAIVE_LABELS = ['loaded at', 'visible shifts']
+const BATCH_LABELS = ['frames placed at', 'fully loaded at', 'column height', 'visible shifts']
+const PROGRESSIVE_LABELS = ['first frame at', 'last frame at', 'fully loaded at', 'column height']
+
+function renderPlaceholderStats(mode: Mode): void {
+  naiveStat.innerHTML = NAIVE_LABELS.map((l) => metric(l, '—')).join('')
+  const labels = mode === 'batch' ? BATCH_LABELS : PROGRESSIVE_LABELS
+  measuredStat.innerHTML = labels.map((l) => metric(l, '—')).join('')
 }
 
 async function renderMeasuredBatch(
@@ -301,12 +316,11 @@ async function run(): Promise<void> {
   runButton.textContent = 'Checking network…'
   naivePanel.innerHTML = ''
   measuredPanel.innerHTML = ''
-  naiveStat.innerHTML = ''
-  measuredStat.innerHTML = ''
+  renderPlaceholderStats(mode)
   metaEl.textContent = ''
 
   const useLive = await picsumReachable()
-  const cacheBust = newCacheBustToken()
+  const cacheBust = getCacheBust()
   runButton.textContent = useLive
     ? `Loading ${COUNT} photos from picsum…`
     : `Generating ${COUNT} canvas fallbacks…`
@@ -314,7 +328,10 @@ async function run(): Promise<void> {
   const urls = resolved.map((r) => r.url)
 
   metaEl.textContent =
-    `${COUNT} photos · ${useLive ? 'picsum.photos (cache-busted — real network)' : 'picsum offline — canvas fallbacks'}`
+    `${COUNT} photos · ` +
+    (useLive
+      ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
+      : 'picsum offline — canvas fallbacks')
 
   runButton.textContent = 'Running…'
 
@@ -359,10 +376,17 @@ runButton.addEventListener('click', () => {
   void run()
 })
 
-// Update the right-panel subtitle immediately on toggle so the user
-// sees what the next Run will produce, without re-fetching 60 photos.
+// Update the right-panel subtitle + placeholder-stat shape
+// immediately on mode toggle so the user sees what the next Run will
+// produce, without re-fetching 60 photos.
 for (const input of document.querySelectorAll<HTMLInputElement>('input[name="mode"]')) {
-  input.addEventListener('change', () => setMeasuredSub(getMode()))
+  input.addEventListener('change', () => {
+    const mode = getMode()
+    setMeasuredSub(mode)
+    renderPlaceholderStats(mode)
+  })
 }
 
+renderPlaceholderStats(getMode())
+setMeasuredSub(getMode())
 void run()
