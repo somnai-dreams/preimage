@@ -73,8 +73,8 @@ function buildArticleHtml(
 
 async function renderNaive(blobs: Blob[], latencyMs: number): Promise<{ ms: number; shifts: number }> {
   const t0 = performance.now()
-  const monitor = observeShifts(naivePanel.parentElement!)
   const imgs = buildArticleHtml(naivePanel, false, FIGURES)
+  const monitor = observeShifts(naivePanel.parentElement!)
   await Promise.all(imgs.map((img, i) => loadImgWithLatency(img, blobs[i]!, latencyMs)))
   monitor.stop()
   return { ms: performance.now() - t0, shifts: monitor.shifts() }
@@ -82,9 +82,9 @@ async function renderNaive(blobs: Blob[], latencyMs: number): Promise<{ ms: numb
 
 async function renderNative(blobs: Blob[], latencyMs: number): Promise<{ ms: number; shifts: number; frameReadyAt: number }> {
   const t0 = performance.now()
-  const monitor = observeShifts(nativePanel.parentElement!)
   const imgs = buildArticleHtml(nativePanel, true, FIGURES)
   const frameReadyAt = performance.now() - t0
+  const monitor = observeShifts(nativePanel.parentElement!)
   await Promise.all(imgs.map((img, i) => loadImgWithLatency(img, blobs[i]!, latencyMs)))
   monitor.stop()
   return { ms: performance.now() - t0, shifts: monitor.shifts(), frameReadyAt }
@@ -96,7 +96,6 @@ async function renderMeasured(
 ): Promise<{ ms: number; shifts: number; prepareMs: number; lineCount: number }> {
   const t0 = performance.now()
   measuredPanel.innerHTML = ''
-  const monitor = observeShifts(measuredPanel.parentElement!)
   await document.fonts.ready
   const probeDelay = Math.round(latencyMs * 0.1)
   if (probeDelay > 0) await sleep(probeDelay)
@@ -150,6 +149,8 @@ async function renderMeasured(
   }
 
   const remainingDelay = Math.max(0, latencyMs - probeDelay)
+  // Observe only the async image-load phase, after layout placement.
+  const monitor = observeShifts(measuredPanel.parentElement!)
   await Promise.all(
     figImgs.map(async (img, i) => {
       const itemIndex = figIndexByItem[i]!

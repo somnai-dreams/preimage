@@ -21,13 +21,16 @@ const latencyControl = wireLatencySlider('latency', 'latencyValue', 800)
 async function renderNaive(blobs: Blob[], latencyMs: number): Promise<{ ms: number; shifts: number }> {
   const t0 = performance.now()
   naivePanel.innerHTML = ''
-  const monitor = observeShifts(naivePanel.parentElement!)
   const imgs = blobs.map(() => {
     const img = document.createElement('img')
     img.alt = ''
     naivePanel.appendChild(img)
     return img
   })
+  // Start observing only after the synchronous DOM setup, so the counter
+  // measures shifts caused by async image loads — not by clearing+
+  // rebuilding the panel between runs.
+  const monitor = observeShifts(naivePanel.parentElement!)
   await Promise.all(imgs.map((img, i) => loadImgWithLatency(img, blobs[i]!, latencyMs)))
   monitor.stop()
   return { ms: performance.now() - t0, shifts: monitor.shifts() }
@@ -40,7 +43,6 @@ async function renderNative(
 ): Promise<{ ms: number; shifts: number; frameReadyAt: number }> {
   const t0 = performance.now()
   nativePanel.innerHTML = ''
-  const monitor = observeShifts(nativePanel.parentElement!)
   const imgs: HTMLImageElement[] = []
   for (let i = 0; i < blobs.length; i++) {
     const p = photos[i]!
@@ -56,6 +58,10 @@ async function renderNative(
     imgs.push(img)
   }
   const frameReadyAt = performance.now() - t0
+  // Start observing after the frames are in place, so we only count
+  // shifts caused by async image loads — the reserved aspect-ratio
+  // boxes should absorb the imagery without moving anything.
+  const monitor = observeShifts(nativePanel.parentElement!)
   await Promise.all(imgs.map((img, i) => loadImgWithLatency(img, blobs[i]!, latencyMs)))
   monitor.stop()
   return { ms: performance.now() - t0, shifts: monitor.shifts(), frameReadyAt }
@@ -67,7 +73,6 @@ async function renderMeasured(
 ): Promise<{ ms: number; shifts: number; prepareMs: number }> {
   const t0 = performance.now()
   measuredPanel.innerHTML = ''
-  const monitor = observeShifts(measuredPanel.parentElement!)
   // In a real network scenario prepare streams from the first-arriving
   // bytes. Model that: wait ~10% of the simulated transfer before
   // measurement returns.
@@ -106,6 +111,9 @@ async function renderMeasured(
   // each image's cached blobUrl can actually resolve in the DOM. (In
   // the live-picsum case latencyMs == 0, so this is ~instant.)
   const remainingDelay = Math.max(0, latencyMs - probeDelay)
+  // Start observing after the frame grid is placed, so only actual
+  // image-driven shifts are counted.
+  const monitor = observeShifts(measuredPanel.parentElement!)
   await Promise.all(
     imgs.map((img, i) => {
       const url = getMeasurement(prepared[i]!).blobUrl ?? URL.createObjectURL(blobs[i]!)

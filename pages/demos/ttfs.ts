@@ -68,12 +68,12 @@ async function runNaive(blob: Blob, latencyMs: number): Promise<{ events: Event[
   const host = f1
   host.innerHTML = ''
   const stage = host.parentElement!
-  const monitor = observeShifts(stage)
   const t0 = performance.now()
   const img = document.createElement('img')
   img.style.maxWidth = `${PANEL_WIDTH}px`
   img.style.display = 'block'
   host.appendChild(img)
+  const monitor = observeShifts(stage)
   await loadImgWithLatency(img, blob, latencyMs)
   const events: Event[] = [
     { label: 'dims known (onload)', t: performance.now() - t0 },
@@ -92,7 +92,6 @@ async function runNative(
   const host = f2
   host.innerHTML = ''
   const stage = host.parentElement!
-  const monitor = observeShifts(stage)
   const t0 = performance.now()
   const scale = PANEL_WIDTH / declaredWidth
   const frameH = Math.min(declaredHeight * scale, MAX_FRAME_HEIGHT)
@@ -103,6 +102,7 @@ async function runNative(
   img.width = declaredWidth
   img.height = declaredHeight
   frame.appendChild(img)
+  const monitor = observeShifts(stage)
   await loadImgWithLatency(img, blob, latencyMs)
   events.push({ label: 'image painted', t: performance.now() - t0 })
   monitor.stop()
@@ -116,7 +116,6 @@ async function runPreimage(
   const host = f3
   host.innerHTML = ''
   const stage = host.parentElement!
-  const monitor = observeShifts(stage)
   const t0 = performance.now()
   // Simulate: the first bytes arrive quickly (~10% of the total transfer
   // on a streaming connection), enough for the header probe. prepare()
@@ -135,6 +134,8 @@ async function runPreimage(
   ]
   const img = document.createElement('img')
   frame.appendChild(img)
+  // Observe only the remaining-bytes phase — the frame is in place.
+  const monitor = observeShifts(stage)
   // The remaining bytes arrive over the rest of the simulated transfer.
   const remainingDelay = Math.max(0, latencyMs - probeDelay)
   await loadImgWithLatency(img, blob, remainingDelay)
