@@ -14,9 +14,8 @@ export {
   preparedFromMeasurement,
   type PreparedImage,
   type PrepareOptions,
+  type PrepareStrategy,
 } from './prepare.js'
-
-export { prepareFast, type PrepareFastOptions } from './prepare-fast.js'
 
 export {
   probeImageBytes,

@@ -1,6 +1,5 @@
 import {
   prepare,
-  prepareFast,
   getMeasurement,
   clearMeasurementCaches,
 } from '../../src/index.js'
@@ -18,7 +17,6 @@ async function makeLargePng(width: number, height: number): Promise<Blob> {
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')!
-  // Gradient + circles so the encoder doesn't collapse to a tiny PNG.
   const grad = ctx.createLinearGradient(0, 0, width, height)
   grad.addColorStop(0, '#0052cc')
   grad.addColorStop(1, '#ffb600')
@@ -54,36 +52,31 @@ async function run(): Promise<void> {
 
   runButton.textContent = 'Measuring…'
 
-  // Run each 3 times (discard first run), against a fresh cache each time.
-  // First run includes JIT / allocator warmup.
-  async function timePrepare(): Promise<{ ms: number; w: number; h: number }> {
+  // The default strategy ('auto') uses byte-probing. 'image-element'
+  // forces the classic HTMLImageElement.decode() path. Same API, just
+  // different pipelines under the hood.
+  async function time(strategy: 'image-element' | 'auto'): Promise<{ ms: number; w: number; h: number }> {
     clearMeasurementCaches()
     const url = URL.createObjectURL(blob)
     const t0 = performance.now()
-    const prepared = await prepare(url)
+    const prepared =
+      strategy === 'image-element'
+        ? await prepare(url, { strategy: 'image-element' })
+        : await prepare(blob) // Blob path probes directly, no URL indirection
     const t1 = performance.now()
     const m = getMeasurement(prepared)
     URL.revokeObjectURL(url)
     return { ms: t1 - t0, w: m.naturalWidth, h: m.naturalHeight }
   }
 
-  async function timePrepareFast(): Promise<{ ms: number; w: number; h: number }> {
-    clearMeasurementCaches()
-    const t0 = performance.now()
-    const prepared = await prepareFast(blob)
-    const t1 = performance.now()
-    const m = getMeasurement(prepared)
-    return { ms: t1 - t0, w: m.naturalWidth, h: m.naturalHeight }
-  }
-
-  await timePrepare() // warmup
-  const slow1 = await timePrepare()
-  const slow2 = await timePrepare()
+  await time('image-element') // warmup
+  const slow1 = await time('image-element')
+  const slow2 = await time('image-element')
   const slowMs = Math.min(slow1.ms, slow2.ms)
 
-  await timePrepareFast() // warmup
-  const fast1 = await timePrepareFast()
-  const fast2 = await timePrepareFast()
+  await time('auto') // warmup
+  const fast1 = await time('auto')
+  const fast2 = await time('auto')
   const fastMs = Math.min(fast1.ms, fast2.ms)
 
   slowTime.textContent = fmt(slowMs)
@@ -102,6 +95,4 @@ async function run(): Promise<void> {
 runButton.addEventListener('click', () => {
   void run()
 })
-
-// Kick off automatically so the demo has something on-screen for screenshots.
 void run()

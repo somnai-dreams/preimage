@@ -4,9 +4,10 @@
 
 Time-to-first-sizing.
 
-- **Added `prepareFast(src: string | Blob, options?)`** — streaming fetch + header parse for URL sources, first-4KB slice + parse for Blob sources. Measured TTFS ~374ms → ~700µs on an 11MB in-memory PNG; for large remote images the delta is larger (the classic path also waits for full transfer).
+- **`prepare(src: string | Blob, options?)`** streams the fetch for URLs and byte-probes the first ~2KB, or slices and probes the first 4KB of a Blob. Measured TTFS ~374ms → ~700µs on an 11MB in-memory PNG; for large remote images the delta is larger (the classic path also waits for full transfer).
 - **Added `probeImageBytes(bytes: Uint8Array)`** as a standalone public helper — covers PNG, JPEG, WebP (VP8 / VP8L / VP8X), GIF, BMP, SVG.
-- **Added `blobUrl` to `ImageMeasurement`** — when `prepareFast` streamed the bytes itself, it exposes an object URL so `<img src>` renders reuse the same bytes (no double fetch).
+- **Added `blobUrl` to `ImageMeasurement`** — when `prepare` streamed the bytes itself, it exposes an object URL so `<img src>` renders reuse the same bytes without a second fetch.
+- **Added `strategy` to `PrepareOptions`** — `'auto'` (default, streams with classic fallback), `'stream'` (streaming only, errors on CORS failure), `'image-element'` (classic `HTMLImageElement.decode()` path, for instrumentation or audit contexts that must not issue a fetch).
 - Automatic transparent fallback to `createImageBitmap(blob)` for AVIF / HEIC / anything without a header parser.
 
 ## 0.0.2

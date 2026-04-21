@@ -45,9 +45,10 @@ export type ImageMeasurement = {
   orientation: OrientationCode
   decoded: boolean // true if the browser fully decoded the bitmap
   analysis: ImageAnalysis
-  // Set by `prepareFast` when it streams the bytes itself: a blob URL that
-  // callers can render via <img> without triggering a second network fetch.
-  // Always undefined for the classic HTMLImageElement.decode() path.
+  // Set by `prepare` when it streamed the bytes itself (URL streaming or
+  // Blob source): a blob URL callers can render via <img> to reuse the
+  // same bytes without triggering a second fetch. Undefined for the
+  // classic HTMLImageElement.decode() fallback path.
   blobUrl?: string
 }
 

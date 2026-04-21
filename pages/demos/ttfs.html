@@ -29,8 +29,8 @@
 <body>
   <main>
     <section>
-      <h1>Time-to-first-sizing — <code>prepare</code> vs <code>prepareFast</code></h1>
-      <p>Generates a large PNG (4000×3000 rendered into a <code>Blob</code>), then asks each API how long it takes to return dimensions. Classic <code>prepare()</code> waits for a full decode. <code>prepareFast()</code> reads the first ~24 bytes, parses the PNG IHDR, and returns.</p>
+      <h1>Time-to-first-sizing — <code>image-element</code> vs <code>auto</code> strategy</h1>
+      <p>Generates a large PNG (4000×3000 as a <code>Blob</code>), then calls <code>prepare()</code> with each strategy and measures how long it takes to return dimensions. The <code>auto</code> strategy (default) byte-probes the first ~24 bytes and returns; <code>image-element</code> waits for a full decode.</p>
 
       <div class="controls">
         <button id="run">Run</button>
@@ -39,12 +39,12 @@
 
       <div class="results">
         <div class="card">
-          <h3><code>prepare()</code> via <code>img.decode()</code></h3>
+          <h3><code>prepare(url, { strategy: 'image-element' })</code></h3>
           <div class="timing" id="slowTime">—</div>
           <div class="meta" id="slowMeta">waiting…</div>
         </div>
         <div class="card">
-          <h3><code>prepareFast()</code> via byte probe</h3>
+          <h3><code>prepare(blob)</code> <span class="meta">— default strategy</span></h3>
           <div class="timing" id="fastTime">— <span class="ratio" id="ratio"></span></div>
           <div class="meta" id="fastMeta">waiting…</div>
         </div>
@@ -53,20 +53,20 @@
 
     <aside>
       <h2>What this shows</h2>
-      <p>Both APIs return the same <code>{width, height}</code>. The delta is time-to-return. Here the image lives in-memory as a Blob, so the transfer term is zero; the delta is pure decode vs byte-parse.</p>
-      <p>For remote images the difference is much larger: <code>prepare()</code> waits for the full transfer AND the decode; <code>prepareFast()</code> returns after the first ~2KB arrive.</p>
+      <p>Both API calls return the same <code>{width, height}</code>. Only the pipeline differs. Here the image lives in-memory as a Blob, so the network term is zero; the delta is pure decode vs byte-parse.</p>
+      <p>For remote URLs the default strategy also streams the fetch — dimensions are returned after the first ~2KB arrive, so the full transfer doesn't have to complete before layout can proceed.</p>
 
       <h2>Headline numbers</h2>
       <pre><code>5MB JPEG over 10 Mbps:
-  prepare():       ~4000ms
-  prepareFast():   ~150ms
+  image-element strategy:  ~4000ms
+  default (auto):          ~150ms
 
 4000×3000 PNG Blob:
-  prepare():       ~80ms  (decode only)
-  prepareFast():   ~5ms   (probe IHDR)</code></pre>
+  image-element strategy:  ~80ms  (decode only)
+  default (auto):          ~5ms   (probe IHDR)</code></pre>
 
-      <h2>When prepareFast falls back</h2>
-      <p>AVIF, HEIC, or truncated bytes trigger the <code>createImageBitmap</code> fallback path — still faster than a round trip because the bytes are already in memory, but not the "first-2KB" win.</p>
+      <h2>When the probe path yields</h2>
+      <p>AVIF, HEIC, or truncated bytes trigger a transparent <code>createImageBitmap</code> fallback on the bytes we already streamed — still faster than a round trip because the bytes are buffered, just without the first-2KB shortcut.</p>
     </aside>
   </main>
 

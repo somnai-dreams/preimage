@@ -32,8 +32,8 @@
   </div>
 
   <div class="demo">
-    <h3><a href="./ttfs">Time-to-first-sizing: <code>prepare</code> vs <code>prepareFast</code></a></h3>
-    <p>Generates a 4000×3000 PNG Blob and measures how fast each API returns dimensions. <code>prepareFast</code> parses the IHDR header (~24 bytes) instead of waiting for a full decode.</p>
+    <h3><a href="./ttfs">Time-to-first-sizing — default <code>prepare</code> vs <code>image-element</code> strategy</a></h3>
+    <p>Generates a 4000×3000 PNG Blob and measures how fast each pipeline returns dimensions. The default byte-probe path returns in ~700µs; the <code>image-element</code> strategy waits for a full decode.</p>
   </div>
 
   <h2>With pretext</h2>
