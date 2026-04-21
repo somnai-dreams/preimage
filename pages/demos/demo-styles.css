@@ -1,0 +1,297 @@
+/* Shared design system for all preimage demos. */
+
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: #f7f7f8;
+  --surface-accent: #eff5ff;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --text: #18181b;
+  --text-muted: #52525b;
+  --text-soft: #71717a;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --frame: #2563eb;
+  --reflow: #b91c1c;
+  --reflow-bg: #fef2f2;
+  --stable: #15803d;
+  --stable-bg: #f0fdf4;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font: 14px/1.55 -apple-system, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Nav */
+
+.demo-nav {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 13px;
+}
+.demo-nav .brand {
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  margin-right: 8px;
+}
+.demo-nav a {
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: 4px 0;
+  border-bottom: 1px solid transparent;
+}
+.demo-nav a:hover,
+.demo-nav a[aria-current] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.demo-nav .spacer {
+  flex: 1;
+}
+.demo-nav .gh {
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+/* Page container */
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.page-header h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.page-header p {
+  margin: 0 0 20px;
+  color: var(--text-muted);
+  max-width: 68ch;
+  font-size: 14px;
+}
+
+/* Controls bar */
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.controls .meta {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  flex: 1;
+  min-width: 200px;
+}
+
+button.primary {
+  font: inherit;
+  font-weight: 500;
+  padding: 7px 16px;
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 120ms;
+}
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+button.primary:disabled {
+  background: var(--border-strong);
+  cursor: not-allowed;
+}
+
+/* Panel cards */
+
+.panels {
+  display: grid;
+  gap: 16px;
+}
+.panels.two { grid-template-columns: 1fr 1fr; }
+.panels.three { grid-template-columns: repeat(3, 1fr); }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+.panel-title code {
+  text-transform: none;
+  font-size: 11.5px;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  background: var(--surface-muted);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+.panel-sub {
+  font-size: 12px;
+  color: var(--text-soft);
+  margin: 0 0 12px;
+  font-variant-numeric: tabular-nums;
+  min-height: 1.3em;
+}
+.panel-stat {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.panel-stat .metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.panel-stat .metric b {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* Badges */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  line-height: 18px;
+}
+.badge.reflow { background: var(--reflow-bg); color: var(--reflow); border: 1px solid #fecaca; }
+.badge.stable { background: var(--stable-bg); color: var(--stable); border: 1px solid #bbf7d0; }
+
+/* Code */
+
+code, pre {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12.5px;
+}
+code {
+  background: var(--surface-muted);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+pre {
+  background: var(--surface-muted);
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  line-height: 1.55;
+  margin: 8px 0;
+}
+pre code { background: transparent; padding: 0; }
+
+/* Frame rectangles shared by the reflow demos */
+
+.frame-skeleton {
+  position: relative;
+  border: 1.5px dashed var(--frame);
+  border-radius: var(--radius-sm);
+  background: rgba(37, 99, 235, 0.05);
+  overflow: hidden;
+}
+.frame-skeleton > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+.frame-skeleton > img.loaded { opacity: 1; }
+
+/* Aside (sidebar explainer panels in TTFS, canvas-fit) */
+
+.with-aside {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+.aside {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+.aside h2 {
+  margin: 12px 0 4px;
+  font-size: 11.5px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.aside h2:first-child { margin-top: 0; }
+.aside p { margin: 6px 0; color: var(--text-muted); }
+.aside pre { font-size: 11.5px; }

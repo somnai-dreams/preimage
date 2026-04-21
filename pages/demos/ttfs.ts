@@ -1,6 +1,11 @@
 import { prepare, getMeasurement } from '../../src/index.js'
-import { loadPhoto, latencyFor, PICSUM_PHOTOS } from './photo-source.js'
-import { loadImgWithLatency, observeShifts, sleep, wireLatencySlider } from './demo-utils.js'
+import {
+  newCacheBustToken,
+  picsumReachable,
+  resolvePhotoUrl,
+  PICSUM_PHOTOS,
+} from './photo-source.js'
+import { observeShifts } from './demo-utils.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -11,142 +16,142 @@ const e1 = document.getElementById('e1')!
 const e2 = document.getElementById('e2')!
 const e3 = document.getElementById('e3')!
 
-const PANEL_WIDTH = 280
+const PANEL_WIDTH = 320
 const MAX_FRAME_HEIGHT = 220
 
-const latencyControl = wireLatencySlider('latency', 'latencyValue', 800)
-
 type Event = { label: string; t: number; note?: string }
-
-function setFrame(host: HTMLElement, width: number, height: number, label: string, framed: boolean): HTMLElement {
-  host.innerHTML = ''
-  const frame = document.createElement('div')
-  frame.className = 'image-frame' + (framed ? '' : ' unframed')
-  frame.style.width = `${width}px`
-  frame.style.height = `${height}px`
-  if (framed) frame.textContent = label
-  host.appendChild(frame)
-  return frame
-}
 
 function renderEvents(host: HTMLElement, events: Event[], shifts: number): void {
   host.innerHTML = ''
   for (const ev of events) {
     const row = document.createElement('div')
-    row.className = 'event'
-    const label = document.createElement('span')
-    label.textContent = ev.label
-    const time = document.createElement('span')
-    time.innerHTML = `<b>${ev.t.toFixed(1)}ms</b>${ev.note ? ` · ${ev.note}` : ''}`
-    row.appendChild(label)
-    row.appendChild(time)
+    row.className = 'row'
+    row.innerHTML = `<span>${ev.label}</span><span><b>${ev.t.toFixed(1)}ms</b>${ev.note ? ` · ${ev.note}` : ''}</span>`
     host.appendChild(row)
   }
-  const row = document.createElement('div')
-  row.className = 'event'
-  const label = document.createElement('span')
-  label.textContent = 'visible shifts'
-  const time = document.createElement('span')
-  time.innerHTML =
-    shifts > 0
-      ? `<span class="shift-marker">${shifts}</span>`
-      : `<b>0</b>`
-  row.appendChild(label)
-  row.appendChild(time)
-  host.appendChild(row)
+  const shiftRow = document.createElement('div')
+  shiftRow.className = 'row'
+  shiftRow.innerHTML = `<span>visible shifts</span><span${shifts > 0 ? ' class="shift"' : ''}><b>${shifts}</b></span>`
+  host.appendChild(shiftRow)
 }
 
-// Each strategy starts from the same Blob (so byte-arrival is identical
-// across panels) and reports when dims become known + when the image is
-// fully painted. They all run in parallel. `latencyMs` simulates a
-// network transfer on top of the in-memory decode — the naive path
-// waits before seeing any bytes; the preimage path still returns dims
-// via its byte-probe after the first chunk would have arrived (modelled
-// here as ~10% of the total latency).
-
-async function runNaive(blob: Blob, latencyMs: number): Promise<{ events: Event[]; shifts: number }> {
-  const host = f1
+function aspectFrame(
+  host: HTMLElement,
+  naturalW: number,
+  naturalH: number,
+  label: string,
+): HTMLElement {
   host.innerHTML = ''
-  const stage = host.parentElement!
+  const scale = PANEL_WIDTH / naturalW
+  const h = Math.min(naturalH * scale, MAX_FRAME_HEIGHT)
+  const w = h * (naturalW / naturalH)
+  const frame = document.createElement('div')
+  frame.className = 'frame-skeleton'
+  frame.style.width = `${w}px`
+  frame.style.height = `${h}px`
+  const tag = document.createElement('span')
+  tag.style.cssText = 'position:absolute;top:6px;left:8px;color:var(--frame);font-size:10.5px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;z-index:1;'
+  tag.textContent = label
+  frame.appendChild(tag)
+  host.appendChild(frame)
+  return frame
+}
+
+async function runNaive(url: string): Promise<{ events: Event[]; shifts: number }> {
+  f1.innerHTML = ''
+  const stage = f1.parentElement!
   const t0 = performance.now()
   const img = document.createElement('img')
-  img.style.maxWidth = `${PANEL_WIDTH}px`
-  img.style.display = 'block'
-  host.appendChild(img)
+  img.alt = ''
+  f1.appendChild(img)
   const monitor = observeShifts(stage)
-  await loadImgWithLatency(img, blob, latencyMs)
-  const events: Event[] = [
-    { label: 'dims known (onload)', t: performance.now() - t0 },
-    { label: 'image painted', t: performance.now() - t0 },
-  ]
+  await new Promise<void>((resolve) => {
+    img.onload = () => resolve()
+    img.onerror = () => resolve()
+    img.src = url
+  })
+  const t = performance.now() - t0
   monitor.stop()
-  return { events, shifts: monitor.shifts() }
+  return {
+    events: [
+      { label: 'dims known (onload)', t },
+      { label: 'image painted', t },
+    ],
+    shifts: monitor.shifts(),
+  }
 }
 
 async function runNative(
-  blob: Blob,
+  url: string,
   declaredWidth: number,
   declaredHeight: number,
-  latencyMs: number,
 ): Promise<{ events: Event[]; shifts: number }> {
-  const host = f2
-  host.innerHTML = ''
-  const stage = host.parentElement!
+  f2.innerHTML = ''
+  const stage = f2.parentElement!
   const t0 = performance.now()
-  const scale = PANEL_WIDTH / declaredWidth
-  const frameH = Math.min(declaredHeight * scale, MAX_FRAME_HEIGHT)
-  const frameW = frameH * (declaredWidth / declaredHeight)
-  const frame = setFrame(host, frameW, frameH, `reserved ${declaredWidth}×${declaredHeight}`, true)
-  const events: Event[] = [{ label: 'dims known (from attrs)', t: performance.now() - t0 }]
+  const frame = aspectFrame(f2, declaredWidth, declaredHeight, `reserved ${declaredWidth}×${declaredHeight}`)
+  const frameAt = performance.now() - t0
   const img = document.createElement('img')
   img.width = declaredWidth
   img.height = declaredHeight
   frame.appendChild(img)
   const monitor = observeShifts(stage)
-  await loadImgWithLatency(img, blob, latencyMs)
-  events.push({ label: 'image painted', t: performance.now() - t0 })
+  await new Promise<void>((resolve) => {
+    img.onload = () => {
+      img.classList.add('loaded')
+      resolve()
+    }
+    img.onerror = () => resolve()
+    img.src = url
+  })
+  const paintedAt = performance.now() - t0
   monitor.stop()
-  return { events, shifts: monitor.shifts() }
+  return {
+    events: [
+      { label: 'dims known (from attrs)', t: frameAt },
+      { label: 'image painted', t: paintedAt },
+    ],
+    shifts: monitor.shifts(),
+  }
 }
 
-async function runPreimage(
-  blob: Blob,
-  latencyMs: number,
-): Promise<{ events: Event[]; shifts: number }> {
-  const host = f3
-  host.innerHTML = ''
-  const stage = host.parentElement!
+async function runPreimage(url: string): Promise<{ events: Event[]; shifts: number }> {
+  f3.innerHTML = ''
+  const stage = f3.parentElement!
   const t0 = performance.now()
-  // Simulate: the first bytes arrive quickly (~10% of the total transfer
-  // on a streaming connection), enough for the header probe. prepare()
-  // would return after that first chunk.
-  const probeDelay = Math.round(latencyMs * 0.1)
-  if (probeDelay > 0) await sleep(probeDelay)
-  const prepared = await prepare(blob)
+  const prepared = await prepare(url)
   const m = getMeasurement(prepared)
-  const dimsKnownAt = performance.now() - t0
-  const scale = PANEL_WIDTH / m.naturalWidth
-  const frameH = Math.min(m.naturalHeight * scale, MAX_FRAME_HEIGHT)
-  const frameW = frameH * (m.naturalWidth / m.naturalHeight)
-  const frame = setFrame(host, frameW, frameH, `measured ${m.naturalWidth}×${m.naturalHeight}`, true)
-  const events: Event[] = [
-    { label: 'dims known (prepare)', t: dimsKnownAt, note: `${m.naturalWidth}×${m.naturalHeight}` },
-  ]
+  const preparedAt = performance.now() - t0
+  const frame = aspectFrame(f3, m.naturalWidth, m.naturalHeight, `measured ${m.naturalWidth}×${m.naturalHeight}`)
   const img = document.createElement('img')
   frame.appendChild(img)
-  // Observe only the remaining-bytes phase — the frame is in place.
   const monitor = observeShifts(stage)
-  // The remaining bytes arrive over the rest of the simulated transfer.
-  const remainingDelay = Math.max(0, latencyMs - probeDelay)
-  await loadImgWithLatency(img, blob, remainingDelay)
-  events.push({ label: 'image painted', t: performance.now() - t0 })
+  await new Promise<void>((resolve) => {
+    const done = (): void => {
+      img.classList.add('loaded')
+      resolve()
+    }
+    if (img.complete && img.naturalWidth > 0) done()
+    else {
+      img.onload = done
+      img.onerror = done
+    }
+    img.src = m.blobUrl ?? url
+  })
+  const paintedAt = performance.now() - t0
   monitor.stop()
-  return { events, shifts: monitor.shifts() }
+  return {
+    events: [
+      { label: 'dims known (prepare)', t: preparedAt, note: `${m.naturalWidth}×${m.naturalHeight}` },
+      { label: 'image painted', t: paintedAt },
+    ],
+    shifts: monitor.shifts(),
+  }
 }
 
 async function run(): Promise<void> {
   runButton.disabled = true
-  runButton.textContent = 'Loading photo…'
+  runButton.textContent = 'Checking network…'
   metaEl.textContent = ''
   f1.innerHTML = ''
   f2.innerHTML = ''
@@ -156,20 +161,24 @@ async function run(): Promise<void> {
   e3.innerHTML = ''
 
   const photo = PICSUM_PHOTOS[0]!
-  const loaded = await loadPhoto(photo, 200)
-  const latencyMs = latencyControl.read()
-  void latencyFor // retained export; slider overrides the default
+  const useLive = await picsumReachable()
+  const cacheBust = newCacheBustToken()
+  runButton.textContent = useLive ? 'Fetching from picsum…' : 'Generating fallback…'
+  const resolved = await resolvePhotoUrl(photo, cacheBust, useLive, 200)
+
   metaEl.textContent =
-    `${photo.caption ?? photo.seed} · ${photo.width}×${photo.height} · ${(loaded.blob.size / 1024 / 1024).toFixed(2)} MB · ` +
-    (loaded.origin === 'picsum' ? 'picsum.photos (live)' : 'picsum offline — canvas fallback') +
-    ` · simulating ${latencyMs}ms transfer per image`
+    `${photo.caption ?? photo.seed} · ${photo.width}×${photo.height} · ` +
+    (useLive ? 'picsum.photos (cache-busted — real network)' : 'picsum offline — canvas fallback (same aspect, no network term)')
 
   runButton.textContent = 'Running…'
 
+  // The naive and native panels use the direct URL (real network). The
+  // preimage panel calls prepare(url), which internally streams the same
+  // URL — so all three race against the same network condition.
   const [naive, native, preimaged] = await Promise.all([
-    runNaive(loaded.blob, latencyMs),
-    runNative(loaded.blob, photo.width, photo.height, latencyMs),
-    runPreimage(loaded.blob, latencyMs),
+    runNaive(resolved.url),
+    runNative(resolved.url, photo.width, photo.height),
+    runPreimage(resolved.url),
   ])
 
   renderEvents(e1, naive.events, naive.shifts)

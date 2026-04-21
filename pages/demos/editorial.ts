@@ -2,63 +2,54 @@ import { prepareWithSegments, materializeLineRange } from '@chenglou/pretext'
 
 import { prepare, getMeasurement } from '../../src/index.js'
 import { flowColumnWithFloats } from '../../src/pretext.js'
-import { loadPhotos, latencyFor, type PhotoDescriptor } from './photo-source.js'
-import { loadImgWithLatency, observeShifts, sleep, wireLatencySlider } from './demo-utils.js'
+import {
+  newCacheBustToken,
+  picsumReachable,
+  resolvePhotoUrls,
+  type PhotoDescriptor,
+} from './photo-source.js'
+import { observeShifts } from './demo-utils.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
 const naivePanel = document.getElementById('naive')!
-const nativePanel = document.getElementById('native')!
 const measuredPanel = document.getElementById('measured')!
 const naiveStat = document.getElementById('naiveStat')!
-const nativeStat = document.getElementById('nativeStat')!
 const measuredStat = document.getElementById('measuredStat')!
 
-const COLUMN_WIDTH = 340
+const COLUMN_WIDTH = 460
 const LINE_HEIGHT = 22
-const FONT = '14px/22px -apple-system, system-ui, sans-serif'
+const FONT = '14px/22px -apple-system, "SF Pro Text", Inter, system-ui, sans-serif'
 
-const ARTICLE = `The first figure sits at the top of this paragraph as a right float. Without declared dimensions, the image starts at zero height and every line below reflows when the browser decodes the real size. Multiply by three figures and you get the cumulative layout shift editorial sites have paid content-policy penalties for since 2020.
+const ARTICLE = `The first figure sits at the top of this paragraph as a right float. Without declared dimensions, the image starts at zero height and every line below reflows when the browser decodes the real size. Multiply by three figures and you get the cumulative layout shift editorial sites have paid content-policy penalties for since 2020. Almost no CMS, no markdown renderer, and no WYSIWYG editor ships image dimensions in the HTML by default.
 
-The middle panel shows the simplest modern answer: declare the image width and height as HTML attributes. The browser uses them to derive an aspect-ratio box and reserves the frame from the first paint. No library required — but the author had to know each figure's dimensions ahead of time.
+The right panel measures each figure before layout runs. Preimage's prepare() streams the first kilobytes of each image, parses the format header for width and height, and returns the concrete rect. Pretext takes those rects as input to its variable-width cursor loop and flows the paragraph text around them in a single synchronous pass.
 
-The right panel uses preimage plus pretext. Preimage measures each figure in a pre-layout pass, streaming the first kilobytes of each file's bytes via a header probe. Pretext lays out the text around those measured rects synchronously. No shift, no skeleton swap, no author-declared attributes — and nothing that depends on the server cooperating.`
+No author-declared attributes. No intermediate skeleton swap. The column's final height, every line's y-coordinate, and every figure's rect are all known before the first paint. When the bytes finish streaming the figures just fill into their already-reserved positions.`
 
 const FIGURES: readonly PhotoDescriptor[] = [
-  { seed: 'preimage-editorial-1', width: 1600, height: 1067, caption: 'landscape' },
-  { seed: 'preimage-editorial-2', width: 1600, height: 900, caption: 'cityscape' },
-  { seed: 'preimage-editorial-3', width: 1000, height: 1400, caption: 'portrait' },
+  { seed: 'preimage-editorial-1', width: 2000, height: 1333, caption: 'landscape' },
+  { seed: 'preimage-editorial-2', width: 2000, height: 1125, caption: 'cityscape' },
+  { seed: 'preimage-editorial-3', width: 1400, height: 1960, caption: 'portrait' },
 ]
 
-const FIGURE_TOPS = [0, 170, 330]
+const FIGURE_TOPS = [0, 210, 420]
 
-const latencyControl = wireLatencySlider('latency', 'latencyValue', 800)
+function metric(label: string, value: string, highlight: boolean = false): string {
+  return `<span class="metric">${label} <b${highlight ? ' style="color:var(--reflow)"' : ''}>${value}</b></span>`
+}
 
-function buildArticleHtml(
-  panel: HTMLElement,
-  useDeclaredDims: boolean,
-  photos: readonly PhotoDescriptor[],
-): HTMLImageElement[] {
+function buildArticle(panel: HTMLElement): HTMLImageElement[] {
   panel.innerHTML = ''
   const paragraphs = ARTICLE.split('\n\n')
   const imgs: HTMLImageElement[] = []
   for (let pi = 0; pi < paragraphs.length; pi++) {
     const p = document.createElement('p')
-    if (pi < photos.length) {
+    if (pi < FIGURES.length) {
       const fig = document.createElement('figure')
-      const photo = photos[pi]!
       const img = document.createElement('img')
-      if (useDeclaredDims) {
-        img.width = photo.width
-        img.height = photo.height
-        const frame = document.createElement('span')
-        frame.className = 'frame'
-        frame.style.aspectRatio = `${photo.width} / ${photo.height}`
-        frame.appendChild(img)
-        fig.appendChild(frame)
-      } else {
-        fig.appendChild(img)
-      }
+      img.alt = ''
+      fig.appendChild(img)
       imgs.push(img)
       const cap = document.createElement('figcaption')
       cap.textContent = `Figure ${pi + 1}`
@@ -71,35 +62,34 @@ function buildArticleHtml(
   return imgs
 }
 
-async function renderNaive(blobs: Blob[], latencyMs: number): Promise<{ ms: number; shifts: number }> {
+async function renderNaive(urls: readonly string[]): Promise<{ ms: number; shifts: number }> {
   const t0 = performance.now()
-  const imgs = buildArticleHtml(naivePanel, false, FIGURES)
-  const monitor = observeShifts(naivePanel.parentElement!)
-  await Promise.all(imgs.map((img, i) => loadImgWithLatency(img, blobs[i]!, latencyMs)))
+  const imgs = buildArticle(naivePanel)
+  const monitor = observeShifts(naivePanel)
+  for (let i = 0; i < imgs.length; i++) imgs[i]!.src = urls[i]!
+  await Promise.all(
+    imgs.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          if (img.complete && img.naturalWidth > 0) resolve()
+          else {
+            img.onload = () => resolve()
+            img.onerror = () => resolve()
+          }
+        }),
+    ),
+  )
   monitor.stop()
   return { ms: performance.now() - t0, shifts: monitor.shifts() }
 }
 
-async function renderNative(blobs: Blob[], latencyMs: number): Promise<{ ms: number; shifts: number; frameReadyAt: number }> {
-  const t0 = performance.now()
-  const imgs = buildArticleHtml(nativePanel, true, FIGURES)
-  const frameReadyAt = performance.now() - t0
-  const monitor = observeShifts(nativePanel.parentElement!)
-  await Promise.all(imgs.map((img, i) => loadImgWithLatency(img, blobs[i]!, latencyMs)))
-  monitor.stop()
-  return { ms: performance.now() - t0, shifts: monitor.shifts(), frameReadyAt }
-}
-
 async function renderMeasured(
-  blobs: Blob[],
-  latencyMs: number,
-): Promise<{ ms: number; shifts: number; prepareMs: number; lineCount: number }> {
+  urls: readonly string[],
+): Promise<{ ms: number; prepareMs: number; lineCount: number; shifts: number }> {
   const t0 = performance.now()
   measuredPanel.innerHTML = ''
   await document.fonts.ready
-  const probeDelay = Math.round(latencyMs * 0.1)
-  if (probeDelay > 0) await sleep(probeDelay)
-  const prepared = await Promise.all(blobs.map((b) => prepare(b)))
+  const prepared = await Promise.all(urls.map((u) => prepare(u)))
   const prepareMs = performance.now() - t0
 
   const text = prepareWithSegments(ARTICLE, FONT)
@@ -112,8 +102,8 @@ async function renderMeasured(
       side: 'right' as const,
       top: FIGURE_TOPS[i]!,
       maxWidth: Math.round(COLUMN_WIDTH * 0.44),
-      maxHeight: 130,
-      gapX: 10,
+      maxHeight: 160,
+      gapX: 12,
       gapY: 2,
     })),
   })
@@ -122,7 +112,7 @@ async function renderMeasured(
   measuredPanel.style.height = `${result.totalHeight}px`
 
   const figImgs: HTMLImageElement[] = []
-  const figIndexByItem: number[] = []
+  const figItemIndex: number[] = []
   for (const item of result.items) {
     if (item.kind === 'line') {
       const line = materializeLineRange(text, item.range)
@@ -144,69 +134,69 @@ async function renderMeasured(
       fig.appendChild(img)
       measuredPanel.appendChild(fig)
       figImgs.push(img)
-      figIndexByItem.push(item.itemIndex)
+      figItemIndex.push(item.itemIndex)
     }
   }
 
-  const remainingDelay = Math.max(0, latencyMs - probeDelay)
-  // Observe only the async image-load phase, after layout placement.
-  const monitor = observeShifts(measuredPanel.parentElement!)
+  const monitor = observeShifts(measuredPanel)
   await Promise.all(
-    figImgs.map(async (img, i) => {
-      const itemIndex = figIndexByItem[i]!
-      const blob = blobs[itemIndex]!
-      const cachedUrl = getMeasurement(prepared[itemIndex]!).blobUrl
-      if (remainingDelay > 0) await sleep(remainingDelay)
-      return await new Promise<void>((resolve) => {
+    figImgs.map((img, i) => {
+      const itemIndex = figItemIndex[i]!
+      const url = getMeasurement(prepared[itemIndex]!).blobUrl ?? urls[itemIndex]!
+      return new Promise<void>((resolve) => {
         const done = (): void => {
           img.classList.add('loaded')
           resolve()
         }
         if (img.complete && img.naturalWidth > 0) done()
-        else img.onload = done
-        img.src = cachedUrl ?? URL.createObjectURL(blob)
+        else {
+          img.onload = done
+          img.onerror = done
+        }
+        img.src = url
       })
     }),
   )
   monitor.stop()
-  return { ms: performance.now() - t0, shifts: monitor.shifts(), prepareMs, lineCount: result.lineCount }
+  return {
+    ms: performance.now() - t0,
+    prepareMs,
+    lineCount: result.lineCount,
+    shifts: monitor.shifts(),
+  }
 }
 
 async function run(): Promise<void> {
   runButton.disabled = true
-  runButton.textContent = 'Loading photos…'
+  runButton.textContent = 'Checking network…'
   naivePanel.innerHTML = ''
-  nativePanel.innerHTML = ''
   measuredPanel.innerHTML = ''
-  naiveStat.textContent = 'loading…'
-  nativeStat.textContent = 'loading…'
-  measuredStat.textContent = 'loading…'
+  naiveStat.innerHTML = ''
+  measuredStat.innerHTML = ''
+  metaEl.textContent = ''
 
-  const loaded = await loadPhotos(FIGURES)
-  const blobs = loaded.map((l) => l.blob)
-  const picsumCount = loaded.filter((l) => l.origin === 'picsum').length
-  const latencyMs = latencyControl.read()
-  void latencyFor
-  const totalMB = blobs.reduce((a, b) => a + b.size, 0) / 1024 / 1024
-  metaEl.textContent =
-    `${FIGURES.length} photos · ${totalMB.toFixed(1)} MB · ` +
-    (picsumCount > 0 ? `${picsumCount}/${blobs.length} from picsum.photos` : 'picsum offline — canvas fallbacks') +
-    ` · simulating ${latencyMs}ms transfer per image`
+  const useLive = await picsumReachable()
+  const cacheBust = newCacheBustToken()
+  runButton.textContent = useLive ? 'Loading from picsum…' : 'Generating fallbacks…'
+  const resolved = await resolvePhotoUrls(FIGURES, cacheBust, useLive)
+  const urls = resolved.map((r) => r.url)
 
-  runButton.textContent = 'Rendering…'
-  naiveStat.textContent = 'rendering…'
-  nativeStat.textContent = 'rendering…'
-  measuredStat.textContent = 'rendering…'
+  metaEl.textContent = `${FIGURES.length} figures · ${useLive ? 'picsum.photos (cache-busted)' : 'picsum offline — canvas fallbacks'}`
 
-  const [naive, native, measured] = await Promise.all([
-    renderNaive(blobs, latencyMs),
-    renderNative(blobs, latencyMs),
-    renderMeasured(blobs, latencyMs),
-  ])
+  runButton.textContent = 'Running…'
 
-  naiveStat.textContent = `loaded in ${naive.ms.toFixed(0)}ms · ${naive.shifts} visible shifts`
-  nativeStat.textContent = `frames at t=${native.frameReadyAt.toFixed(0)}ms · loaded in ${native.ms.toFixed(0)}ms · ${native.shifts} visible shifts`
-  measuredStat.textContent = `frames at t=${measured.prepareMs.toFixed(0)}ms · ${measured.lineCount} lines placed · loaded in ${measured.ms.toFixed(0)}ms · ${measured.shifts} visible shifts`
+  const [naive, measured] = await Promise.all([renderNaive(urls), renderMeasured(urls)])
+
+  naiveStat.innerHTML = [
+    metric('loaded at', `${naive.ms.toFixed(0)}ms`),
+    metric('visible shifts', String(naive.shifts), naive.shifts > 0),
+  ].join('')
+  measuredStat.innerHTML = [
+    metric('frame placed at', `${measured.prepareMs.toFixed(0)}ms`),
+    metric('lines placed', String(measured.lineCount)),
+    metric('fully loaded at', `${measured.ms.toFixed(0)}ms`),
+    metric('visible shifts', String(measured.shifts), measured.shifts > 0),
+  ].join('')
 
   runButton.textContent = 'Run again'
   runButton.disabled = false
