@@ -5,7 +5,7 @@ import {
   resolvePhotoUrl,
   PICSUM_PHOTOS,
 } from './photo-source.js'
-import { observeShifts, waitForDominantColor } from './demo-utils.js'
+import { observeShifts, setPanelStatus, waitForDominantColor } from './demo-utils.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -15,6 +15,9 @@ const f3 = document.getElementById('f3')!
 const e1 = document.getElementById('e1')!
 const e2 = document.getElementById('e2')!
 const e3 = document.getElementById('e3')!
+const panel1 = f1.closest('.panel') as HTMLElement
+const panel2 = f2.closest('.panel') as HTMLElement
+const panel3 = f3.closest('.panel') as HTMLElement
 
 const PANEL_WIDTH = 320
 const MAX_FRAME_HEIGHT = 220
@@ -196,6 +199,20 @@ async function runPreimage(url: string): Promise<{ events: Event[]; shifts: numb
   }
 }
 
+async function resolveForPanel(
+  photo: { seed: string; width: number; height: number; caption?: string },
+  cacheBust: string | null,
+  useLive: boolean,
+  panelTag: string,
+): Promise<string> {
+  const hue = 200 + panelTag.length * 37
+  const resolved = await resolvePhotoUrl(photo, cacheBust, useLive, hue)
+  if (!useLive) return resolved.url // blob URL — panel-specific already
+  const base = resolved.url
+  const sep = base.includes('?') ? '&' : '?'
+  return `${base}${sep}panel=${panelTag}`
+}
+
 async function run(): Promise<void> {
   runButton.disabled = true
   runButton.textContent = 'Checking network…'
@@ -204,12 +221,14 @@ async function run(): Promise<void> {
   f2.innerHTML = ''
   f3.innerHTML = ''
   renderAllPlaceholders()
+  setPanelStatus(panel1, 'queued')
+  setPanelStatus(panel2, 'queued')
+  setPanelStatus(panel3, 'queued')
 
   const photo = PICSUM_PHOTOS[0]!
   const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
   runButton.textContent = useLive ? 'Fetching from picsum…' : 'Generating fallback…'
-  const resolved = await resolvePhotoUrl(photo, cacheBust, useLive, 200)
 
   metaEl.textContent =
     `${photo.caption ?? photo.seed} · ${photo.width}×${photo.height} · ` +
@@ -217,20 +236,29 @@ async function run(): Promise<void> {
       ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
       : 'picsum offline — canvas fallback (same aspect, no network term)')
 
-  runButton.textContent = 'Running…'
-
-  // The naive and native panels use the direct URL (real network). The
-  // preimage panel calls prepare(url), which internally streams the same
-  // URL — so all three race against the same network condition.
-  const [naive, native, preimaged] = await Promise.all([
-    runNaive(resolved.url),
-    runNative(resolved.url, photo.width, photo.height),
-    runPreimage(resolved.url),
-  ])
-
+  // Sequential across the three strategies. Each panel gets its own
+  // cache-busted URL so the later panels aren't trivially fast from
+  // the HTTP cache populated by earlier ones.
+  setPanelStatus(panel1, 'running')
+  runButton.textContent = 'Panel 1 (naive)…'
+  const naiveUrl = await resolveForPanel(photo, cacheBust, useLive, 'naive')
+  const naive = await runNaive(naiveUrl)
   renderEvents(e1, naive.events, naive.shifts)
+  setPanelStatus(panel1, 'done')
+
+  setPanelStatus(panel2, 'running')
+  runButton.textContent = 'Panel 2 (native)…'
+  const nativeUrl = await resolveForPanel(photo, cacheBust, useLive, 'native')
+  const native = await runNative(nativeUrl, photo.width, photo.height)
   renderEvents(e2, native.events, native.shifts)
+  setPanelStatus(panel2, 'done')
+
+  setPanelStatus(panel3, 'running')
+  runButton.textContent = 'Panel 3 (preimage)…'
+  const preimageUrl = await resolveForPanel(photo, cacheBust, useLive, 'preimage')
+  const preimaged = await runPreimage(preimageUrl)
   renderEvents(e3, preimaged.events, preimaged.shifts)
+  setPanelStatus(panel3, 'done')
 
   runButton.textContent = 'Run again'
   runButton.disabled = false

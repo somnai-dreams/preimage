@@ -6,7 +6,7 @@ import {
   picsumUrl,
   type PhotoDescriptor,
 } from './photo-source.js'
-import { waitForDominantColor } from './demo-utils.js'
+import { setPanelStatus, waitForDominantColor } from './demo-utils.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -25,6 +25,8 @@ const naiveTimeTag = document.getElementById('naiveTimeTag')!
 const pooledTimeTag = document.getElementById('pooledTimeTag')!
 const naiveCanvasWrap = naiveCanvas.parentElement!
 const pooledCanvasWrap = pooledCanvas.parentElement!
+const naivePanelEl = naiveCanvas.closest('.panel') as HTMLElement
+const pooledPanelEl = pooledCanvas.closest('.panel') as HTMLElement
 
 const FRAME_COUNT = 16
 
@@ -294,6 +296,8 @@ async function run(): Promise<void> {
   pooledSlider.value = '0'
   naiveCanvasWrap.style.backgroundColor = ''
   pooledCanvasWrap.style.backgroundColor = ''
+  setPanelStatus(naivePanelEl, 'queued')
+  setPanelStatus(pooledPanelEl, 'queued')
 
   const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
@@ -301,25 +305,26 @@ async function run(): Promise<void> {
     ? `Loading ${FRAME_COUNT} frames from picsum…`
     : `Generating ${FRAME_COUNT} canvas fallbacks…`
 
-  const [naiveResolved, pooledResolved] = await Promise.all([
-    resolvePhotosForPanel(useLive, cacheBust, 'naive'),
-    resolvePhotosForPanel(useLive, cacheBust, 'pool'),
-  ])
-
   metaEl.textContent =
     `${FRAME_COUNT} frames · ` +
     (useLive
       ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
       : 'picsum offline — canvas fallbacks')
 
-  runButton.textContent = 'Warming…'
+  // Sequential: each panel gets the full connection budget and its
+  // own URL-space. The naive panel's setup measures prepare() time;
+  // the pool panel's setup measures full-decode warming time.
+  setPanelStatus(naivePanelEl, 'running')
+  runButton.textContent = 'Panel 1 (naive setup)…'
+  const naiveResolved = await resolvePhotosForPanel(useLive, cacheBust, 'naive')
+  await bindNaive(naiveResolved.map((r) => r.url))
+  setPanelStatus(naivePanelEl, 'done')
 
-  // Each panel runs its own independent setup + bind. No shared state,
-  // no shared promises — each owns its own clock.
-  await Promise.all([
-    bindNaive(naiveResolved.map((r) => r.url)),
-    bindPool(pooledResolved.map((r) => r.url)),
-  ])
+  setPanelStatus(pooledPanelEl, 'running')
+  runButton.textContent = 'Panel 2 (pool warm)…'
+  const pooledResolved = await resolvePhotosForPanel(useLive, cacheBust, 'pool')
+  await bindPool(pooledResolved.map((r) => r.url))
+  setPanelStatus(pooledPanelEl, 'done')
 
   runButton.textContent = 'Reload with new frames'
   runButton.disabled = false

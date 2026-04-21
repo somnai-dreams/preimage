@@ -1,14 +1,15 @@
 import { prepareWithSegments, materializeLineRange } from '@chenglou/pretext'
 
-import { prepare, getMeasurement, type PreparedImage } from '../../src/index.js'
+import { prepare, getMeasurement } from '../../src/index.js'
 import { flowColumnWithFloats } from '../../src/pretext.js'
 import {
+  generateFallbackBlob,
   newCacheBustToken,
   picsumReachable,
-  resolvePhotoUrls,
+  picsumUrl,
   type PhotoDescriptor,
 } from './photo-source.js'
-import { observeShifts, paintDominantColorBehind } from './demo-utils.js'
+import { observeShifts, paintDominantColorBehind, setPanelStatus } from './demo-utils.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -16,6 +17,28 @@ const naivePanel = document.getElementById('naive')!
 const measuredPanel = document.getElementById('measured')!
 const naiveStat = document.getElementById('naiveStat')!
 const measuredStat = document.getElementById('measuredStat')!
+const naivePanelEl = naivePanel.closest('.panel') as HTMLElement
+const measuredPanelEl = measuredPanel.closest('.panel') as HTMLElement
+
+async function resolvePhotosForPanel(
+  useLive: boolean,
+  cacheBust: string | null,
+  panelTag: string,
+): Promise<Array<{ url: string }>> {
+  if (useLive) {
+    return FIGURES.map((p) => {
+      const base = picsumUrl(p, cacheBust)
+      const sep = base.includes('?') ? '&' : '?'
+      return { url: `${base}${sep}panel=${panelTag}` }
+    })
+  }
+  const out: Array<{ url: string }> = []
+  for (let i = 0; i < FIGURES.length; i++) {
+    const blob = await generateFallbackBlob(FIGURES[i]!, (i * 43 + panelTag.length) % 360)
+    out.push({ url: URL.createObjectURL(blob) })
+  }
+  return out
+}
 
 const COLUMN_WIDTH = 460
 const LINE_HEIGHT = 22
@@ -98,15 +121,15 @@ async function renderNaive(urls: readonly string[]): Promise<{ ms: number; shift
 
 async function renderMeasured(
   urls: readonly string[],
-  preparedPromise: Promise<PreparedImage[]>,
 ): Promise<{ ms: number; prepareMs: number; lineCount: number; shifts: number }> {
   const t0 = performance.now()
   measuredPanel.innerHTML = ''
   // fonts.ready and prepare() race in parallel; whichever is slower
-  // gates the layout. `preparedPromise` was started earlier in run()
-  // so naive's img.src fetches can't queue the prepare fetches behind
-  // themselves when the browser dedupes same-URL requests.
-  const [prepared] = await Promise.all([preparedPromise, document.fonts.ready])
+  // gates the layout.
+  const [prepared] = await Promise.all([
+    Promise.all(urls.map((u) => prepare(u, { extractDominantColor: true }))),
+    document.fonts.ready,
+  ])
   const prepareMs = performance.now() - t0
 
   const text = prepareWithSegments(ARTICLE, FONT)
@@ -191,12 +214,12 @@ async function run(): Promise<void> {
   measuredPanel.innerHTML = ''
   renderPlaceholderStats()
   metaEl.textContent = ''
+  setPanelStatus(naivePanelEl, 'queued')
+  setPanelStatus(measuredPanelEl, 'queued')
 
   const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
   runButton.textContent = useLive ? 'Loading from picsum…' : 'Generating fallbacks…'
-  const resolved = await resolvePhotoUrls(FIGURES, cacheBust, useLive)
-  const urls = resolved.map((r) => r.url)
 
   metaEl.textContent =
     `${FIGURES.length} figures · ` +
@@ -204,36 +227,31 @@ async function run(): Promise<void> {
       ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
       : 'picsum offline — canvas fallbacks')
 
-  runButton.textContent = 'Running…'
-
-  // Kick off prepares before renderNaive starts setting img.src. When
-  // both panels fetch the same URL, the browser can stall the second
-  // request behind the first's response headers; starting the
-  // streaming header-probe first ensures the measured panel isn't
-  // queued behind the naive panel's full-image downloads.
-  //
-  // `extractDominantColor` runs alongside the stream drain — each
-  // figure paints its averaged palette into its frame as soon as the
-  // color lands, so the placeholder isn't a flat library default.
-  const preparedPromise = Promise.all(
-    urls.map((u) => prepare(u, { extractDominantColor: true })),
-  )
-
-  const [naive, measured] = await Promise.all([
-    renderNaive(urls),
-    renderMeasured(urls, preparedPromise),
-  ])
-
+  // Sequential: naive first, measured second. Each panel uses its own
+  // URL-space so the second isn't a cache hit against the first.
+  setPanelStatus(naivePanelEl, 'running')
+  runButton.textContent = 'Panel 1 (naive)…'
+  const naiveUrls = (await resolvePhotosForPanel(useLive, cacheBust, 'naive')).map((r) => r.url)
+  const naive = await renderNaive(naiveUrls)
   naiveStat.innerHTML = [
     metric('loaded at', `${naive.ms.toFixed(0)}ms`),
     metric('visible shifts', String(naive.shifts), naive.shifts > 0),
   ].join('')
+  setPanelStatus(naivePanelEl, 'done')
+
+  setPanelStatus(measuredPanelEl, 'running')
+  runButton.textContent = 'Panel 2 (measured)…'
+  const measuredUrls = (
+    await resolvePhotosForPanel(useLive, cacheBust, 'measured')
+  ).map((r) => r.url)
+  const measured = await renderMeasured(measuredUrls)
   measuredStat.innerHTML = [
     metric('frame placed at', `${measured.prepareMs.toFixed(0)}ms`),
     metric('lines placed', String(measured.lineCount)),
     metric('fully loaded at', `${measured.ms.toFixed(0)}ms`),
     metric('visible shifts', String(measured.shifts), measured.shifts > 0),
   ].join('')
+  setPanelStatus(measuredPanelEl, 'done')
 
   runButton.textContent = 'Run again'
   runButton.disabled = false

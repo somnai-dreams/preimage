@@ -67,3 +67,38 @@ export async function paintDominantColorBehind(
   if (color !== null) el.style.backgroundColor = color
   return color
 }
+
+// Per-panel status: queued / running / done. Renders a small pill into
+// the panel header replacing the existing badge, and toggles a
+// `is-queued` class on the panel root so CSS can dim the panel while
+// it's waiting its turn. Sequential demos use this to make the
+// wait-then-run order obvious.
+export type PanelStatus = 'queued' | 'running' | 'done'
+
+export function setPanelStatus(panel: HTMLElement, status: PanelStatus, label?: string): void {
+  panel.classList.toggle('is-queued', status === 'queued')
+  const header = panel.querySelector<HTMLElement>('.panel-header')
+  if (header === null) return
+  let pill = header.querySelector<HTMLElement>('.panel-status')
+  if (pill === null) {
+    // Insert the pill after the existing kind-badge (reflow/stable)
+    // so both sit together on the right of the header.
+    pill = document.createElement('span')
+    pill.className = 'panel-status'
+    header.appendChild(pill)
+  }
+  pill.className = `panel-status ${status}`
+  pill.textContent = label ?? defaultStatusLabel(status)
+}
+
+export function clearPanelStatus(panel: HTMLElement): void {
+  panel.classList.remove('is-queued')
+  const pill = panel.querySelector<HTMLElement>('.panel-status')
+  if (pill !== null) pill.remove()
+}
+
+function defaultStatusLabel(status: PanelStatus): string {
+  if (status === 'queued') return 'queued'
+  if (status === 'running') return 'running'
+  return 'done'
+}

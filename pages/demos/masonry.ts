@@ -6,7 +6,7 @@ import {
   picsumUrl,
   type PhotoDescriptor,
 } from './photo-source.js'
-import { observeShifts, paintDominantColorBehind } from './demo-utils.js'
+import { observeShifts, paintDominantColorBehind, setPanelStatus } from './demo-utils.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -82,13 +82,24 @@ function layoutMasonry(
 
 type ResolvedPhoto = { url: string; origin: 'picsum' | 'fallback' }
 
-async function resolvePhotos(useLive: boolean, cacheBust: string | null): Promise<ResolvedPhoto[]> {
+async function resolvePhotosForPanel(
+  useLive: boolean,
+  cacheBust: string | null,
+  panelTag: string,
+): Promise<ResolvedPhoto[]> {
   if (useLive) {
-    return PHOTOS.map((p) => ({ url: picsumUrl(p, cacheBust), origin: 'picsum' as const }))
+    // Each panel gets its own URL-space so the second panel isn't
+    // served from the HTTP cache populated by the first (which would
+    // inflate the faster panel's apparent speed).
+    return PHOTOS.map((p) => {
+      const base = picsumUrl(p, cacheBust)
+      const sep = base.includes('?') ? '&' : '?'
+      return { url: `${base}${sep}panel=${panelTag}`, origin: 'picsum' as const }
+    })
   }
   const results: ResolvedPhoto[] = []
   for (let i = 0; i < PHOTOS.length; i++) {
-    const blob = await generateFallbackBlob(PHOTOS[i]!, (i * 43) % 360)
+    const blob = await generateFallbackBlob(PHOTOS[i]!, (i * 43 + panelTag.length) % 360)
     results.push({ url: URL.createObjectURL(blob), origin: 'fallback' })
   }
   return results
@@ -159,13 +170,15 @@ function renderPlaceholderStats(mode: Mode): void {
   measuredStat.innerHTML = labels.map((l) => metric(l, '—')).join('')
 }
 
-async function renderMeasuredBatch(
-  urls: readonly string[],
-  prepares: ReadonlyArray<Promise<PreparedImage>>,
-): Promise<BatchResult> {
+async function renderMeasuredBatch(urls: readonly string[]): Promise<BatchResult> {
   measuredPanel.innerHTML = ''
   const t0 = performance.now()
-  const prepared = await Promise.all(prepares)
+  // extractDominantColor populates measurement.dominantColor once the
+  // stream drains; paintDominantColorBehind waits on it and paints
+  // the tile background.
+  const prepared = await Promise.all(
+    urls.map((u) => prepare(u, { extractDominantColor: true })),
+  )
   const prepareMs = performance.now() - t0
 
   // Layout entirely from the measured aspect ratios. No library
@@ -229,10 +242,7 @@ async function renderMeasuredBatch(
 // waits for the slowest image. Existing frames never move once
 // placed, so the layout is still stable frame-by-frame — it just
 // grows as bytes arrive.
-async function renderMeasuredProgressive(
-  urls: readonly string[],
-  prepares: ReadonlyArray<Promise<PreparedImage>>,
-): Promise<ProgressiveResult> {
+async function renderMeasuredProgressive(urls: readonly string[]): Promise<ProgressiveResult> {
   measuredPanel.innerHTML = ''
   measuredPanel.style.height = '0px'
   const t0 = performance.now()
@@ -241,6 +251,7 @@ async function renderMeasuredProgressive(
   const heights = new Array<number>(COLUMNS).fill(0)
   let firstPlacedMs = 0
   let lastPlacedMs = 0
+  const prepares = urls.map((u) => prepare(u, { extractDominantColor: true }))
 
   await Promise.all(
     urls.map((url, idx) =>
@@ -299,12 +310,9 @@ async function renderMeasuredProgressive(
 
 function renderMeasured(
   urls: readonly string[],
-  prepares: ReadonlyArray<Promise<PreparedImage>>,
   mode: Mode,
 ): Promise<BatchResult | ProgressiveResult> {
-  return mode === 'batch'
-    ? renderMeasuredBatch(urls, prepares)
-    : renderMeasuredProgressive(urls, prepares)
+  return mode === 'batch' ? renderMeasuredBatch(urls) : renderMeasuredProgressive(urls)
 }
 
 const measuredSubEl = document.getElementById('measuredSub')!
@@ -316,6 +324,9 @@ function setMeasuredSub(mode: Mode): void {
       : 'each frame placed the moment its dimensions arrive · layout grows as bytes stream in'
 }
 
+const naivePanelEl = naivePanel.closest('.panel') as HTMLElement
+const measuredPanelEl = measuredPanel.closest('.panel') as HTMLElement
+
 async function run(): Promise<void> {
   const mode = getMode()
   setMeasuredSub(mode)
@@ -325,14 +336,14 @@ async function run(): Promise<void> {
   measuredPanel.innerHTML = ''
   renderPlaceholderStats(mode)
   metaEl.textContent = ''
+  setPanelStatus(naivePanelEl, 'queued')
+  setPanelStatus(measuredPanelEl, 'queued')
 
   const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
   runButton.textContent = useLive
     ? `Loading ${COUNT} photos from picsum…`
     : `Generating ${COUNT} canvas fallbacks…`
-  const resolved = await resolvePhotos(useLive, cacheBust)
-  const urls = resolved.map((r) => r.url)
 
   metaEl.textContent =
     `${COUNT} photos · ` +
@@ -340,29 +351,26 @@ async function run(): Promise<void> {
       ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
       : 'picsum offline — canvas fallbacks')
 
-  runButton.textContent = 'Running…'
-
-  // Kick off prepares before renderNaive starts setting img.src. When
-  // both panels fetch the same URL, the browser can stall the second
-  // request behind the first's response headers; starting the
-  // streaming header-probe first ensures the measured panel isn't
-  // queued behind the naive panel's full-image downloads.
-  //
-  // `extractDominantColor: true` pulls an averaged 1×1 color out of
-  // each image once the bytes have drained — demos paint it behind
-  // the tile as a colored placeholder before the full bitmap lands.
-  const prepares = urls.map((u) => prepare(u, { extractDominantColor: true }))
-
-  const [naive, measured] = await Promise.all([
-    renderNaive(urls),
-    renderMeasured(urls, prepares, mode),
-  ])
-
+  // Sequential: each panel gets the full connection budget while it's
+  // the one running, so timings aren't polluted by pool contention.
+  // Each panel resolves its own URLs (with its own panel=X suffix)
+  // so the second one isn't a cache hit against the first.
+  setPanelStatus(naivePanelEl, 'running')
+  runButton.textContent = 'Panel 1 (naive)…'
+  const naiveUrls = (await resolvePhotosForPanel(useLive, cacheBust, 'naive')).map((r) => r.url)
+  const naive = await renderNaive(naiveUrls)
   naiveStat.innerHTML = [
     metric('loaded at', `${naive.ms.toFixed(0)}ms`),
     metric('visible shifts', String(naive.shifts), naive.shifts > 0),
   ].join('')
+  setPanelStatus(naivePanelEl, 'done')
 
+  setPanelStatus(measuredPanelEl, 'running')
+  runButton.textContent = 'Panel 2 (measured)…'
+  const measuredUrls = (
+    await resolvePhotosForPanel(useLive, cacheBust, 'measured')
+  ).map((r) => r.url)
+  const measured = await renderMeasured(measuredUrls, mode)
   if (measured.mode === 'batch') {
     measuredStat.innerHTML = [
       metric('frames placed at', `${measured.prepareMs.toFixed(0)}ms`),
@@ -378,6 +386,7 @@ async function run(): Promise<void> {
       metric('column height', `${Math.round(measured.totalHeight)}px`),
     ].join('')
   }
+  setPanelStatus(measuredPanelEl, 'done')
 
   runButton.textContent = 'Run again'
   runButton.disabled = false

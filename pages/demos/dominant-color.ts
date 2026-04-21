@@ -6,16 +6,20 @@ import {
   picsumUrl,
   type PhotoDescriptor,
 } from './photo-source.js'
-import { waitForDominantColor } from './demo-utils.js'
+import { setPanelStatus, waitForDominantColor } from './demo-utils.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
 const plainPanel = document.getElementById('plain')!
 const coloredPanel = document.getElementById('colored')!
+const plainPanelEl = plainPanel.closest('.panel') as HTMLElement
+const coloredPanelEl = coloredPanel.closest('.panel') as HTMLElement
 const plainStat = document.getElementById('plainStat')!
 const coloredStat = document.getElementById('coloredStat')!
 
 const COUNT = 16
+const COLUMNS = 4
+const GAP = 10
 
 const ASPECTS: Array<[number, number, string]> = [
   [1600, 1067, 'preimage-dominant-warm-1'],
@@ -64,16 +68,12 @@ async function resolvePhotosForPanel(
   panelTag: string,
 ): Promise<ResolvedPhoto[]> {
   if (useLive) {
-    // Each panel gets its own URL suffix so the browser doesn't
-    // dedupe the two panels' fetches into one.
     return PHOTOS.map((p) => {
       const base = picsumUrl(p, cacheBust)
       const sep = base.includes('?') ? '&' : '?'
       return { url: `${base}${sep}panel=${panelTag}` }
     })
   }
-  // Offline: each panel gets its own canvas-fallback blob URL. They're
-  // independent memory objects so there's no shared-fetch concern.
   const out: ResolvedPhoto[] = []
   for (let i = 0; i < PHOTOS.length; i++) {
     const blob = await generateFallbackBlob(PHOTOS[i]!, (i * 43 + panelTag.length) % 360)
@@ -82,9 +82,38 @@ async function resolvePhotosForPanel(
   return out
 }
 
-function createTile(): { container: HTMLElement; fill: HTMLElement; img: HTMLImageElement } {
+type Placement = { x: number; y: number; width: number; height: number }
+
+function layoutShortestColumn(
+  aspects: readonly number[],
+  panelWidth: number,
+): { placements: Placement[]; totalHeight: number } {
+  const colWidth = (panelWidth - GAP * (COLUMNS - 1)) / COLUMNS
+  const heights = new Array<number>(COLUMNS).fill(0)
+  const placements: Placement[] = []
+  for (const aspect of aspects) {
+    let shortest = 0
+    for (let c = 1; c < COLUMNS; c++) {
+      if (heights[c]! < heights[shortest]!) shortest = c
+    }
+    const h = colWidth / aspect
+    const x = shortest * (colWidth + GAP)
+    const y = heights[shortest]!
+    placements.push({ x, y, width: colWidth, height: h })
+    heights[shortest] = y + h + GAP
+  }
+  return { placements, totalHeight: Math.max(...heights) - GAP }
+}
+
+type Tile = { container: HTMLElement; fill: HTMLElement; img: HTMLImageElement }
+
+function createTile(place: Placement, withNoColor: boolean): Tile {
   const container = document.createElement('div')
-  container.className = 'tile no-color'
+  container.className = withNoColor ? 'tile no-color' : 'tile'
+  container.style.left = `${place.x}px`
+  container.style.top = `${place.y}px`
+  container.style.width = `${place.width}px`
+  container.style.height = `${place.height}px`
   const fill = document.createElement('div')
   fill.className = 'fill'
   const img = document.createElement('img')
@@ -103,135 +132,144 @@ function imgLoaded(img: HTMLImageElement): Promise<void> {
 }
 
 type PlainStats = {
-  firstTileAt: number
-  lastTileAt: number
-  allImagesLoadedAt: number
+  measuredMs: number
+  laidOutMs: number
+  imagesLoadedMs: number
 }
 
-// Plain path: plain prepare(), no color. Each tile is rendered the
-// moment its own prepare() resolves; img loads and fully-loaded time
-// is tracked independently from tile placement.
 async function runPlain(urls: readonly string[]): Promise<PlainStats> {
-  plainPanel.innerHTML = ''
+  // Panel timer starts only when this panel actually begins its work.
   const t0 = performance.now()
-  const tiles = urls.map(() => {
-    const t = createTile()
-    plainPanel.appendChild(t.container)
-    return t
+  plainPanel.innerHTML = ''
+  plainPanel.style.height = '0px'
+
+  // 1. Measure every image up front. This is the library's contract:
+  //    dimensions known before layout runs, no thrashing while each
+  //    one's aspect ratio arrives.
+  const prepared = await Promise.all(urls.map((u) => prepare(u)))
+  const measuredMs = performance.now() - t0
+
+  // 2. Lay out the shortest-column grid from the measured aspects
+  //    and commit the panel height + every tile's (x, y, w, h) in
+  //    one synchronous pass.
+  const panelWidth = plainPanel.getBoundingClientRect().width
+  const aspects = prepared.map((p) => getMeasurement(p).aspectRatio)
+  const { placements, totalHeight } = layoutShortestColumn(aspects, panelWidth)
+  plainPanel.style.height = `${totalHeight}px`
+
+  const frag = document.createDocumentFragment()
+  const tiles = prepared.map((_, i) => {
+    const tile = createTile(placements[i]!, false)
+    frag.appendChild(tile.container)
+    return tile
   })
+  plainPanel.appendChild(frag)
+  const laidOutMs = performance.now() - t0
 
-  let firstTileAt = 0
-  let lastTileAt = 0
-  let placedCount = 0
-
-  const imgLoads: Promise<void>[] = []
-
-  const placements = urls.map((url, i) =>
-    prepare(url).then((prepared) => {
-      const tile = tiles[i]!
-      const m = getMeasurement(prepared)
-      tile.container.style.aspectRatio = `${m.displayWidth} / ${m.displayHeight}`
-      const now = performance.now() - t0
-      if (firstTileAt === 0) firstTileAt = now
-      lastTileAt = now
-      placedCount++
-      const src = m.blobUrl ?? url
-      const p = imgLoaded(tile.img)
-      imgLoads.push(p)
-      tile.img.addEventListener('load', () => tile.img.classList.add('loaded'), { once: true })
-      tile.img.src = src
-    }),
-  )
-
-  await Promise.all(placements)
+  // 3. Kick off image loads; fully-loaded time measured independently.
+  const imgLoads = tiles.map((tile, i) => {
+    const src = getMeasurement(prepared[i]!).blobUrl ?? urls[i]!
+    const p = imgLoaded(tile.img)
+    tile.img.addEventListener('load', () => tile.img.classList.add('loaded'), { once: true })
+    tile.img.src = src
+    return p
+  })
   await Promise.all(imgLoads)
-  const allImagesLoadedAt = performance.now() - t0
-  return { firstTileAt, lastTileAt, allImagesLoadedAt }
+  const imagesLoadedMs = performance.now() - t0
+  return { measuredMs, laidOutMs, imagesLoadedMs }
 }
 
 type ColoredStats = {
-  firstTileAt: number
-  firstColorAt: number
-  lastColorAt: number
-  allImagesLoadedAt: number
+  measuredMs: number
+  laidOutMs: number
+  firstColorMs: number
+  allColorsMs: number
+  imagesLoadedMs: number
 }
 
-// Colored path: prepare({ extractDominantColor: true }). Tile placement,
-// image loading, and color arrival are each driven by their own events
-// — no ordering coupling between them.
 async function runColored(urls: readonly string[]): Promise<ColoredStats> {
-  coloredPanel.innerHTML = ''
   const t0 = performance.now()
-  const tiles = urls.map(() => {
-    const t = createTile()
-    coloredPanel.appendChild(t.container)
-    return t
+  coloredPanel.innerHTML = ''
+  coloredPanel.style.height = '0px'
+
+  const prepared = await Promise.all(
+    urls.map((u) => prepare(u, { extractDominantColor: true })),
+  )
+  const measuredMs = performance.now() - t0
+
+  const panelWidth = coloredPanel.getBoundingClientRect().width
+  const aspects = prepared.map((p) => getMeasurement(p).aspectRatio)
+  const { placements, totalHeight } = layoutShortestColumn(aspects, panelWidth)
+  coloredPanel.style.height = `${totalHeight}px`
+
+  const frag = document.createDocumentFragment()
+  const tiles = prepared.map((_, i) => {
+    const tile = createTile(placements[i]!, true)
+    frag.appendChild(tile.container)
+    return tile
   })
+  coloredPanel.appendChild(frag)
+  const laidOutMs = performance.now() - t0
 
-  let firstTileAt = 0
-  let firstColorAt = 0
-  let lastColorAt = 0
+  let firstColorMs = 0
+  let allColorsMs = 0
   let colorsPainted = 0
-
-  const imgLoads: Promise<void>[] = []
-  const colorArrivals: Promise<void>[] = []
-
-  const placements = urls.map((url, i) =>
-    prepare(url, { extractDominantColor: true }).then((prepared: PreparedImage) => {
+  const colorArrivals = prepared.map((p, i) =>
+    waitForDominantColor(p).then((color) => {
+      if (color === null) return
       const tile = tiles[i]!
-      const m = getMeasurement(prepared)
-      tile.container.style.aspectRatio = `${m.displayWidth} / ${m.displayHeight}`
+      tile.fill.style.backgroundColor = color
+      tile.container.classList.remove('no-color')
       const now = performance.now() - t0
-      if (firstTileAt === 0) firstTileAt = now
-
-      // Image load track (independent of color arrival).
-      const src = m.blobUrl ?? url
-      imgLoads.push(imgLoaded(tile.img))
-      tile.img.addEventListener('load', () => tile.img.classList.add('loaded'), { once: true })
-      tile.img.src = src
-
-      // Color track (independent of image load).
-      colorArrivals.push(
-        waitForDominantColor(prepared).then((color) => {
-          if (color === null) return
-          tile.fill.style.backgroundColor = color
-          tile.container.classList.remove('no-color')
-          const tc = performance.now() - t0
-          if (firstColorAt === 0) firstColorAt = tc
-          colorsPainted++
-          if (colorsPainted === urls.length) lastColorAt = tc
-        }),
-      )
+      if (firstColorMs === 0) firstColorMs = now
+      colorsPainted++
+      if (colorsPainted === prepared.length) allColorsMs = now
     }),
   )
 
-  await Promise.all(placements)
+  const imgLoads = tiles.map((tile, i) => {
+    const src = getMeasurement(prepared[i]!).blobUrl ?? urls[i]!
+    const pr = imgLoaded(tile.img)
+    tile.img.addEventListener('load', () => tile.img.classList.add('loaded'), { once: true })
+    tile.img.src = src
+    return pr
+  })
   await Promise.all(imgLoads)
-  const allImagesLoadedAt = performance.now() - t0
+  const imagesLoadedMs = performance.now() - t0
   await Promise.all(colorArrivals)
-  return { firstTileAt, firstColorAt, lastColorAt, allImagesLoadedAt }
+  return { measuredMs, laidOutMs, firstColorMs, allColorsMs, imagesLoadedMs }
+}
+
+function resetStats(): void {
+  setStat(plainStat, [
+    ['dimensions measured', '—'],
+    ['grid laid out', '—'],
+    ['images loaded', '—'],
+  ])
+  setStat(coloredStat, [
+    ['dimensions measured', '—'],
+    ['grid laid out', '—'],
+    ['first color', '—'],
+    ['all colors', '—'],
+    ['images loaded', '—'],
+  ])
 }
 
 async function run(): Promise<void> {
   runButton.disabled = true
   runButton.textContent = 'Checking network…'
-  // Stat placeholders are baked into the HTML. Reset to the same
-  // placeholder shape between runs so real values drop in without a
-  // reflow.
-  setStat(plainStat, [
-    ['first tile placed at', '—'],
-    ['last tile placed at', '—'],
-    ['images fully loaded at', '—'],
-  ])
-  setStat(coloredStat, [
-    ['first tile placed at', '—'],
-    ['first color painted at', '—'],
-    ['all colors painted at', '—'],
-    ['images fully loaded at', '—'],
-  ])
+  resetStats()
   plainPanel.innerHTML = ''
   coloredPanel.innerHTML = ''
+  plainPanel.style.height = '0px'
+  coloredPanel.style.height = '0px'
   metaEl.textContent = ''
+
+  // Sequential: plain first, then colored. Each gets the full
+  // connection-pool budget while it's running, so the timings
+  // aren't polluted by contention with the other panel.
+  setPanelStatus(plainPanelEl, 'running', 'running')
+  setPanelStatus(coloredPanelEl, 'queued', 'queued')
 
   const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
@@ -239,13 +277,7 @@ async function run(): Promise<void> {
     ? `Loading ${COUNT} photos from picsum…`
     : `Generating ${COUNT} canvas fallbacks…`
 
-  // Each panel resolves its own URLs — no sharing, no coordination.
-  const [plainResolved, coloredResolved] = await Promise.all([
-    resolvePhotosForPanel(useLive, cacheBust, 'plain'),
-    resolvePhotosForPanel(useLive, cacheBust, 'colored'),
-  ])
-  const plainUrls = plainResolved.map((r) => r.url)
-  const coloredUrls = coloredResolved.map((r) => r.url)
+  const plainResolved = await resolvePhotosForPanel(useLive, cacheBust, 'plain')
 
   metaEl.textContent =
     `${COUNT} photos · ` +
@@ -253,29 +285,29 @@ async function run(): Promise<void> {
       ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
       : 'picsum offline — canvas fallbacks')
 
-  runButton.textContent = 'Running…'
+  runButton.textContent = 'Panel 1 (plain)…'
+  const plainStats = await runPlain(plainResolved.map((r) => r.url))
+  setStat(plainStat, [
+    ['dimensions measured', `${plainStats.measuredMs.toFixed(0)}ms`],
+    ['grid laid out', `${plainStats.laidOutMs.toFixed(0)}ms`],
+    ['images loaded', `${plainStats.imagesLoadedMs.toFixed(0)}ms`],
+  ])
+  setPanelStatus(plainPanelEl, 'done', 'done')
 
-  // Two truly independent paths. Each returns its own stats shape
-  // measured from its own t0. The Promise.all at the top level is
-  // only so the UI unblocks once both finish; neither path depends
-  // on the other.
-  const plainTask = runPlain(plainUrls).then((stats) => {
-    setStat(plainStat, [
-      ['first tile placed at', `${stats.firstTileAt.toFixed(0)}ms`],
-      ['last tile placed at', `${stats.lastTileAt.toFixed(0)}ms`],
-      ['images fully loaded at', `${stats.allImagesLoadedAt.toFixed(0)}ms`],
-    ])
-  })
-  const coloredTask = runColored(coloredUrls).then((stats) => {
-    setStat(coloredStat, [
-      ['first tile placed at', `${stats.firstTileAt.toFixed(0)}ms`],
-      ['first color painted at', `${stats.firstColorAt.toFixed(0)}ms`],
-      ['all colors painted at', `${stats.lastColorAt.toFixed(0)}ms`],
-      ['images fully loaded at', `${stats.allImagesLoadedAt.toFixed(0)}ms`],
-    ])
-  })
+  runButton.textContent = 'Resolving panel 2…'
+  setPanelStatus(coloredPanelEl, 'running', 'running')
+  const coloredResolved = await resolvePhotosForPanel(useLive, cacheBust, 'colored')
 
-  await Promise.all([plainTask, coloredTask])
+  runButton.textContent = 'Panel 2 (dominant color)…'
+  const coloredStats = await runColored(coloredResolved.map((r) => r.url))
+  setStat(coloredStat, [
+    ['dimensions measured', `${coloredStats.measuredMs.toFixed(0)}ms`],
+    ['grid laid out', `${coloredStats.laidOutMs.toFixed(0)}ms`],
+    ['first color', `${coloredStats.firstColorMs.toFixed(0)}ms`],
+    ['all colors', `${coloredStats.allColorsMs.toFixed(0)}ms`],
+    ['images loaded', `${coloredStats.imagesLoadedMs.toFixed(0)}ms`],
+  ])
+  setPanelStatus(coloredPanelEl, 'done', 'done')
 
   runButton.textContent = 'Run again'
   runButton.disabled = false

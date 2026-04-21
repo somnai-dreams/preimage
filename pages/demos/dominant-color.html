@@ -6,14 +6,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="./demo-styles.css" />
   <style>
-    .tile-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-    .tile { position: relative; border-radius: var(--radius-sm); overflow: hidden; background: var(--surface-muted); }
-    .tile .fill { position: absolute; inset: 0; transition: background-color 180ms ease; }
-    .tile img { position: relative; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 320ms ease-out; }
+    /* The grid is positioned absolutely over a shortest-column
+       masonry fill computed from preimage's measured aspect ratios.
+       The panel's height and every tile's (x, y, w, h) are known
+       before paint — exactly what the library exists to enable. */
+    .tile-grid { position: relative; }
+    .tile { position: absolute; border-radius: var(--radius-sm); overflow: hidden; background: var(--surface-muted); }
+    .tile .fill { position: absolute; inset: 0; transition: background-color 220ms ease; }
+    .tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 320ms ease-out; }
     .tile img.loaded { opacity: 1; }
     .tile.no-color .fill { background: var(--surface-muted); }
-    .tile-foot { display: flex; justify-content: space-between; align-items: center; padding: 6px 2px 0; font-size: 11px; color: var(--text-soft); font-variant-numeric: tabular-nums; }
-    .tile-foot .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; border: 1px solid var(--border); vertical-align: middle; margin-right: 4px; }
     .panels.two { gap: 24px; }
   </style>
 </head>
@@ -55,7 +57,7 @@
           <span class="badge reflow">grey wait</span>
         </div>
         <p class="panel-sub">tile backgrounds stay at the page default until the full image paints</p>
-        <div class="panel-stat" id="plainStat"><span class="metric">first tile placed at <b>&mdash;</b></span><span class="metric">last tile placed at <b>&mdash;</b></span><span class="metric">images fully loaded at <b>&mdash;</b></span></div>
+        <div class="panel-stat" id="plainStat"><span class="metric">dimensions measured <b>&mdash;</b></span><span class="metric">grid laid out <b>&mdash;</b></span><span class="metric">images loaded <b>&mdash;</b></span></div>
         <div id="plain" class="tile-grid"></div>
       </section>
 
@@ -65,7 +67,7 @@
           <span class="badge stable">colored wait</span>
         </div>
         <p class="panel-sub">1×1 native resample arrives after dimensions · painted as each tile's background</p>
-        <div class="panel-stat" id="coloredStat"><span class="metric">first tile placed at <b>&mdash;</b></span><span class="metric">first color painted at <b>&mdash;</b></span><span class="metric">all colors painted at <b>&mdash;</b></span><span class="metric">images fully loaded at <b>&mdash;</b></span></div>
+        <div class="panel-stat" id="coloredStat"><span class="metric">dimensions measured <b>&mdash;</b></span><span class="metric">grid laid out <b>&mdash;</b></span><span class="metric">first color <b>&mdash;</b></span><span class="metric">all colors <b>&mdash;</b></span><span class="metric">images loaded <b>&mdash;</b></span></div>
         <div id="colored" class="tile-grid"></div>
       </section>
     </div>

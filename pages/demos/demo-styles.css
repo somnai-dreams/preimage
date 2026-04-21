@@ -199,7 +199,6 @@ button.primary:disabled {
 .panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   margin-bottom: 6px;
 }
@@ -210,6 +209,9 @@ button.primary:disabled {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin: 0;
+  /* Push any trailing siblings (badge + panel-status) to the right */
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .panel-title code {
   text-transform: none;
@@ -230,22 +232,87 @@ button.primary:disabled {
 }
 .panel-stat {
   display: flex;
-  gap: 12px;
+  gap: 8px 14px;
   font-size: 12px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   margin-bottom: 12px;
   flex-wrap: wrap;
+  /* Reserve room for two lines of metrics so swapping placeholder
+     dashes for real values can never grow the container. All demos
+     fit inside this budget; shorter rows leave harmless whitespace. */
+  min-height: calc(2 * 1.55em + 8px);
+  align-content: flex-start;
 }
 .panel-stat .metric {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
+  white-space: nowrap;
 }
 .panel-stat .metric b {
   color: var(--text);
   font-weight: 600;
   font-size: 13px;
+}
+
+/* Per-panel lifecycle status. Shown in the panel header while a demo
+   is mid-run so the user sees which panel is currently active vs
+   queued. `queued` panels dim their stat & content areas to make it
+   obvious they're waiting their turn. */
+.panel-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 18px;
+}
+.panel-status.queued {
+  background: var(--surface-muted);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+}
+.panel-status.running {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent);
+  border: 1px solid rgba(37, 99, 235, 0.3);
+}
+.panel-status.done {
+  background: var(--stable-bg);
+  color: var(--stable);
+  border: 1px solid #bbf7d0;
+}
+.panel-status.queued::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+.panel-status.running::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+.panel.is-queued .panel-stat,
+.panel.is-queued > div:not(.panel-header):not(.panel-sub) {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 /* Badges */
