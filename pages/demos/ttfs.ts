@@ -5,7 +5,7 @@ import {
   resolvePhotoUrl,
   PICSUM_PHOTOS,
 } from './photo-source.js'
-import { observeShifts } from './demo-utils.js'
+import { observeShifts, waitForDominantColor } from './demo-utils.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -54,7 +54,7 @@ function renderEventsPlaceholder(host: HTMLElement, labels: readonly string[]): 
 
 const NAIVE_EVENTS = ['dims known (onload)', 'image painted']
 const NATIVE_EVENTS = ['dims known (from attrs)', 'image painted']
-const PREIMAGE_EVENTS = ['dims known (prepare)', 'image painted']
+const PREIMAGE_EVENTS = ['dims known (prepare)', 'image painted', 'dominant color at']
 
 function renderAllPlaceholders(): void {
   renderEventsPlaceholder(e1, NAIVE_EVENTS)
@@ -151,10 +151,19 @@ async function runPreimage(url: string): Promise<{ events: Event[]; shifts: numb
   f3.innerHTML = ''
   const stage = f3.parentElement!
   const t0 = performance.now()
-  const prepared = await prepare(url)
+  const prepared = await prepare(url, { extractDominantColor: true })
   const m = getMeasurement(prepared)
   const preparedAt = performance.now() - t0
   const frame = aspectFrame(f3, m.naturalWidth, m.naturalHeight, `measured ${m.naturalWidth}×${m.naturalHeight}`)
+  // Colour track runs on its own clock — paint the frame background
+  // the moment the averaged pixel arrives.
+  let colorAt = 0
+  const colorPromise = waitForDominantColor(prepared).then((color) => {
+    if (color === null) return null
+    frame.style.backgroundColor = color
+    colorAt = performance.now() - t0
+    return color
+  })
   const img = document.createElement('img')
   frame.appendChild(img)
   const monitor = observeShifts(stage)
@@ -171,11 +180,17 @@ async function runPreimage(url: string): Promise<{ events: Event[]; shifts: numb
     img.src = m.blobUrl ?? url
   })
   const paintedAt = performance.now() - t0
+  const color = await colorPromise
   monitor.stop()
   return {
     events: [
       { label: 'dims known (prepare)', t: preparedAt, note: `${m.naturalWidth}×${m.naturalHeight}` },
       { label: 'image painted', t: paintedAt },
+      {
+        label: 'dominant color at',
+        t: colorAt,
+        note: color ?? 'unavailable',
+      },
     ],
     shifts: monitor.shifts(),
   }

@@ -8,7 +8,7 @@ import {
   resolvePhotoUrls,
   type PhotoDescriptor,
 } from './photo-source.js'
-import { observeShifts } from './demo-utils.js'
+import { observeShifts, paintDominantColorBehind } from './demo-utils.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -152,6 +152,7 @@ async function renderMeasured(
       measuredPanel.appendChild(fig)
       figImgs.push(img)
       figItemIndex.push(item.itemIndex)
+      void paintDominantColorBehind(prepared[item.itemIndex]!, fig)
     }
   }
 
@@ -210,7 +211,13 @@ async function run(): Promise<void> {
   // request behind the first's response headers; starting the
   // streaming header-probe first ensures the measured panel isn't
   // queued behind the naive panel's full-image downloads.
-  const preparedPromise = Promise.all(urls.map((u) => prepare(u)))
+  //
+  // `extractDominantColor` runs alongside the stream drain — each
+  // figure paints its averaged palette into its frame as soon as the
+  // color lands, so the placeholder isn't a flat library default.
+  const preparedPromise = Promise.all(
+    urls.map((u) => prepare(u, { extractDominantColor: true })),
+  )
 
   const [naive, measured] = await Promise.all([
     renderNaive(urls),

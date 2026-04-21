@@ -6,7 +6,7 @@ import {
   picsumUrl,
   type PhotoDescriptor,
 } from './photo-source.js'
-import { observeShifts } from './demo-utils.js'
+import { observeShifts, paintDominantColorBehind } from './demo-utils.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -176,6 +176,7 @@ async function renderMeasuredBatch(
   measuredPanel.style.height = `${totalHeight}px`
 
   const imgs: HTMLImageElement[] = []
+  const items: HTMLElement[] = []
   for (let i = 0; i < placements.length; i++) {
     const p = placements[i]!
     const item = document.createElement('div')
@@ -188,6 +189,11 @@ async function renderMeasuredBatch(
     item.appendChild(img)
     measuredPanel.appendChild(item)
     imgs.push(img)
+    items.push(item)
+    // Dominant color arrives asynchronously and paints the tile's
+    // background so the placeholder is the photo's actual palette,
+    // not the page's default surface tone.
+    void paintDominantColorBehind(prepared[i]!, item)
   }
 
   const monitor = observeShifts(measuredPanel)
@@ -263,6 +269,7 @@ async function renderMeasuredProgressive(
         const img = document.createElement('img')
         item.appendChild(img)
         measuredPanel.appendChild(item)
+        void paintDominantColorBehind(p, item)
 
         const cachedUrl = getMeasurement(p).blobUrl ?? url
         return new Promise<void>((resolve) => {
@@ -340,7 +347,11 @@ async function run(): Promise<void> {
   // request behind the first's response headers; starting the
   // streaming header-probe first ensures the measured panel isn't
   // queued behind the naive panel's full-image downloads.
-  const prepares = urls.map((u) => prepare(u))
+  //
+  // `extractDominantColor: true` pulls an averaged 1×1 color out of
+  // each image once the bytes have drained — demos paint it behind
+  // the tile as a colored placeholder before the full bitmap lands.
+  const prepares = urls.map((u) => prepare(u, { extractDominantColor: true }))
 
   const [naive, measured] = await Promise.all([
     renderNaive(urls),

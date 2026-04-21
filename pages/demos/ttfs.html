@@ -58,7 +58,7 @@
         <div class="ttfs-stage">
           <div class="ttfs-frame raw" id="f1"></div>
           <div class="ttfs-below">Paragraph below the image. With nothing declared, the browser reserves zero space and this text jumps when the image's natural size arrives.</div>
-          <div class="events" id="e1"></div>
+          <div class="events" id="e1"><div class="row"><span>dims known (onload)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div></div>
         </div>
       </section>
 
@@ -71,7 +71,7 @@
         <div class="ttfs-stage">
           <div class="ttfs-frame" id="f2"></div>
           <div class="ttfs-below">Paragraph below the image. The <code>width</code>/<code>height</code> attributes let the browser reserve an aspect-ratio box from first paint.</div>
-          <div class="events" id="e2"></div>
+          <div class="events" id="e2"><div class="row"><span>dims known (from attrs)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div></div>
         </div>
       </section>
 
@@ -84,7 +84,7 @@
         <div class="ttfs-stage">
           <div class="ttfs-frame" id="f3"></div>
           <div class="ttfs-below">Paragraph below the image. Preimage streams the fetch, parses the header as bytes arrive, and reserves the frame long before the full transfer completes.</div>
-          <div class="events" id="e3"></div>
+          <div class="events" id="e3"><div class="row"><span>dims known (prepare)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>dominant color at</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div></div>
         </div>
       </section>
     </div>

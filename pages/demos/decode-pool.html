@@ -55,11 +55,11 @@
           <span class="badge reflow">jank</span>
         </div>
         <p class="panel-sub">browser decodes each frame on the main thread, every scrub</p>
-        <div class="panel-stat" id="naiveStat"></div>
+        <div class="panel-stat" id="naiveStat"><span class="metric">setup <b>&mdash;</b></span><span class="metric">avg scrub frame <b>&mdash;</b></span><span class="metric">slowest scrub <b>&mdash;</b></span><span class="metric">scrubs <b>&mdash;</b></span></div>
         <div class="canvas-wrap">
           <div class="hud">
             <span id="naiveFrameTag">frame 1</span>
-            <span id="naiveTimeTag" class="tag">—</span>
+            <span id="naiveTimeTag" class="tag">&mdash;</span>
           </div>
           <canvas id="naiveCanvas"></canvas>
           <div class="scrub">
@@ -76,7 +76,7 @@
           <span class="badge stable">smooth</span>
         </div>
         <p class="panel-sub">bitmaps decoded once off-main-thread · scrub is a single blit</p>
-        <div class="panel-stat" id="pooledStat"></div>
+        <div class="panel-stat" id="pooledStat"><span class="metric">setup <b>&mdash;</b></span><span class="metric">avg scrub frame <b>&mdash;</b></span><span class="metric">slowest scrub <b>&mdash;</b></span><span class="metric">scrubs <b>&mdash;</b></span></div>
         <div class="canvas-wrap">
           <div class="hud">
             <span id="pooledFrameTag">frame 1</span>
