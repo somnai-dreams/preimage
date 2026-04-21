@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.4
+
+- Removed `@somnai-dreams/preimage/gallery`. Row packing isn't part of preimage's remit — it's a layout concern that lives at the caller. Deleted `src/gallery.ts` and dropped the subpath export.
+
 ## 0.0.3
 
 Time-to-first-sizing.

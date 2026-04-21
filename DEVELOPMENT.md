@@ -27,7 +27,6 @@ bun start               # run the demo site locally on port 3000
 | `src/orientation.ts` | EXIF orientation (codes 1–8) |
 | `src/fit.ts` | pure CSS object-fit math |
 | `src/prepare.ts` | single-image `prepare()` / `layout()` |
-| `src/gallery.ts` | standalone justified / fixed-height row packer |
 | `src/pretext-float.ts` | pretext integration: `flowColumnWithFloats`, `solveFloat` |
 | `src/pretext-inline.ts` | pretext integration: `inlineImage`, `resolveMixedInlineItems` |
 | `src/index.ts` | main entry barrel |

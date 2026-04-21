@@ -9,13 +9,13 @@ Preimage answers that question. It loads and decodes images once (via `HTMLImage
 - **`flowColumnWithFloats`** — drives pretext's cursor loop, reserves horizontal space for a floated image, yields a stream of placed lines + placed images with absolute `(x, y, w, h)`.
 - **`inlineImage` / `resolveMixedInlineItems`** — return pretext `RichInlineItem` values whose `extraWidth` reserves the measured image's rendered width, so pretext's rich-inline walker treats it as an atomic pill that wraps naturally with surrounding text.
 
-Plus the primitives those adapters are built on (`prepare`, `layout`, `fitRect`, EXIF orientation, SVG viewBox extraction), plus a standalone justified-gallery row packer for pure image grids.
+Plus the primitives those adapters are built on — `prepare`, `layout`, `fitRect`, EXIF orientation handling, SVG viewBox extraction, and byte-level `probeImageBytes` for File/Blob sources.
 
 ## Demos at a glance
 
 | | |
 |---|---|
-| **[Masonry](./pages/demos/masonry.html)** — 24 fresh image Blobs into a grid. Left: naive `<img>` with no declared dims, ~12 layout shifts on first load. Right: `prepare()` + `packGallery`, zero shifts. | ![masonry](./pages/assets/screenshots/masonry.png) |
+| **[Masonry](./pages/demos/masonry.html)** — ~60 fresh photos into a grid. Left: naive `<img>`, layout shifts on every image decode. Right: `prepare()` each image then place by measured aspect ratio — the grid is stable from the first frame. | ![masonry](./pages/assets/screenshots/masonry.png) |
 | **[Editorial](./pages/demos/editorial.html)** — article with 3 floated figures. Left: naive HTML, text reflows as each figure loads. Right: pretext + preimage via `flowColumnWithFloats`, layout stable from first frame. | ![editorial](./pages/assets/screenshots/editorial.png) |
 | **[Pretext float](./pages/demos/pretext-float.html)** — paragraph wrapping around a measured figure. Column width, float side, and float top are live-editable; every change re-flows on pure arithmetic. | ![pretext float](./pages/assets/screenshots/pretext-float.png) |
 | **[Pretext rich-inline](./pages/demos/pretext-inline.html)** — chat bubble with three inline icon images. Resizing the bubble re-breaks the lines and shuffles the icons to their new slots. | ![pretext inline](./pages/assets/screenshots/pretext-inline.png) |
@@ -195,15 +195,6 @@ type InlineImageItem = RichInlineItem & {
   chromeWidth: number         // non-image extraWidth
 }
 ```
-
-### Standalone gallery (`@somnai-dreams/preimage/gallery`)
-
-```ts
-packGallery(items, options): GalleryRow[]
-measureGalleryHeight(items, options): { rowCount, height, maxRowWidth }
-```
-
-Not part of the pretext integration — a justified / fixed-height row packer that happens to share the same prepared measurements, for callers who want a Flickr-style image grid alongside their pretext columns.
 
 ## Why these two integrations, and nothing else
 

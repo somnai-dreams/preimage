@@ -10,8 +10,7 @@
     .naive-grid { column-count: 3; column-gap: 6px; }
     .naive-grid img { width: 100%; display: block; margin-bottom: 6px; break-inside: avoid; background: var(--surface-muted); }
     .packed { position: relative; }
-    .packed .row { position: relative; margin-bottom: 6px; }
-    .packed .item { position: absolute; top: 0; overflow: hidden; border-radius: var(--radius-sm); background: var(--surface-muted); }
+    .packed .item { position: absolute; overflow: hidden; border-radius: var(--radius-sm); background: var(--surface-muted); }
     .packed .item img { width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 200ms ease-out; }
     .packed .item img.loaded { opacity: 1; }
     .packed .item.framed { border: 1.5px dashed var(--frame); background: rgba(37, 99, 235, 0.05); }
@@ -33,7 +32,7 @@
   <main class="page">
     <header class="page-header">
       <h1>Masonry — images without declared dimensions</h1>
-      <p>Most images on the web arrive without <code>width</code> / <code>height</code> attributes: markdown doesn't ship them, CMSes omit them, third-party feeds and user uploads almost never have them. Left panel shows what that looks like today. Right panel measures each image first via <code>prepare()</code> and packs them into a stable justified grid.</p>
+      <p>Sixty photos, loaded side by side. Most images on the web arrive without <code>width</code> / <code>height</code> attributes: markdown doesn't ship them, CMSes omit them, third-party feeds and user uploads almost never have them. Left panel shows what that looks like today. Right panel calls <code>prepare()</code> on each image first, then uses the measured aspect ratios to place them into a stable masonry — the layout logic is a plain shortest-column fill in the demo itself, not part of preimage.</p>
     </header>
 
     <div class="controls">
@@ -54,10 +53,10 @@
 
       <section class="panel">
         <div class="panel-header">
-          <h2 class="panel-title">Preimage <code>prepare</code> + <code>packGallery</code></h2>
+          <h2 class="panel-title">Preimage <code>prepare</code> + inline masonry</h2>
           <span class="badge stable">stable</span>
         </div>
-        <p class="panel-sub" id="measuredSub">dimensions probed from the first bytes · packed into a justified grid before paint</p>
+        <p class="panel-sub" id="measuredSub">dimensions probed from the first bytes · placed into a shortest-column layout before paint</p>
         <div class="panel-stat" id="measuredStat"></div>
         <div id="measured" class="packed"></div>
       </section>
