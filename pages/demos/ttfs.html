@@ -8,10 +8,19 @@
   <style>
     .ttfs-panels { grid-template-columns: repeat(3, 1fr); }
     .ttfs-stage { display: flex; flex-direction: column; gap: 10px; }
-    .ttfs-frame { max-width: 100%; }
-    .ttfs-frame.raw img { max-width: 100%; height: auto; display: block; background: var(--surface-muted); }
+    .ttfs-frame { max-width: 100%; min-height: 180px; border-radius: var(--radius-sm); overflow: hidden; position: relative; }
+    .ttfs-frame.empty { background: var(--surface-muted); }
+    .ttfs-frame img { max-width: 100%; height: auto; display: block; }
+    .ttfs-frame.measured img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 240ms ease-out; }
+    .ttfs-frame.measured img.loaded { opacity: 1; }
     .ttfs-below { color: var(--text-muted); font-size: 12.5px; line-height: 1.55; }
-    .events { border-top: 1px solid var(--border); padding-top: 8px; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; display: flex; flex-direction: column; gap: 3px; }
+    .panel-run { display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; font-size: 12px; color: var(--text-soft); }
+    .panel-run button { font: inherit; font-weight: 500; padding: 7px 14px; background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm); cursor: pointer; transition: background 120ms; }
+    .panel-run button:hover:not(:disabled) { background: var(--accent-hover); }
+    .panel-run button:disabled { background: var(--border-strong); cursor: not-allowed; }
+    .panel-run .result { min-height: 18px; font-variant-numeric: tabular-nums; }
+    .panel-run .result b { color: var(--text); font-weight: 600; }
+    .events { border-top: 1px solid var(--border); padding-top: 8px; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; display: flex; flex-direction: column; gap: 3px; min-height: 80px; }
     .events .row { display: flex; justify-content: space-between; }
     .events b { color: var(--text); font-weight: 600; }
     .events .shift { color: var(--reflow); }
@@ -23,23 +32,18 @@
     <a href="./masonry">Masonry</a>
     <a href="./editorial">Editorial</a>
     <a href="./ttfs" aria-current="page">TTFS</a>
-    <a href="./dominant-color">Dominant color</a>
     <a href="./decode-pool">Decode pool</a>
-    <a href="./canvas-fit">Canvas fit</a>
-    <a href="./pretext-float">Pretext float</a>
-    <a href="./pretext-inline">Pretext inline</a>
     <span class="spacer"></span>
     <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
   </nav>
 
   <main class="page">
     <header class="page-header">
-      <h1>Time to first sizing — one photo, three strategies</h1>
-      <p>The same fresh photo loaded from picsum three ways in parallel, cache-busted so the browser makes a real network request each run. Each panel reports when it <em>knows</em> the image's dimensions and when the image finishes painting. The gap between those two events is the library's visible window.</p>
+      <h1>Time to first sizing — one high-res photo, three strategies</h1>
+      <p>One 4800×3200 photo (≈2-5MB over the wire), loaded three ways. Each panel has its own Run button — click to feel the click-to-dimensions delay for each strategy. Naive <code>&lt;img src&gt;</code> can only tell you dimensions once the full transfer is decoded. Declared <code>width</code>/<code>height</code> attributes are instant but require the author to already know them. <code>prepare()</code> streams the response and parses the format header out of the first ~2KB — dimensions arrive long before the image finishes downloading.</p>
     </header>
 
     <div class="controls">
-      <button id="run" class="primary">Run</button>
       <span class="controls-label">Cache-bust</span>
       <div class="segmented" role="radiogroup" aria-label="Cache-bust">
         <label><input type="radio" name="cache" value="on" checked> On</label>
@@ -52,12 +56,13 @@
       <section class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Naive <code>&lt;img src&gt;</code></h2>
-          <span class="badge reflow">reflows</span>
         </div>
-        <p class="panel-sub">dimensions unknown until the image is fully decoded</p>
+        <div class="panel-run">
+          <button id="run1" class="primary">Run</button>
+          <span id="r1" class="result"></span>
+        </div>
         <div class="ttfs-stage">
-          <div class="ttfs-frame raw" id="f1"></div>
-          <div class="ttfs-below">Paragraph below the image. With nothing declared, the browser reserves zero space and this text jumps when the image's natural size arrives.</div>
+          <div class="ttfs-frame empty" id="f1"></div>
           <div class="events" id="e1"><div class="row"><span>dims known (onload)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div></div>
         </div>
       </section>
@@ -65,12 +70,13 @@
       <section class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Native <code>&lt;img width height&gt;</code></h2>
-          <span class="badge stable">stable</span>
         </div>
-        <p class="panel-sub">dimensions declared as HTML attributes — only possible if the author knew them</p>
+        <div class="panel-run">
+          <button id="run2" class="primary">Run</button>
+          <span id="r2" class="result"></span>
+        </div>
         <div class="ttfs-stage">
-          <div class="ttfs-frame" id="f2"></div>
-          <div class="ttfs-below">Paragraph below the image. The <code>width</code>/<code>height</code> attributes let the browser reserve an aspect-ratio box from first paint.</div>
+          <div class="ttfs-frame empty" id="f2"></div>
           <div class="events" id="e2"><div class="row"><span>dims known (from attrs)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div></div>
         </div>
       </section>
@@ -78,12 +84,13 @@
       <section class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Preimage <code>prepare(src)</code></h2>
-          <span class="badge stable">stable</span>
         </div>
-        <p class="panel-sub">dimensions probed from the first bytes — no author declaration required</p>
+        <div class="panel-run">
+          <button id="run3" class="primary">Run</button>
+          <span id="r3" class="result"></span>
+        </div>
         <div class="ttfs-stage">
-          <div class="ttfs-frame" id="f3"></div>
-          <div class="ttfs-below">Paragraph below the image. Preimage streams the fetch, parses the header as bytes arrive, and reserves the frame long before the full transfer completes.</div>
+          <div class="ttfs-frame empty" id="f3"></div>
           <div class="events" id="e3"><div class="row"><span>dims known (prepare)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>dominant color at</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div></div>
         </div>
       </section>

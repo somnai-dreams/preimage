@@ -6,66 +6,72 @@ import {
   picsumUrl,
   type PhotoDescriptor,
 } from './photo-source.js'
-import { setPanelStatus, waitForDominantColor } from './demo-utils.js'
+import { waitForDominantColor } from './demo-utils.js'
 
-const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
-const naiveStat = document.getElementById('naiveStat')!
-const pooledStat = document.getElementById('pooledStat')!
+const runNaiveBtn = document.getElementById('runNaive') as HTMLButtonElement
+const runPoolBtn = document.getElementById('runPool') as HTMLButtonElement
+const naiveResult = document.getElementById('naiveResult')!
+const poolResult = document.getElementById('poolResult')!
 
 const naiveCanvas = document.getElementById('naiveCanvas') as HTMLCanvasElement
-const pooledCanvas = document.getElementById('pooledCanvas') as HTMLCanvasElement
+const poolCanvas = document.getElementById('poolCanvas') as HTMLCanvasElement
 const naiveSlider = document.getElementById('naiveSlider') as HTMLInputElement
-const pooledSlider = document.getElementById('pooledSlider') as HTMLInputElement
+const poolSlider = document.getElementById('poolSlider') as HTMLInputElement
 const naiveFrameLabel = document.getElementById('naiveFrameLabel')!
-const pooledFrameLabel = document.getElementById('pooledFrameLabel')!
+const poolFrameLabel = document.getElementById('poolFrameLabel')!
 const naiveFrameTag = document.getElementById('naiveFrameTag')!
-const pooledFrameTag = document.getElementById('pooledFrameTag')!
+const poolFrameTag = document.getElementById('poolFrameTag')!
 const naiveTimeTag = document.getElementById('naiveTimeTag')!
-const pooledTimeTag = document.getElementById('pooledTimeTag')!
+const poolTimeTag = document.getElementById('poolTimeTag')!
+const naiveEmpty = document.getElementById('naiveEmpty')!
+const poolEmpty = document.getElementById('poolEmpty')!
 const naiveCanvasWrap = naiveCanvas.parentElement!
-const pooledCanvasWrap = pooledCanvas.parentElement!
-const naivePanelEl = naiveCanvas.closest('.panel') as HTMLElement
-const pooledPanelEl = pooledCanvas.closest('.panel') as HTMLElement
+const poolCanvasWrap = poolCanvas.parentElement!
 
 const FRAME_COUNT = 16
 
+// 2000×1125 JPEGs are heavy enough (≈250-500KB each) that main-thread
+// decode is measurable on every scrub. Smaller frames make the naive
+// path look artificially fast.
 const PHOTOS: PhotoDescriptor[] = Array.from({ length: FRAME_COUNT }, (_, i) => ({
   seed: `preimage-pool-${i}`,
-  width: 1600,
-  height: 900,
+  width: 2000,
+  height: 1125,
   caption: `frame ${i + 1}`,
 }))
-
-function metric(label: string, value: string, highlight = false): string {
-  return `<span class="metric">${label} <b${highlight ? ' style="color:var(--reflow)"' : ''}>${value}</b></span>`
-}
 
 function getCacheBust(): string | null {
   const checked = document.querySelector<HTMLInputElement>('input[name="cache"]:checked')
   return checked?.value === 'off' ? null : newCacheBustToken()
 }
 
-type ResolvedPhoto = { url: string }
-
-async function resolvePhotosForPanel(
+async function resolvePhotos(
   useLive: boolean,
   cacheBust: string | null,
   panelTag: string,
-): Promise<ResolvedPhoto[]> {
+): Promise<string[]> {
   if (useLive) {
     return PHOTOS.map((p) => {
       const base = picsumUrl(p, cacheBust)
       const sep = base.includes('?') ? '&' : '?'
-      return { url: `${base}${sep}panel=${panelTag}` }
+      return `${base}${sep}panel=${panelTag}`
     })
   }
-  const out: ResolvedPhoto[] = []
+  const out: string[] = []
   for (let i = 0; i < PHOTOS.length; i++) {
     const blob = await generateFallbackBlob(PHOTOS[i]!, (i * 29 + panelTag.length) % 360)
-    out.push({ url: URL.createObjectURL(blob) })
+    out.push(URL.createObjectURL(blob))
   }
   return out
+}
+
+function setMeta(useLive: boolean, cacheBust: string | null): void {
+  metaEl.textContent =
+    `${FRAME_COUNT} frames @ ${PHOTOS[0]!.width}×${PHOTOS[0]!.height} · ` +
+    (useLive
+      ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
+      : 'picsum offline — canvas fallbacks')
 }
 
 function sizeCanvas(canvas: HTMLCanvasElement): { w: number; h: number } {
@@ -112,40 +118,36 @@ function newStats(setupMs: number): Stats {
   return { setupMs, scrubCount: 0, totalScrubMs: 0, slowest: 0 }
 }
 
-function recordScrub(stats: Stats, dt: number): void {
-  stats.scrubCount++
-  stats.totalScrubMs += dt
-  if (dt > stats.slowest) stats.slowest = dt
-}
-
-function renderStats(el: HTMLElement, stats: Stats): void {
+function renderResult(el: HTMLElement, stats: Stats, setupLabel: string): void {
   const avg = stats.scrubCount === 0 ? 0 : stats.totalScrubMs / stats.scrubCount
-  el.innerHTML = [
-    metric('setup', `${stats.setupMs.toFixed(0)}ms`),
-    metric(
-      'avg scrub frame',
-      stats.scrubCount === 0 ? '—' : `${avg.toFixed(1)}ms`,
-      avg > 16,
-    ),
-    metric(
-      'slowest scrub',
-      stats.scrubCount === 0 ? '—' : `${stats.slowest.toFixed(1)}ms`,
-      stats.slowest > 16,
-    ),
-    metric('scrubs', String(stats.scrubCount)),
-  ].join('')
+  const parts = [`${setupLabel} <b>${stats.setupMs.toFixed(0)}ms</b>`]
+  if (stats.scrubCount > 0) {
+    parts.push(`avg scrub <b>${avg.toFixed(1)}ms</b>`)
+    parts.push(`slowest <b>${stats.slowest.toFixed(1)}ms</b>`)
+    parts.push(`<b>${stats.scrubCount}</b> scrubs`)
+  }
+  el.innerHTML = parts.join(' · ')
 }
 
-// --- Naive path: truly naive. No library. img.src per scrub, decode
-//     on every scrub, drawImage. prepare() is only used up front to
-//     pull dominant colors (the demo's "color-before-pixels" backdrop)
-//     — that's independent of the scrub-time cost measured here.
-async function bindNaive(urls: readonly string[]): Promise<void> {
-  const t0 = performance.now()
+// --- Naive path ---
 
-  // Pre-create <img> elements. We DO set src up front (this is
-  // unavoidable to have anything scrubbable), but we don't await
-  // decode — the naive path's point is that decode happens on scrub.
+async function runNaive(): Promise<void> {
+  runNaiveBtn.disabled = true
+  runNaiveBtn.textContent = 'Loading…'
+  naiveResult.innerHTML = ''
+  naiveEmpty.style.display = 'flex'
+  naiveEmpty.textContent = 'loading…'
+  naiveFrameTag.textContent = '—'
+  naiveTimeTag.textContent = '—'
+  naiveTimeTag.className = 'tag'
+  naiveCanvasWrap.style.backgroundColor = ''
+
+  const useLive = await picsumReachable()
+  const cacheBust = getCacheBust()
+  setMeta(useLive, cacheBust)
+  const urls = await resolvePhotos(useLive, cacheBust, 'naive')
+
+  const t0 = performance.now()
   const images = urls.map((u) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
@@ -153,10 +155,6 @@ async function bindNaive(urls: readonly string[]): Promise<void> {
     return img
   })
   const colorByIndex: Array<string | undefined> = new Array(urls.length)
-  // Natural sizes needed for object-fit math. Fetch via prepare(),
-  // which is fast (header probe). Dominant color is extracted
-  // alongside — it populates colorByIndex on its own schedule,
-  // independent of the scrub-time path.
   const naturalSizes = await Promise.all(
     urls.map(async (u, i) => {
       const prepared = await prepare(u, { extractDominantColor: true })
@@ -167,61 +165,79 @@ async function bindNaive(urls: readonly string[]): Promise<void> {
       return { w: m.displayWidth, h: m.displayHeight }
     }),
   )
-
   const setupMs = performance.now() - t0
   const ctx = naiveCanvas.getContext('2d')!
   const stats = newStats(setupMs)
-  renderStats(naiveStat, stats)
+  naiveEmpty.style.display = 'none'
 
   const draw = async (i: number): Promise<void> => {
     const t = performance.now()
-    // Paint the dominant color immediately so the viewer sees the
-    // "color before pixels" flash that's the headline of this feature.
     const color = colorByIndex[i]
     if (color !== undefined) naiveCanvasWrap.style.backgroundColor = color
 
     const img = images[i]!
     if (!img.complete || img.naturalWidth === 0) {
-      await new Promise<void>((res, rej) => {
+      await new Promise<void>((res) => {
         img.addEventListener('load', () => res(), { once: true })
-        img.addEventListener('error', () => rej(new Error('img load failed')), { once: true })
+        img.addEventListener('error', () => res(), { once: true })
       })
     }
     if (typeof img.decode === 'function') {
       try {
         await img.decode()
       } catch {
-        // Safari rejects decode on some sources — fall through to draw.
+        // some engines reject decode on certain sources
       }
     }
     const { w, h } = sizeCanvas(naiveCanvas)
     const size = naturalSizes[i]!
     drawContain(ctx, img, size.w, size.h, w, h)
     const dt = performance.now() - t
-    recordScrub(stats, dt)
+    stats.scrubCount++
+    stats.totalScrubMs += dt
+    if (dt > stats.slowest) stats.slowest = dt
     updateFrameTag(naiveTimeTag, dt)
     naiveFrameTag.textContent = `frame ${i + 1}`
-    renderStats(naiveStat, stats)
+    renderResult(naiveResult, stats, 'setup')
   }
 
-  naiveSlider.max = String(FRAME_COUNT - 1)
+  naiveSlider.disabled = false
+  naiveSlider.value = '0'
+  naiveFrameLabel.textContent = `1 / ${FRAME_COUNT}`
   naiveSlider.addEventListener('input', () => {
     const i = Number(naiveSlider.value)
     naiveFrameLabel.textContent = `${i + 1} / ${FRAME_COUNT}`
     void draw(i)
   })
-  // Initial render. Doesn't count as a scrub — the measured cost is
-  // the first decode, which naive paths always pay on page load.
   await draw(0)
+  // The first paint is really setup cost, not a scrub — reset counters
+  // so the "avg scrub" reflects actual user drags.
   stats.scrubCount = 0
   stats.totalScrubMs = 0
   stats.slowest = 0
-  renderStats(naiveStat, stats)
+  renderResult(naiveResult, stats, 'setup')
+  runNaiveBtn.disabled = false
+  runNaiveBtn.textContent = 'Reload frames'
 }
 
-// --- Pool path: DecodePool warms every frame up front. Each scrub
-//     is a single blit from a cached ImageBitmap.
-async function bindPool(urls: readonly string[]): Promise<void> {
+// --- Pool path ---
+
+async function runPool(): Promise<void> {
+  runPoolBtn.disabled = true
+  runPoolBtn.textContent = 'Warming…'
+  poolResult.innerHTML = ''
+  poolEmpty.style.display = 'flex'
+  poolEmpty.textContent = 'warming pool…'
+  poolFrameTag.textContent = '—'
+  poolTimeTag.textContent = '—'
+  poolTimeTag.className = 'tag'
+  poolCanvasWrap.style.backgroundColor = ''
+
+  const useLive = await picsumReachable()
+  const cacheBust = getCacheBust()
+  setMeta(useLive, cacheBust)
+  const urls = await resolvePhotos(useLive, cacheBust, 'pool')
+
   const t0 = performance.now()
   const pool = new DecodePool({
     concurrency: 4,
@@ -230,7 +246,6 @@ async function bindPool(urls: readonly string[]): Promise<void> {
   const colorByIndex: Array<string | undefined> = new Array(urls.length)
   const naturalSizes = await Promise.all(
     urls.map(async (u, i) => {
-      // Extract dominant color alongside the pool warm-up.
       const prepared = await prepare(u, { extractDominantColor: true })
       void waitForDominantColor(prepared).then((color) => {
         if (color !== null) colorByIndex[i] = color
@@ -240,98 +255,43 @@ async function bindPool(urls: readonly string[]): Promise<void> {
     }),
   )
   const setupMs = performance.now() - t0
-  const ctx = pooledCanvas.getContext('2d')!
+  const ctx = poolCanvas.getContext('2d')!
   const stats = newStats(setupMs)
-  renderStats(pooledStat, stats)
+  poolEmpty.style.display = 'none'
 
   const draw = async (i: number): Promise<void> => {
     const t = performance.now()
     const color = colorByIndex[i]
-    if (color !== undefined) pooledCanvasWrap.style.backgroundColor = color
+    if (color !== undefined) poolCanvasWrap.style.backgroundColor = color
     const bitmap = await pool.get(urls[i]!)
-    const { w, h } = sizeCanvas(pooledCanvas)
+    const { w, h } = sizeCanvas(poolCanvas)
     const size = naturalSizes[i]!
     drawContain(ctx, bitmap, size.w, size.h, w, h)
     const dt = performance.now() - t
-    recordScrub(stats, dt)
-    updateFrameTag(pooledTimeTag, dt)
-    pooledFrameTag.textContent = `frame ${i + 1}`
-    renderStats(pooledStat, stats)
+    stats.scrubCount++
+    stats.totalScrubMs += dt
+    if (dt > stats.slowest) stats.slowest = dt
+    updateFrameTag(poolTimeTag, dt)
+    poolFrameTag.textContent = `frame ${i + 1}`
+    renderResult(poolResult, stats, 'warm')
   }
 
-  pooledSlider.max = String(FRAME_COUNT - 1)
-  pooledSlider.addEventListener('input', () => {
-    const i = Number(pooledSlider.value)
-    pooledFrameLabel.textContent = `${i + 1} / ${FRAME_COUNT}`
+  poolSlider.disabled = false
+  poolSlider.value = '0'
+  poolFrameLabel.textContent = `1 / ${FRAME_COUNT}`
+  poolSlider.addEventListener('input', () => {
+    const i = Number(poolSlider.value)
+    poolFrameLabel.textContent = `${i + 1} / ${FRAME_COUNT}`
     void draw(i)
   })
   await draw(0)
   stats.scrubCount = 0
   stats.totalScrubMs = 0
   stats.slowest = 0
-  renderStats(pooledStat, stats)
+  renderResult(poolResult, stats, 'warm')
+  runPoolBtn.disabled = false
+  runPoolBtn.textContent = 'Reload frames'
 }
 
-function resetStats(): void {
-  for (const el of [naiveStat, pooledStat]) {
-    el.innerHTML = [
-      metric('setup', '—'),
-      metric('avg scrub frame', '—'),
-      metric('slowest scrub', '—'),
-      metric('scrubs', '—'),
-    ].join('')
-  }
-  naiveTimeTag.textContent = '—'
-  naiveTimeTag.className = 'tag'
-  pooledTimeTag.textContent = '—'
-  pooledTimeTag.className = 'tag'
-}
-
-async function run(): Promise<void> {
-  runButton.disabled = true
-  runButton.textContent = 'Checking network…'
-  resetStats()
-  metaEl.textContent = ''
-  naiveSlider.value = '0'
-  pooledSlider.value = '0'
-  naiveCanvasWrap.style.backgroundColor = ''
-  pooledCanvasWrap.style.backgroundColor = ''
-  setPanelStatus(naivePanelEl, 'queued')
-  setPanelStatus(pooledPanelEl, 'queued')
-
-  const useLive = await picsumReachable()
-  const cacheBust = getCacheBust()
-  runButton.textContent = useLive
-    ? `Loading ${FRAME_COUNT} frames from picsum…`
-    : `Generating ${FRAME_COUNT} canvas fallbacks…`
-
-  metaEl.textContent =
-    `${FRAME_COUNT} frames · ` +
-    (useLive
-      ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
-      : 'picsum offline — canvas fallbacks')
-
-  // Sequential: each panel gets the full connection budget and its
-  // own URL-space. The naive panel's setup measures prepare() time;
-  // the pool panel's setup measures full-decode warming time.
-  setPanelStatus(naivePanelEl, 'running')
-  runButton.textContent = 'Panel 1 (naive setup)…'
-  const naiveResolved = await resolvePhotosForPanel(useLive, cacheBust, 'naive')
-  await bindNaive(naiveResolved.map((r) => r.url))
-  setPanelStatus(naivePanelEl, 'done')
-
-  setPanelStatus(pooledPanelEl, 'running')
-  runButton.textContent = 'Panel 2 (pool warm)…'
-  const pooledResolved = await resolvePhotosForPanel(useLive, cacheBust, 'pool')
-  await bindPool(pooledResolved.map((r) => r.url))
-  setPanelStatus(pooledPanelEl, 'done')
-
-  runButton.textContent = 'Reload with new frames'
-  runButton.disabled = false
-}
-
-runButton.addEventListener('click', () => {
-  void run()
-})
-
-void run()
+runNaiveBtn.addEventListener('click', () => void runNaive())
+runPoolBtn.addEventListener('click', () => void runPool())

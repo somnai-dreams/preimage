@@ -6,16 +6,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="./demo-styles.css" />
   <style>
-    .article-pair { gap: 20px; }
+    .panel-run { display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; font-size: 12px; color: var(--text-soft); }
+    .panel-run button { font: inherit; font-weight: 500; padding: 7px 14px; background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm); cursor: pointer; transition: background 120ms; }
+    .panel-run button:hover:not(:disabled) { background: var(--accent-hover); }
+    .panel-run button:disabled { background: var(--border-strong); cursor: not-allowed; }
+    .panel-run .result { min-height: 18px; font-variant-numeric: tabular-nums; }
+    .panel-run .result b { color: var(--text); font-weight: 600; }
+
     .article { font-size: 14px; line-height: 1.6; color: var(--text); }
     .article p { margin: 0 0 0.8em; }
-    .article figure { margin: 0 0 6px 14px; float: right; width: 44%; }
-    .article figure figcaption { font-size: 11px; color: var(--text-soft); margin-top: 4px; }
-    .naive-article figure img { width: 100%; display: block; background: var(--surface-muted); }
+    .naive-article figure { margin: 0 0 6px 14px; float: right; width: 44%; }
+    .naive-article figure figcaption { font-size: 11px; color: var(--text-soft); margin-top: 4px; }
+    .naive-article figure img { width: 100%; display: block; }
+
     .measured-article { position: relative; }
     .measured-article .line { position: absolute; white-space: pre; font: 14px/22px -apple-system, 'SF Pro Text', 'Inter', system-ui, sans-serif; color: var(--text); }
-    .measured-article .fig { position: absolute; border: 1.5px dashed var(--frame); border-radius: var(--radius-sm); background: rgba(37, 99, 235, 0.05); overflow: hidden; }
-    .measured-article .fig img { width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 200ms ease-out; }
+    .measured-article .fig { position: absolute; border-radius: var(--radius-sm); overflow: hidden; background: var(--surface-muted); }
+    .measured-article .fig img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 240ms ease-out; }
     .measured-article .fig img.loaded { opacity: 1; }
   </style>
 </head>
@@ -25,11 +32,7 @@
     <a href="./masonry">Masonry</a>
     <a href="./editorial" aria-current="page">Editorial</a>
     <a href="./ttfs">TTFS</a>
-    <a href="./dominant-color">Dominant color</a>
     <a href="./decode-pool">Decode pool</a>
-    <a href="./canvas-fit">Canvas fit</a>
-    <a href="./pretext-float">Pretext float</a>
-    <a href="./pretext-inline">Pretext inline</a>
     <span class="spacer"></span>
     <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
   </nav>
@@ -37,11 +40,10 @@
   <main class="page">
     <header class="page-header">
       <h1>Editorial article — floated figures</h1>
-      <p>Article content with three inline figures. Left panel: <code>&lt;figure&gt;&lt;img&gt;</code> the way most editorial pages render — no dimensions, text reflows as each image decodes. Right panel: preimage measures every figure before layout, pretext flows the paragraph text around the measured rects via <code>flowColumnWithFloats</code>.</p>
+      <p>Article content with three floated figures, same URLs, separate Run buttons. The left panel uses plain <code>&lt;figure&gt;&lt;img&gt;</code> — text reflows as each figure's bytes decode. The right panel measures every figure before layout, then pretext's <code>flowColumnWithFloats</code> places lines around the measured rects in a single synchronous pass.</p>
     </header>
 
     <div class="controls">
-      <button id="run" class="primary">Run</button>
       <span class="controls-label">Cache-bust</span>
       <div class="segmented" role="radiogroup" aria-label="Cache-bust">
         <label><input type="radio" name="cache" value="on" checked> On</label>
@@ -50,24 +52,26 @@
       <span id="meta" class="meta"></span>
     </div>
 
-    <div class="panels two article-pair">
+    <div class="panels two">
       <section class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Naive HTML floats</h2>
-          <span class="badge reflow">reflows</span>
         </div>
-        <p class="panel-sub">images drop into the article with no reserved space</p>
-        <div class="panel-stat" id="naiveStat"><span class="metric">loaded at <b>&mdash;</b></span><span class="metric">visible shifts <b>&mdash;</b></span></div>
+        <div class="panel-run">
+          <button id="runNaive" class="primary">Run</button>
+          <span id="naiveResult" class="result"></span>
+        </div>
         <div id="naive" class="article naive-article"></div>
       </section>
 
       <section class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Pretext + preimage</h2>
-          <span class="badge stable">stable</span>
         </div>
-        <p class="panel-sub">figures measured, column laid out in one synchronous pass</p>
-        <div class="panel-stat" id="measuredStat"><span class="metric">frame placed at <b>&mdash;</b></span><span class="metric">lines placed <b>&mdash;</b></span><span class="metric">fully loaded at <b>&mdash;</b></span><span class="metric">visible shifts <b>&mdash;</b></span></div>
+        <div class="panel-run">
+          <button id="runMeasured" class="primary">Run</button>
+          <span id="measuredResult" class="result"></span>
+        </div>
         <div id="measured" class="article measured-article"></div>
       </section>
     </div>

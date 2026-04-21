@@ -6,14 +6,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="./demo-styles.css" />
   <style>
+    .page.wide { max-width: 1400px; }
+
+    .controls-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+    .count-control { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-muted); }
+    .count-control input[type=range] { width: 180px; }
+    .count-control .count-val { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; min-width: 2ch; text-align: right; }
+
     .masonry-pair { gap: 20px; }
+    .panel-run { display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; font-size: 12px; color: var(--text-soft); }
+    .panel-run button { font: inherit; font-weight: 500; padding: 7px 14px; background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm); cursor: pointer; transition: background 120ms; }
+    .panel-run button:hover:not(:disabled) { background: var(--accent-hover); }
+    .panel-run button:disabled { background: var(--border-strong); cursor: not-allowed; }
+    .panel-run .result { min-height: 18px; font-variant-numeric: tabular-nums; }
+    .panel-run .result b { color: var(--text); font-weight: 600; }
+
+    /* Naive grid: stock <img> tags in a CSS column layout. No reserved
+       space, so the column grows as each image finishes decoding. */
     .naive-grid { column-count: 3; column-gap: 6px; }
-    .naive-grid img { width: 100%; display: block; margin-bottom: 6px; break-inside: avoid; background: var(--surface-muted); }
+    .naive-grid img { width: 100%; display: block; margin-bottom: 6px; break-inside: avoid; }
+
+    /* Measured grid: absolutely-positioned tiles over a container
+       whose height is computed from the measured aspect ratios. */
     .packed { position: relative; }
     .packed .item { position: absolute; overflow: hidden; border-radius: var(--radius-sm); background: var(--surface-muted); }
-    .packed .item img { width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 200ms ease-out; }
+    .packed .item img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 240ms ease-out; }
     .packed .item img.loaded { opacity: 1; }
-    .packed .item.framed { border: 1.5px dashed var(--frame); background: rgba(37, 99, 235, 0.05); }
   </style>
 </head>
 <body>
@@ -22,54 +40,53 @@
     <a href="./masonry" aria-current="page">Masonry</a>
     <a href="./editorial">Editorial</a>
     <a href="./ttfs">TTFS</a>
-    <a href="./dominant-color">Dominant color</a>
     <a href="./decode-pool">Decode pool</a>
-    <a href="./canvas-fit">Canvas fit</a>
-    <a href="./pretext-float">Pretext float</a>
-    <a href="./pretext-inline">Pretext inline</a>
     <span class="spacer"></span>
     <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
   </nav>
 
-  <main class="page">
+  <main class="page wide">
     <header class="page-header">
-      <h1>Masonry — images without declared dimensions</h1>
-      <p>Sixty photos, loaded side by side. Most images on the web arrive without <code>width</code> / <code>height</code> attributes: markdown doesn't ship them, CMSes omit them, third-party feeds and user uploads almost never have them. Left panel shows what that looks like today. Right panel calls <code>prepare()</code> on each image first, then uses the measured aspect ratios to place them into a stable masonry — the layout logic is a plain shortest-column fill in the demo itself, not part of preimage.</p>
+      <h1>Masonry — reflow during image loads</h1>
+      <p>Two grids, same photos, separate Run buttons so you feel each one. The left uses stock <code>&lt;img&gt;</code> tags with no reserved dimensions — the column stretches as each image decodes and every tile below it shifts. The right calls <code>prepare()</code> per image first, then commits a shortest-column layout in one synchronous pass; tiles are positioned before any pixel paints, and the dominant-color placeholder holds the spot.</p>
     </header>
 
     <div class="controls">
-      <button id="run" class="primary">Run</button>
-      <span class="controls-label">Placement</span>
-      <div class="segmented" role="radiogroup" aria-label="Placement mode">
-        <label><input type="radio" name="mode" value="progressive" checked> Progressive</label>
-        <label><input type="radio" name="mode" value="batch"> Batch</label>
-      </div>
-      <span class="controls-label">Cache-bust</span>
-      <div class="segmented" role="radiogroup" aria-label="Cache-bust">
-        <label><input type="radio" name="cache" value="on" checked> On</label>
-        <label><input type="radio" name="cache" value="off"> Off</label>
+      <div class="controls-row">
+        <div class="count-control">
+          <span>Images</span>
+          <input id="countSlider" type="range" min="9" max="90" value="30" step="3" />
+          <span id="countVal" class="count-val">30</span>
+        </div>
+        <span class="controls-label">Cache-bust</span>
+        <div class="segmented" role="radiogroup" aria-label="Cache-bust">
+          <label><input type="radio" name="cache" value="on" checked> On</label>
+          <label><input type="radio" name="cache" value="off"> Off</label>
+        </div>
       </div>
       <span id="meta" class="meta"></span>
     </div>
 
     <div class="panels two masonry-pair">
-      <section class="panel">
+      <section class="panel" id="naivePanel">
         <div class="panel-header">
           <h2 class="panel-title">Naive <code>&lt;img&gt;</code></h2>
-          <span class="badge reflow">reflows</span>
         </div>
-        <p class="panel-sub" id="naiveSub">what most web images look like today — no width/height attributes</p>
-        <div class="panel-stat" id="naiveStat"><span class="metric">loaded at <b>&mdash;</b></span><span class="metric">visible shifts <b>&mdash;</b></span></div>
+        <div class="panel-run">
+          <button id="runNaive" class="primary">Run</button>
+          <span id="naiveResult" class="result"></span>
+        </div>
         <div id="naive" class="naive-grid"></div>
       </section>
 
-      <section class="panel">
+      <section class="panel" id="measuredPanel">
         <div class="panel-header">
-          <h2 class="panel-title">Preimage <code>prepare</code> + inline masonry</h2>
-          <span class="badge stable">stable</span>
+          <h2 class="panel-title">Preimage <code>prepare</code> + measured masonry</h2>
         </div>
-        <p class="panel-sub" id="measuredSub">dimensions probed from the first bytes · placed into a shortest-column layout before paint</p>
-        <div class="panel-stat" id="measuredStat"><span class="metric">first frame at <b>&mdash;</b></span><span class="metric">last frame at <b>&mdash;</b></span><span class="metric">fully loaded at <b>&mdash;</b></span><span class="metric">column height <b>&mdash;</b></span></div>
+        <div class="panel-run">
+          <button id="runMeasured" class="primary">Run</button>
+          <span id="measuredResult" class="result"></span>
+        </div>
         <div id="measured" class="packed"></div>
       </section>
     </div>

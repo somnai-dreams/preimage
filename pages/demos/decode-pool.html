@@ -7,14 +7,21 @@
   <link rel="stylesheet" href="./demo-styles.css" />
   <style>
     .canvas-wrap { position: relative; background: #0b0b0c; border-radius: var(--radius-md); overflow: hidden; }
-    .canvas-wrap canvas { display: block; width: 100%; height: 320px; }
+    .canvas-wrap canvas { display: block; width: 100%; height: 340px; }
     .scrub { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface-muted); border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted); }
     .scrub input[type=range] { flex: 1; }
     .scrub .frame-label { min-width: 60px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
     .hud { position: absolute; top: 8px; left: 10px; right: 10px; display: flex; justify-content: space-between; color: #e4e4e7; font-size: 11px; font-variant-numeric: tabular-nums; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
     .hud .tag.jank { color: #fca5a5; }
     .hud .tag.smooth { color: #86efac; }
-    .panel-title.darkbg { color: var(--text); }
+    .panel-run { display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; font-size: 12px; color: var(--text-soft); }
+    .panel-run button { font: inherit; font-weight: 500; padding: 7px 14px; background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm); cursor: pointer; transition: background 120ms; }
+    .panel-run button:hover:not(:disabled) { background: var(--accent-hover); }
+    .panel-run button:disabled { background: var(--border-strong); cursor: not-allowed; }
+    .panel-run .result { min-height: 18px; font-variant-numeric: tabular-nums; }
+    .panel-run .result b { color: var(--text); font-weight: 600; }
+
+    .canvas-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #71717a; font-size: 12.5px; font-weight: 500; letter-spacing: 0.02em; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -23,23 +30,18 @@
     <a href="./masonry">Masonry</a>
     <a href="./editorial">Editorial</a>
     <a href="./ttfs">TTFS</a>
-    <a href="./dominant-color">Dominant color</a>
     <a href="./decode-pool" aria-current="page">Decode pool</a>
-    <a href="./canvas-fit">Canvas fit</a>
-    <a href="./pretext-float">Pretext float</a>
-    <a href="./pretext-inline">Pretext inline</a>
     <span class="spacer"></span>
     <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
   </nav>
 
   <main class="page">
     <header class="page-header">
-      <h1>Decode pool — scrubbing a photo timeline on a canvas</h1>
-      <p>Sixteen frames, rendered to a canvas as you drag the slider. The left panel calls <code>drawImage</code> on an <code>&lt;img&gt;</code> whose <code>src</code> is set on every scrub — the browser decodes on demand, on the main thread. The right panel warms a <code>DecodePool</code>, then draws from cached <code>ImageBitmap</code>s — every frame is a single blit. Watch the <em>frame time</em> reading while you drag quickly.</p>
+      <h1>Decode pool — scrub a high-res photo timeline on a canvas</h1>
+      <p>Sixteen 2000×1125 frames rendered to a canvas as you drag the slider. Each panel has its own Run button so you feel the difference. Left: <code>img.src = url</code> per scrub, with a main-thread decode on every tick. Right: warm a <code>DecodePool</code> up front, then every scrub is a single blit of a cached <code>ImageBitmap</code>. Scrub quickly and watch the per-frame time.</p>
     </header>
 
     <div class="controls">
-      <button id="run" class="primary">Load frames</button>
       <span class="controls-label">Cache-bust</span>
       <div class="segmented" role="radiogroup" aria-label="Cache-bust">
         <label><input type="radio" name="cache" value="on" checked> On</label>
@@ -52,20 +54,22 @@
       <section class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Decode on scrub — <code>img.src = url</code></h2>
-          <span class="badge reflow">jank</span>
         </div>
-        <p class="panel-sub">browser decodes each frame on the main thread, every scrub</p>
-        <div class="panel-stat" id="naiveStat"><span class="metric">setup <b>&mdash;</b></span><span class="metric">avg scrub frame <b>&mdash;</b></span><span class="metric">slowest scrub <b>&mdash;</b></span><span class="metric">scrubs <b>&mdash;</b></span></div>
+        <div class="panel-run">
+          <button id="runNaive" class="primary">Load frames</button>
+          <span id="naiveResult" class="result"></span>
+        </div>
         <div class="canvas-wrap">
           <div class="hud">
-            <span id="naiveFrameTag">frame 1</span>
-            <span id="naiveTimeTag" class="tag">&mdash;</span>
+            <span id="naiveFrameTag">—</span>
+            <span id="naiveTimeTag" class="tag">—</span>
           </div>
           <canvas id="naiveCanvas"></canvas>
+          <div class="canvas-empty" id="naiveEmpty">click Load frames to start</div>
           <div class="scrub">
             <span>frame</span>
-            <input type="range" id="naiveSlider" min="0" max="15" value="0" step="1" />
-            <span id="naiveFrameLabel" class="frame-label">1 / 16</span>
+            <input type="range" id="naiveSlider" min="0" max="15" value="0" step="1" disabled />
+            <span id="naiveFrameLabel" class="frame-label">— / 16</span>
           </div>
         </div>
       </section>
@@ -73,20 +77,22 @@
       <section class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Pre-decoded — <code>DecodePool</code></h2>
-          <span class="badge stable">smooth</span>
         </div>
-        <p class="panel-sub">bitmaps decoded once off-main-thread · scrub is a single blit</p>
-        <div class="panel-stat" id="pooledStat"><span class="metric">setup <b>&mdash;</b></span><span class="metric">avg scrub frame <b>&mdash;</b></span><span class="metric">slowest scrub <b>&mdash;</b></span><span class="metric">scrubs <b>&mdash;</b></span></div>
+        <div class="panel-run">
+          <button id="runPool" class="primary">Warm pool</button>
+          <span id="poolResult" class="result"></span>
+        </div>
         <div class="canvas-wrap">
           <div class="hud">
-            <span id="pooledFrameTag">frame 1</span>
-            <span id="pooledTimeTag" class="tag">—</span>
+            <span id="poolFrameTag">—</span>
+            <span id="poolTimeTag" class="tag">—</span>
           </div>
-          <canvas id="pooledCanvas"></canvas>
+          <canvas id="poolCanvas"></canvas>
+          <div class="canvas-empty" id="poolEmpty">click Warm pool to start</div>
           <div class="scrub">
             <span>frame</span>
-            <input type="range" id="pooledSlider" min="0" max="15" value="0" step="1" />
-            <span id="pooledFrameLabel" class="frame-label">1 / 16</span>
+            <input type="range" id="poolSlider" min="0" max="15" value="0" step="1" disabled />
+            <span id="poolFrameLabel" class="frame-label">— / 16</span>
           </div>
         </div>
       </section>

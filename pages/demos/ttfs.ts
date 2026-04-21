@@ -1,13 +1,13 @@
 import { prepare, getMeasurement } from '../../src/index.js'
 import {
+  generateFallbackBlob,
   newCacheBustToken,
   picsumReachable,
-  resolvePhotoUrl,
-  PICSUM_PHOTOS,
+  picsumUrl,
+  type PhotoDescriptor,
 } from './photo-source.js'
-import { observeShifts, setPanelStatus, waitForDominantColor } from './demo-utils.js'
+import { observeShifts, waitForDominantColor } from './demo-utils.js'
 
-const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
 const f1 = document.getElementById('f1')!
 const f2 = document.getElementById('f2')!
@@ -15,12 +15,25 @@ const f3 = document.getElementById('f3')!
 const e1 = document.getElementById('e1')!
 const e2 = document.getElementById('e2')!
 const e3 = document.getElementById('e3')!
-const panel1 = f1.closest('.panel') as HTMLElement
-const panel2 = f2.closest('.panel') as HTMLElement
-const panel3 = f3.closest('.panel') as HTMLElement
+const r1 = document.getElementById('r1')!
+const r2 = document.getElementById('r2')!
+const r3 = document.getElementById('r3')!
+const run1 = document.getElementById('run1') as HTMLButtonElement
+const run2 = document.getElementById('run2') as HTMLButtonElement
+const run3 = document.getElementById('run3') as HTMLButtonElement
 
-const PANEL_WIDTH = 320
-const MAX_FRAME_HEIGHT = 220
+// High-res photo: ~4800×3200 JPEGs weigh in at 2-5MB. That's the
+// window where "dims known from first 2KB" vs "dims known after
+// full transfer" becomes a visible delta, even on fast connections.
+const PHOTO: PhotoDescriptor = {
+  seed: 'preimage-ttfs-highres',
+  width: 4800,
+  height: 3200,
+  caption: 'high-res landscape',
+}
+
+const PANEL_WIDTH = 340
+const MAX_FRAME_HEIGHT = 260
 
 type Event = { label: string; t: number; note?: string }
 
@@ -29,7 +42,7 @@ function renderEvents(host: HTMLElement, events: Event[], shifts: number): void 
   for (const ev of events) {
     const row = document.createElement('div')
     row.className = 'row'
-    row.innerHTML = `<span>${ev.label}</span><span><b>${ev.t.toFixed(1)}ms</b>${ev.note ? ` · ${ev.note}` : ''}</span>`
+    row.innerHTML = `<span>${ev.label}</span><span><b>${ev.t.toFixed(1)}ms</b>${ev.note !== undefined ? ` · ${ev.note}` : ''}</span>`
     host.appendChild(row)
   }
   const shiftRow = document.createElement('div')
@@ -38,67 +51,75 @@ function renderEvents(host: HTMLElement, events: Event[], shifts: number): void 
   host.appendChild(shiftRow)
 }
 
-// Pre-render event row placeholders so the panel's final height is
-// reserved on page load — the real values drop in without a reflow
-// once the run completes.
-function renderEventsPlaceholder(host: HTMLElement, labels: readonly string[]): void {
-  host.innerHTML = ''
-  for (const label of labels) {
-    const row = document.createElement('div')
-    row.className = 'row'
-    row.innerHTML = `<span>${label}</span><span><b>—</b></span>`
-    host.appendChild(row)
-  }
-  const shiftRow = document.createElement('div')
-  shiftRow.className = 'row'
-  shiftRow.innerHTML = '<span>visible shifts</span><span><b>—</b></span>'
-  host.appendChild(shiftRow)
-}
-
-const NAIVE_EVENTS = ['dims known (onload)', 'image painted']
-const NATIVE_EVENTS = ['dims known (from attrs)', 'image painted']
-const PREIMAGE_EVENTS = ['dims known (prepare)', 'image painted', 'dominant color at']
-
-function renderAllPlaceholders(): void {
-  renderEventsPlaceholder(e1, NAIVE_EVENTS)
-  renderEventsPlaceholder(e2, NATIVE_EVENTS)
-  renderEventsPlaceholder(e3, PREIMAGE_EVENTS)
-}
-
 function getCacheBust(): string | null {
   const checked = document.querySelector<HTMLInputElement>('input[name="cache"]:checked')
   return checked?.value === 'off' ? null : newCacheBustToken()
 }
 
-function aspectFrame(
+async function resolveUrl(
+  useLive: boolean,
+  cacheBust: string | null,
+  panelTag: string,
+): Promise<string> {
+  if (useLive) {
+    const base = picsumUrl(PHOTO, cacheBust)
+    const sep = base.includes('?') ? '&' : '?'
+    return `${base}${sep}panel=${panelTag}`
+  }
+  const blob = await generateFallbackBlob(PHOTO, 200 + panelTag.length * 37)
+  return URL.createObjectURL(blob)
+}
+
+function setMeta(useLive: boolean, cacheBust: string | null): void {
+  metaEl.textContent =
+    `${PHOTO.width}×${PHOTO.height} · ` +
+    (useLive
+      ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
+      : 'picsum offline — canvas fallback (no realistic network time)')
+}
+
+function sizedFrame(
   host: HTMLElement,
   naturalW: number,
   naturalH: number,
-  label: string,
 ): HTMLElement {
   host.innerHTML = ''
+  host.classList.remove('empty')
+  host.classList.add('measured')
   const scale = PANEL_WIDTH / naturalW
   const h = Math.min(naturalH * scale, MAX_FRAME_HEIGHT)
   const w = h * (naturalW / naturalH)
-  const frame = document.createElement('div')
-  frame.className = 'frame-skeleton'
-  frame.style.width = `${w}px`
-  frame.style.height = `${h}px`
-  const tag = document.createElement('span')
-  tag.style.cssText = 'position:absolute;top:6px;left:8px;color:var(--frame);font-size:10.5px;letter-spacing:0.03em;text-transform:uppercase;font-weight:600;z-index:1;'
-  tag.textContent = label
-  frame.appendChild(tag)
-  host.appendChild(frame)
-  return frame
+  host.style.width = `${w}px`
+  host.style.height = `${h}px`
+  return host
 }
 
-async function runNaive(url: string): Promise<{ events: Event[]; shifts: number }> {
+// --- Panel 1: naive img ---
+
+async function runNaive(): Promise<void> {
+  run1.disabled = true
+  run1.textContent = 'Running…'
   f1.innerHTML = ''
-  const stage = f1.parentElement!
+  f1.classList.add('empty')
+  f1.style.width = ''
+  f1.style.height = ''
+  r1.innerHTML = ''
+  renderEvents(e1, [
+    { label: 'dims known (onload)', t: 0 },
+    { label: 'image painted', t: 0 },
+  ], 0)
+  e1.innerHTML = `<div class="row"><span>dims known (onload)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div>`
+
+  const useLive = await picsumReachable()
+  const cacheBust = getCacheBust()
+  setMeta(useLive, cacheBust)
+  const url = await resolveUrl(useLive, cacheBust, 'naive')
+
   const t0 = performance.now()
   const img = document.createElement('img')
   img.alt = ''
   f1.appendChild(img)
+  const stage = f1.parentElement!
   const monitor = observeShifts(stage)
   await new Promise<void>((resolve) => {
     img.onload = () => resolve()
@@ -107,29 +128,44 @@ async function runNaive(url: string): Promise<{ events: Event[]; shifts: number 
   })
   const t = performance.now() - t0
   monitor.stop()
-  return {
-    events: [
+  renderEvents(
+    e1,
+    [
       { label: 'dims known (onload)', t },
       { label: 'image painted', t },
     ],
-    shifts: monitor.shifts(),
-  }
+    monitor.shifts(),
+  )
+  r1.innerHTML = `<b>${t.toFixed(0)}ms</b> · ${monitor.shifts()} shifts`
+  run1.disabled = false
+  run1.textContent = 'Run again'
 }
 
-async function runNative(
-  url: string,
-  declaredWidth: number,
-  declaredHeight: number,
-): Promise<{ events: Event[]; shifts: number }> {
+// --- Panel 2: declared width/height attrs ---
+
+async function runNative(): Promise<void> {
+  run2.disabled = true
+  run2.textContent = 'Running…'
   f2.innerHTML = ''
-  const stage = f2.parentElement!
+  f2.classList.add('empty')
+  f2.style.width = ''
+  f2.style.height = ''
+  r2.innerHTML = ''
+  e2.innerHTML = `<div class="row"><span>dims known (from attrs)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div>`
+
+  const useLive = await picsumReachable()
+  const cacheBust = getCacheBust()
+  setMeta(useLive, cacheBust)
+  const url = await resolveUrl(useLive, cacheBust, 'native')
+
   const t0 = performance.now()
-  const frame = aspectFrame(f2, declaredWidth, declaredHeight, `reserved ${declaredWidth}×${declaredHeight}`)
+  const frame = sizedFrame(f2, PHOTO.width, PHOTO.height)
   const frameAt = performance.now() - t0
   const img = document.createElement('img')
-  img.width = declaredWidth
-  img.height = declaredHeight
+  img.width = PHOTO.width
+  img.height = PHOTO.height
   frame.appendChild(img)
+  const stage = f2.parentElement!
   const monitor = observeShifts(stage)
   await new Promise<void>((resolve) => {
     img.onload = () => {
@@ -141,25 +177,41 @@ async function runNative(
   })
   const paintedAt = performance.now() - t0
   monitor.stop()
-  return {
-    events: [
+  renderEvents(
+    e2,
+    [
       { label: 'dims known (from attrs)', t: frameAt },
       { label: 'image painted', t: paintedAt },
     ],
-    shifts: monitor.shifts(),
-  }
+    monitor.shifts(),
+  )
+  r2.innerHTML = `<b>${paintedAt.toFixed(0)}ms</b> · ${monitor.shifts()} shifts`
+  run2.disabled = false
+  run2.textContent = 'Run again'
 }
 
-async function runPreimage(url: string): Promise<{ events: Event[]; shifts: number }> {
+// --- Panel 3: prepare() ---
+
+async function runPreimage(): Promise<void> {
+  run3.disabled = true
+  run3.textContent = 'Running…'
   f3.innerHTML = ''
-  const stage = f3.parentElement!
+  f3.classList.add('empty')
+  f3.style.width = ''
+  f3.style.height = ''
+  r3.innerHTML = ''
+  e3.innerHTML = `<div class="row"><span>dims known (prepare)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>dominant color at</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div>`
+
+  const useLive = await picsumReachable()
+  const cacheBust = getCacheBust()
+  setMeta(useLive, cacheBust)
+  const url = await resolveUrl(useLive, cacheBust, 'preimage')
+
   const t0 = performance.now()
   const prepared = await prepare(url, { extractDominantColor: true })
   const m = getMeasurement(prepared)
   const preparedAt = performance.now() - t0
-  const frame = aspectFrame(f3, m.naturalWidth, m.naturalHeight, `measured ${m.naturalWidth}×${m.naturalHeight}`)
-  // Colour track runs on its own clock — paint the frame background
-  // the moment the averaged pixel arrives.
+  const frame = sizedFrame(f3, m.naturalWidth, m.naturalHeight)
   let colorAt = 0
   const colorPromise = waitForDominantColor(prepared).then((color) => {
     if (color === null) return null
@@ -169,6 +221,7 @@ async function runPreimage(url: string): Promise<{ events: Event[]; shifts: numb
   })
   const img = document.createElement('img')
   frame.appendChild(img)
+  const stage = f3.parentElement!
   const monitor = observeShifts(stage)
   await new Promise<void>((resolve) => {
     const done = (): void => {
@@ -185,88 +238,17 @@ async function runPreimage(url: string): Promise<{ events: Event[]; shifts: numb
   const paintedAt = performance.now() - t0
   const color = await colorPromise
   monitor.stop()
-  return {
-    events: [
-      { label: 'dims known (prepare)', t: preparedAt, note: `${m.naturalWidth}×${m.naturalHeight}` },
-      { label: 'image painted', t: paintedAt },
-      {
-        label: 'dominant color at',
-        t: colorAt,
-        note: color ?? 'unavailable',
-      },
-    ],
-    shifts: monitor.shifts(),
-  }
+  const events: Event[] = [
+    { label: 'dims known (prepare)', t: preparedAt, note: `${m.naturalWidth}×${m.naturalHeight}` },
+    { label: 'image painted', t: paintedAt },
+    { label: 'dominant color at', t: colorAt, note: color ?? 'unavailable' },
+  ]
+  renderEvents(e3, events, monitor.shifts())
+  r3.innerHTML = `dims in <b>${preparedAt.toFixed(0)}ms</b> · painted at <b>${paintedAt.toFixed(0)}ms</b> · ${monitor.shifts()} shifts`
+  run3.disabled = false
+  run3.textContent = 'Run again'
 }
 
-async function resolveForPanel(
-  photo: { seed: string; width: number; height: number; caption?: string },
-  cacheBust: string | null,
-  useLive: boolean,
-  panelTag: string,
-): Promise<string> {
-  const hue = 200 + panelTag.length * 37
-  const resolved = await resolvePhotoUrl(photo, cacheBust, useLive, hue)
-  if (!useLive) return resolved.url // blob URL — panel-specific already
-  const base = resolved.url
-  const sep = base.includes('?') ? '&' : '?'
-  return `${base}${sep}panel=${panelTag}`
-}
-
-async function run(): Promise<void> {
-  runButton.disabled = true
-  runButton.textContent = 'Checking network…'
-  metaEl.textContent = ''
-  f1.innerHTML = ''
-  f2.innerHTML = ''
-  f3.innerHTML = ''
-  renderAllPlaceholders()
-  setPanelStatus(panel1, 'queued')
-  setPanelStatus(panel2, 'queued')
-  setPanelStatus(panel3, 'queued')
-
-  const photo = PICSUM_PHOTOS[0]!
-  const useLive = await picsumReachable()
-  const cacheBust = getCacheBust()
-  runButton.textContent = useLive ? 'Fetching from picsum…' : 'Generating fallback…'
-
-  metaEl.textContent =
-    `${photo.caption ?? photo.seed} · ${photo.width}×${photo.height} · ` +
-    (useLive
-      ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
-      : 'picsum offline — canvas fallback (same aspect, no network term)')
-
-  // Sequential across the three strategies. Each panel gets its own
-  // cache-busted URL so the later panels aren't trivially fast from
-  // the HTTP cache populated by earlier ones.
-  setPanelStatus(panel1, 'running')
-  runButton.textContent = 'Panel 1 (naive)…'
-  const naiveUrl = await resolveForPanel(photo, cacheBust, useLive, 'naive')
-  const naive = await runNaive(naiveUrl)
-  renderEvents(e1, naive.events, naive.shifts)
-  setPanelStatus(panel1, 'done')
-
-  setPanelStatus(panel2, 'running')
-  runButton.textContent = 'Panel 2 (native)…'
-  const nativeUrl = await resolveForPanel(photo, cacheBust, useLive, 'native')
-  const native = await runNative(nativeUrl, photo.width, photo.height)
-  renderEvents(e2, native.events, native.shifts)
-  setPanelStatus(panel2, 'done')
-
-  setPanelStatus(panel3, 'running')
-  runButton.textContent = 'Panel 3 (preimage)…'
-  const preimageUrl = await resolveForPanel(photo, cacheBust, useLive, 'preimage')
-  const preimaged = await runPreimage(preimageUrl)
-  renderEvents(e3, preimaged.events, preimaged.shifts)
-  setPanelStatus(panel3, 'done')
-
-  runButton.textContent = 'Run again'
-  runButton.disabled = false
-}
-
-runButton.addEventListener('click', () => {
-  void run()
-})
-
-renderAllPlaceholders()
-void run()
+run1.addEventListener('click', () => void runNaive())
+run2.addEventListener('click', () => void runNative())
+run3.addEventListener('click', () => void runPreimage())

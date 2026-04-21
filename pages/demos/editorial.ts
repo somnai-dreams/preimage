@@ -9,36 +9,15 @@ import {
   picsumUrl,
   type PhotoDescriptor,
 } from './photo-source.js'
-import { observeShifts, paintDominantColorBehind, setPanelStatus } from './demo-utils.js'
+import { observeShifts, paintDominantColorBehind } from './demo-utils.js'
 
-const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
 const naivePanel = document.getElementById('naive')!
 const measuredPanel = document.getElementById('measured')!
-const naiveStat = document.getElementById('naiveStat')!
-const measuredStat = document.getElementById('measuredStat')!
-const naivePanelEl = naivePanel.closest('.panel') as HTMLElement
-const measuredPanelEl = measuredPanel.closest('.panel') as HTMLElement
-
-async function resolvePhotosForPanel(
-  useLive: boolean,
-  cacheBust: string | null,
-  panelTag: string,
-): Promise<Array<{ url: string }>> {
-  if (useLive) {
-    return FIGURES.map((p) => {
-      const base = picsumUrl(p, cacheBust)
-      const sep = base.includes('?') ? '&' : '?'
-      return { url: `${base}${sep}panel=${panelTag}` }
-    })
-  }
-  const out: Array<{ url: string }> = []
-  for (let i = 0; i < FIGURES.length; i++) {
-    const blob = await generateFallbackBlob(FIGURES[i]!, (i * 43 + panelTag.length) % 360)
-    out.push({ url: URL.createObjectURL(blob) })
-  }
-  return out
-}
+const naiveResult = document.getElementById('naiveResult')!
+const measuredResult = document.getElementById('measuredResult')!
+const runNaiveBtn = document.getElementById('runNaive') as HTMLButtonElement
+const runMeasuredBtn = document.getElementById('runMeasured') as HTMLButtonElement
 
 const COLUMN_WIDTH = 460
 const LINE_HEIGHT = 22
@@ -51,31 +30,47 @@ The right panel measures each figure before layout runs. Preimage's prepare() st
 No author-declared attributes. No intermediate skeleton swap. The column's final height, every line's y-coordinate, and every figure's rect are all known before the first paint. When the bytes finish streaming the figures just fill into their already-reserved positions.`
 
 const FIGURES: readonly PhotoDescriptor[] = [
-  { seed: 'preimage-editorial-1', width: 2000, height: 1333, caption: 'landscape' },
-  { seed: 'preimage-editorial-2', width: 2000, height: 1125, caption: 'cityscape' },
-  { seed: 'preimage-editorial-3', width: 1400, height: 1960, caption: 'portrait' },
+  { seed: 'preimage-editorial-1', width: 2400, height: 1600, caption: 'landscape' },
+  { seed: 'preimage-editorial-2', width: 2400, height: 1350, caption: 'cityscape' },
+  { seed: 'preimage-editorial-3', width: 1800, height: 2400, caption: 'portrait' },
 ]
 
 const FIGURE_TOPS = [0, 210, 420]
-
-function metric(label: string, value: string, highlight: boolean = false): string {
-  return `<span class="metric">${label} <b${highlight ? ' style="color:var(--reflow)"' : ''}>${value}</b></span>`
-}
-
-const NAIVE_LABELS = ['loaded at', 'visible shifts']
-const MEASURED_LABELS = ['frame placed at', 'lines placed', 'fully loaded at', 'visible shifts']
-
-function renderPlaceholderStats(): void {
-  naiveStat.innerHTML = NAIVE_LABELS.map((l) => metric(l, '—')).join('')
-  measuredStat.innerHTML = MEASURED_LABELS.map((l) => metric(l, '—')).join('')
-}
 
 function getCacheBust(): string | null {
   const checked = document.querySelector<HTMLInputElement>('input[name="cache"]:checked')
   return checked?.value === 'off' ? null : newCacheBustToken()
 }
 
-function buildArticle(panel: HTMLElement): HTMLImageElement[] {
+async function resolvePhotos(
+  useLive: boolean,
+  cacheBust: string | null,
+  panelTag: string,
+): Promise<string[]> {
+  if (useLive) {
+    return FIGURES.map((p) => {
+      const base = picsumUrl(p, cacheBust)
+      const sep = base.includes('?') ? '&' : '?'
+      return `${base}${sep}panel=${panelTag}`
+    })
+  }
+  const out: string[] = []
+  for (let i = 0; i < FIGURES.length; i++) {
+    const blob = await generateFallbackBlob(FIGURES[i]!, (i * 43 + panelTag.length) % 360)
+    out.push(URL.createObjectURL(blob))
+  }
+  return out
+}
+
+function setMeta(useLive: boolean, cacheBust: string | null): void {
+  metaEl.textContent =
+    `${FIGURES.length} figures · ` +
+    (useLive
+      ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
+      : 'picsum offline — canvas fallbacks')
+}
+
+function buildNaiveArticle(panel: HTMLElement): HTMLImageElement[] {
   panel.innerHTML = ''
   const paragraphs = ARTICLE.split('\n\n')
   const imgs: HTMLImageElement[] = []
@@ -98,9 +93,20 @@ function buildArticle(panel: HTMLElement): HTMLImageElement[] {
   return imgs
 }
 
-async function renderNaive(urls: readonly string[]): Promise<{ ms: number; shifts: number }> {
+// --- Naive run ---
+
+async function runNaive(): Promise<void> {
+  runNaiveBtn.disabled = true
+  runNaiveBtn.textContent = 'Running…'
+  naivePanel.innerHTML = ''
+  naiveResult.innerHTML = ''
+  const useLive = await picsumReachable()
+  const cacheBust = getCacheBust()
+  setMeta(useLive, cacheBust)
+  const urls = await resolvePhotos(useLive, cacheBust, 'naive')
+
   const t0 = performance.now()
-  const imgs = buildArticle(naivePanel)
+  const imgs = buildNaiveArticle(naivePanel)
   const monitor = observeShifts(naivePanel)
   for (let i = 0; i < imgs.length; i++) imgs[i]!.src = urls[i]!
   await Promise.all(
@@ -116,21 +122,32 @@ async function renderNaive(urls: readonly string[]): Promise<{ ms: number; shift
     ),
   )
   monitor.stop()
-  return { ms: performance.now() - t0, shifts: monitor.shifts() }
+  const totalMs = performance.now() - t0
+  const shifts = monitor.shifts()
+  naiveResult.innerHTML = `<b>${shifts}</b> layout shifts · <b>${totalMs.toFixed(0)}ms</b> to final layout`
+  runNaiveBtn.disabled = false
+  runNaiveBtn.textContent = 'Run again'
 }
 
-async function renderMeasured(
-  urls: readonly string[],
-): Promise<{ ms: number; prepareMs: number; lineCount: number; shifts: number }> {
-  const t0 = performance.now()
+// --- Measured run ---
+
+async function runMeasured(): Promise<void> {
+  runMeasuredBtn.disabled = true
+  runMeasuredBtn.textContent = 'Running…'
   measuredPanel.innerHTML = ''
-  // fonts.ready and prepare() race in parallel; whichever is slower
-  // gates the layout.
+  measuredPanel.style.height = '0px'
+  measuredResult.innerHTML = ''
+  const useLive = await picsumReachable()
+  const cacheBust = getCacheBust()
+  setMeta(useLive, cacheBust)
+  const urls = await resolvePhotos(useLive, cacheBust, 'measured')
+
+  const t0 = performance.now()
   const [prepared] = await Promise.all([
     Promise.all(urls.map((u) => prepare(u, { extractDominantColor: true }))),
     document.fonts.ready,
   ])
-  const prepareMs = performance.now() - t0
+  const preparedMs = performance.now() - t0
 
   const text = prepareWithSegments(ARTICLE, FONT)
   const result = flowColumnWithFloats({
@@ -151,8 +168,7 @@ async function renderMeasured(
   measuredPanel.style.width = `${COLUMN_WIDTH}px`
   measuredPanel.style.height = `${result.totalHeight}px`
 
-  const figImgs: HTMLImageElement[] = []
-  const figItemIndex: number[] = []
+  const figImgs: Array<{ img: HTMLImageElement; itemIndex: number }> = []
   for (const item of result.items) {
     if (item.kind === 'line') {
       const line = materializeLineRange(text, item.range)
@@ -173,16 +189,15 @@ async function renderMeasured(
       const img = document.createElement('img')
       fig.appendChild(img)
       measuredPanel.appendChild(fig)
-      figImgs.push(img)
-      figItemIndex.push(item.itemIndex)
+      figImgs.push({ img, itemIndex: item.itemIndex })
       void paintDominantColorBehind(prepared[item.itemIndex]!, fig)
     }
   }
+  const laidOutMs = performance.now() - t0
 
   const monitor = observeShifts(measuredPanel)
   await Promise.all(
-    figImgs.map((img, i) => {
-      const itemIndex = figItemIndex[i]!
+    figImgs.map(({ img, itemIndex }) => {
       const url = getMeasurement(prepared[itemIndex]!).blobUrl ?? urls[itemIndex]!
       return new Promise<void>((resolve) => {
         const done = (): void => {
@@ -199,67 +214,18 @@ async function renderMeasured(
     }),
   )
   monitor.stop()
-  return {
-    ms: performance.now() - t0,
-    prepareMs,
-    lineCount: result.lineCount,
-    shifts: monitor.shifts(),
-  }
+  const shifts = monitor.shifts()
+  measuredResult.innerHTML =
+    `<b>dims known</b> in <b>${preparedMs.toFixed(0)}ms</b> · ` +
+    `column committed at <b>${laidOutMs.toFixed(0)}ms</b> · ` +
+    `<b>${shifts}</b> shifts`
+  runMeasuredBtn.disabled = false
+  runMeasuredBtn.textContent = 'Run again'
 }
 
-async function run(): Promise<void> {
-  runButton.disabled = true
-  runButton.textContent = 'Checking network…'
-  naivePanel.innerHTML = ''
-  measuredPanel.innerHTML = ''
-  renderPlaceholderStats()
-  metaEl.textContent = ''
-  setPanelStatus(naivePanelEl, 'queued')
-  setPanelStatus(measuredPanelEl, 'queued')
-
-  const useLive = await picsumReachable()
-  const cacheBust = getCacheBust()
-  runButton.textContent = useLive ? 'Loading from picsum…' : 'Generating fallbacks…'
-
-  metaEl.textContent =
-    `${FIGURES.length} figures · ` +
-    (useLive
-      ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
-      : 'picsum offline — canvas fallbacks')
-
-  // Sequential: naive first, measured second. Each panel uses its own
-  // URL-space so the second isn't a cache hit against the first.
-  setPanelStatus(naivePanelEl, 'running')
-  runButton.textContent = 'Panel 1 (naive)…'
-  const naiveUrls = (await resolvePhotosForPanel(useLive, cacheBust, 'naive')).map((r) => r.url)
-  const naive = await renderNaive(naiveUrls)
-  naiveStat.innerHTML = [
-    metric('loaded at', `${naive.ms.toFixed(0)}ms`),
-    metric('visible shifts', String(naive.shifts), naive.shifts > 0),
-  ].join('')
-  setPanelStatus(naivePanelEl, 'done')
-
-  setPanelStatus(measuredPanelEl, 'running')
-  runButton.textContent = 'Panel 2 (measured)…'
-  const measuredUrls = (
-    await resolvePhotosForPanel(useLive, cacheBust, 'measured')
-  ).map((r) => r.url)
-  const measured = await renderMeasured(measuredUrls)
-  measuredStat.innerHTML = [
-    metric('frame placed at', `${measured.prepareMs.toFixed(0)}ms`),
-    metric('lines placed', String(measured.lineCount)),
-    metric('fully loaded at', `${measured.ms.toFixed(0)}ms`),
-    metric('visible shifts', String(measured.shifts), measured.shifts > 0),
-  ].join('')
-  setPanelStatus(measuredPanelEl, 'done')
-
-  runButton.textContent = 'Run again'
-  runButton.disabled = false
-}
-
-runButton.addEventListener('click', () => {
-  void run()
+runNaiveBtn.addEventListener('click', () => {
+  void runNaive()
 })
-
-renderPlaceholderStats()
-void run()
+runMeasuredBtn.addEventListener('click', () => {
+  void runMeasured()
+})

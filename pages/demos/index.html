@@ -24,11 +24,7 @@
     <a href="./masonry">Masonry</a>
     <a href="./editorial">Editorial</a>
     <a href="./ttfs">TTFS</a>
-    <a href="./dominant-color">Dominant color</a>
     <a href="./decode-pool">Decode pool</a>
-    <a href="./canvas-fit">Canvas fit</a>
-    <a href="./pretext-float">Pretext float</a>
-    <a href="./pretext-inline">Pretext inline</a>
     <span class="spacer"></span>
     <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
   </nav>
@@ -40,61 +36,24 @@
     </header>
 
     <section class="demo-section">
-      <h2>First-load reflow</h2>
-      <p class="intro">Real picsum photos, cache-busted on every run so the browser makes a genuine network request. Most images on the web arrive without <code>width</code>/<code>height</code> attributes; the left panel of each demo is what that looks like today, the right is what preimage makes possible.</p>
+      <h2>Demos</h2>
+      <p class="intro">Each demo has per-panel Run buttons — click one side at a time to feel the click-to-layout delay. Real photos from picsum at meaningful sizes, so you can see the download-decode window that reflow happens in.</p>
       <div class="demo-list">
         <a class="demo-card" href="./masonry">
           <h3>Masonry grid</h3>
-          <p>Sixty photos without declared dimensions. Naive <code>&lt;img&gt;</code> reflows as each decodes; <code>prepare()</code> returns measured aspects and a small inline shortest-column fill places them stably from first paint.</p>
+          <p>Up to 90 photos, two grids. Left: stock <code>&lt;img&gt;</code> tags — column grows as each image decodes, every tile below shifts. Right: <code>prepare()</code> measures every image, a shortest-column layout commits in one pass, dominant-color placeholders hold the spot.</p>
         </a>
         <a class="demo-card" href="./editorial">
           <h3>Editorial article with floats</h3>
-          <p>Three floated figures inside flowing paragraph text. Pretext lays out the text around the figures using dimensions preimage measured up front.</p>
+          <p>Three floated figures inside flowing paragraph text. Naive HTML reflows as each figure decodes. Pretext + preimage measures up front and flows the text around the measured rects via <code>flowColumnWithFloats</code>.</p>
         </a>
         <a class="demo-card" href="./ttfs">
           <h3>Time to first sizing</h3>
-          <p>One photo, three strategies side by side: naive <code>&lt;img&gt;</code>, native <code>&lt;img width height&gt;</code>, and <code>prepare()</code>. Timestamps show when each strategy knows the dimensions.</p>
-        </a>
-      </div>
-    </section>
-
-    <section class="demo-section">
-      <h2>Outside the DOM</h2>
-      <p class="intro">Places where CSS's <code>object-fit</code> and <code>aspect-ratio</code> don't apply — and preimage's numeric answers do.</p>
-      <div class="demo-list">
-        <a class="demo-card" href="./canvas-fit">
-          <h3>Canvas fit modes</h3>
-          <p>Draw an image into a canvas at the correct <code>object-fit</code> rect. Compares a naive stretched <code>drawImage</code> against <code>layout()</code>-computed placement.</p>
+          <p>One 4800×3200 photo (~2-5MB) loaded three ways: naive <code>&lt;img src&gt;</code>, declared <code>width</code>/<code>height</code> attrs, and <code>prepare()</code>. The timestamp shows when each strategy knows the dimensions.</p>
         </a>
         <a class="demo-card" href="./decode-pool">
-          <h3>Decode pool on a canvas timeline</h3>
-          <p>Scrub a 16-frame photo timeline. Left: <code>img.src = url</code> per scrub, with a main-thread decode on every tick. Right: <code>DecodePool</code> warms every frame off-main-thread once, then scrub is a single blit.</p>
-        </a>
-      </div>
-    </section>
-
-    <section class="demo-section">
-      <h2>Deferred extras</h2>
-      <p class="intro">Useful side-products <code>prepare()</code> can produce while the bytes are in flight, exposed as opt-ins.</p>
-      <div class="demo-list">
-        <a class="demo-card" href="./dominant-color">
-          <h3>Dominant-color placeholders</h3>
-          <p><code>prepare(url, { extractDominantColor: true })</code> populates each tile's averaged color asynchronously. The tile's box shows the color until the full image paints, so half-loaded scrolling doesn't feel skeletal.</p>
-        </a>
-      </div>
-    </section>
-
-    <section class="demo-section">
-      <h2>Pretext integration</h2>
-      <p class="intro">The two pretext scenarios that require numeric image dimensions pretext doesn't measure on its own.</p>
-      <div class="demo-list">
-        <a class="demo-card" href="./pretext-float">
-          <h3>Float a figure in a pretext column</h3>
-          <p>A paragraph wrapping around a floated figure. <code>flowColumnWithFloats</code> drives pretext's cursor loop, narrowing <code>maxWidth</code> where the float is active.</p>
-        </a>
-        <a class="demo-card" href="./pretext-inline">
-          <h3>Inline images in a rich-inline bubble</h3>
-          <p>A chat bubble mixing text and inline icons. <code>inlineImage()</code> returns a pretext <code>RichInlineItem</code> whose <code>extraWidth</code> reserves the measured image's rendered width.</p>
+          <h3>Decode pool for canvas timelines</h3>
+          <p>Sixteen 2000×1125 frames scrubbable on a canvas. Left decodes on every scrub on the main thread; right warms a <code>DecodePool</code> up front and each scrub is a single cached-bitmap blit.</p>
         </a>
       </div>
     </section>
