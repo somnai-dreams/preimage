@@ -1,6 +1,6 @@
 import { prepareWithSegments, materializeLineRange } from '@chenglou/pretext'
 
-import { prepare, getMeasurement } from '../../src/index.js'
+import { prepare, getMeasurement, type PreparedImage } from '../../src/index.js'
 import { flowColumnWithFloats } from '../../src/pretext.js'
 import {
   newCacheBustToken,
@@ -85,11 +85,15 @@ async function renderNaive(urls: readonly string[]): Promise<{ ms: number; shift
 
 async function renderMeasured(
   urls: readonly string[],
+  preparedPromise: Promise<PreparedImage[]>,
 ): Promise<{ ms: number; prepareMs: number; lineCount: number; shifts: number }> {
   const t0 = performance.now()
   measuredPanel.innerHTML = ''
-  await document.fonts.ready
-  const prepared = await Promise.all(urls.map((u) => prepare(u)))
+  // fonts.ready and prepare() race in parallel; whichever is slower
+  // gates the layout. `preparedPromise` was started earlier in run()
+  // so naive's img.src fetches can't queue the prepare fetches behind
+  // themselves when the browser dedupes same-URL requests.
+  const [prepared] = await Promise.all([preparedPromise, document.fonts.ready])
   const prepareMs = performance.now() - t0
 
   const text = prepareWithSegments(ARTICLE, FONT)
@@ -185,7 +189,17 @@ async function run(): Promise<void> {
 
   runButton.textContent = 'Running…'
 
-  const [naive, measured] = await Promise.all([renderNaive(urls), renderMeasured(urls)])
+  // Kick off prepares before renderNaive starts setting img.src. When
+  // both panels fetch the same URL, the browser can stall the second
+  // request behind the first's response headers; starting the
+  // streaming header-probe first ensures the measured panel isn't
+  // queued behind the naive panel's full-image downloads.
+  const preparedPromise = Promise.all(urls.map((u) => prepare(u)))
+
+  const [naive, measured] = await Promise.all([
+    renderNaive(urls),
+    renderMeasured(urls, preparedPromise),
+  ])
 
   naiveStat.innerHTML = [
     metric('loaded at', `${naive.ms.toFixed(0)}ms`),

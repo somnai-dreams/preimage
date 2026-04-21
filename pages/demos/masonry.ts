@@ -1,4 +1,4 @@
-import { prepare, getMeasurement } from '../../src/index.js'
+import { prepare, getMeasurement, type PreparedImage } from '../../src/index.js'
 import {
   generateFallbackBlob,
   newCacheBustToken,
@@ -144,10 +144,13 @@ function getMode(): Mode {
   return (checked?.value === 'batch' ? 'batch' : 'progressive')
 }
 
-async function renderMeasuredBatch(urls: readonly string[]): Promise<BatchResult> {
+async function renderMeasuredBatch(
+  urls: readonly string[],
+  prepares: ReadonlyArray<Promise<PreparedImage>>,
+): Promise<BatchResult> {
   measuredPanel.innerHTML = ''
   const t0 = performance.now()
-  const prepared = await Promise.all(urls.map((u) => prepare(u)))
+  const prepared = await Promise.all(prepares)
   const prepareMs = performance.now() - t0
 
   // Layout entirely from the measured aspect ratios. No library
@@ -205,7 +208,10 @@ async function renderMeasuredBatch(urls: readonly string[]): Promise<BatchResult
 // waits for the slowest image. Existing frames never move once
 // placed, so the layout is still stable frame-by-frame — it just
 // grows as bytes arrive.
-async function renderMeasuredProgressive(urls: readonly string[]): Promise<ProgressiveResult> {
+async function renderMeasuredProgressive(
+  urls: readonly string[],
+  prepares: ReadonlyArray<Promise<PreparedImage>>,
+): Promise<ProgressiveResult> {
   measuredPanel.innerHTML = ''
   measuredPanel.style.height = '0px'
   const t0 = performance.now()
@@ -216,8 +222,8 @@ async function renderMeasuredProgressive(urls: readonly string[]): Promise<Progr
   let lastPlacedMs = 0
 
   await Promise.all(
-    urls.map((url) =>
-      prepare(url).then((p) => {
+    urls.map((url, idx) =>
+      prepares[idx]!.then((p) => {
         const now = performance.now() - t0
         if (firstPlacedMs === 0) firstPlacedMs = now
         lastPlacedMs = now
@@ -271,9 +277,12 @@ async function renderMeasuredProgressive(urls: readonly string[]): Promise<Progr
 
 function renderMeasured(
   urls: readonly string[],
+  prepares: ReadonlyArray<Promise<PreparedImage>>,
   mode: Mode,
 ): Promise<BatchResult | ProgressiveResult> {
-  return mode === 'batch' ? renderMeasuredBatch(urls) : renderMeasuredProgressive(urls)
+  return mode === 'batch'
+    ? renderMeasuredBatch(urls, prepares)
+    : renderMeasuredProgressive(urls, prepares)
 }
 
 const measuredSubEl = document.getElementById('measuredSub')!
@@ -309,7 +318,17 @@ async function run(): Promise<void> {
 
   runButton.textContent = 'Running…'
 
-  const [naive, measured] = await Promise.all([renderNaive(urls), renderMeasured(urls, mode)])
+  // Kick off prepares before renderNaive starts setting img.src. When
+  // both panels fetch the same URL, the browser can stall the second
+  // request behind the first's response headers; starting the
+  // streaming header-probe first ensures the measured panel isn't
+  // queued behind the naive panel's full-image downloads.
+  const prepares = urls.map((u) => prepare(u))
+
+  const [naive, measured] = await Promise.all([
+    renderNaive(urls),
+    renderMeasured(urls, prepares, mode),
+  ])
 
   naiveStat.innerHTML = [
     metric('loaded at', `${naive.ms.toFixed(0)}ms`),
