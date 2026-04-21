@@ -5,35 +5,47 @@
   <title>Preimage demos</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font: 16px/1.5 -apple-system, system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #111; }
-    a { color: #05f; text-decoration: none; }
+    body { font: 16px/1.55 -apple-system, system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1.25rem; color: #111; }
+    a { color: #0063ff; text-decoration: none; }
     a:hover { text-decoration: underline; }
-    h1 { margin-top: 0; }
-    ul { padding-left: 1.1rem; }
-    li { margin-bottom: 0.3rem; }
-    code { background: #f3f3f3; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em; }
-    .section { margin-top: 1.5rem; }
-    .section h2 { font-size: 1rem; margin-bottom: 0.4rem; }
+    h1 { margin: 0 0 0.5rem; }
+    h2 { font-size: 1.05rem; margin: 2rem 0 0.3rem; }
+    p { margin: 0.4rem 0; }
+    code { background: #f0f0f0; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.92em; }
+    .demo { border: 1px solid #e5e5e5; border-radius: 6px; padding: 1rem 1.25rem; margin: 0.8rem 0; }
+    .demo h3 { margin: 0 0 0.25rem; font-size: 1rem; }
+    .demo p { font-size: 14.5px; color: #333; }
+    .footnote { color: #888; font-size: 13.5px; }
   </style>
 </head>
 <body>
   <h1>Preimage demos</h1>
-  <p>Measured images for <a href="https://github.com/chenglou/pretext"><code>@chenglou/pretext</code></a>: float figures beside flowing text, and inline images inside rich-inline runs — all without triggering DOM reflow.</p>
+  <p>Preimage is a small library of two parts: a <strong>standalone image-measurement primitive</strong> (useful wherever CSS doesn't apply — canvas, SVG, WebGL), and a <strong>pretext integration</strong> that supplies the image dimensions pretext's text-layout loop assumes as input.</p>
+  <p>The demos below are grouped the same way.</p>
 
-  <div class="section">
-    <h2>Pretext integration (the headline)</h2>
-    <ul>
-      <li><a href="/demos/pretext-float.html">Float a figure beside a pretext column</a></li>
-      <li><a href="/demos/pretext-inline.html">Inline images in a rich-inline chat bubble</a></li>
-    </ul>
+  <h2>Without pretext</h2>
+  <p>Strong case: drawing to canvas. The DOM has <code>object-fit</code> and <code>aspect-ratio</code> for free — you don't need a library. Canvas, SVG, and WebGL have neither.</p>
+
+  <div class="demo">
+    <h3><a href="/demos/canvas-fit.html">Canvas fit</a></h3>
+    <p>Draws an image to a canvas at the correct object-fit rect. Compares a naive <code>drawImage(img, 0, 0, w, h)</code> (stretched) against <code>layout(prepared, w, h, fit)</code> + <code>drawImage(img, r.x, r.y, r.w, r.h)</code> (correctly fit).</p>
   </div>
 
-  <div class="section">
-    <h2>Standalone primitives</h2>
-    <ul>
-      <li><a href="/demos/object-fit.html">Single-image <code>object-fit</code> math</a></li>
-      <li><a href="/demos/justified-gallery.html">Justified image gallery</a></li>
-    </ul>
+  <h2>With pretext</h2>
+  <p>These are the demos that actually justify the library. Pretext's README describes two use-cases — text wrapping around a figure, and rich-inline flow with atomic pills — and deliberately stops short of computing the image dimensions for either. Preimage fills that gap.</p>
+
+  <div class="demo">
+    <h3><a href="/demos/pretext-float.html">Float a figure in a pretext column</a></h3>
+    <p>An article with a figure floated beside it. Preimage measures the image once; <code>flowColumnWithFloats</code> drives pretext's cursor loop, narrowing <code>maxWidth</code> while the float is active. Works on DOM, canvas, SVG, or WebGL targets.</p>
   </div>
+
+  <div class="demo">
+    <h3><a href="/demos/pretext-inline.html">Inline images in a rich-inline chat bubble</a></h3>
+    <p>A chat bubble mixing text and small inline images. Preimage's <code>inlineImage()</code> returns a pretext <code>RichInlineItem</code> whose <code>extraWidth</code> reserves the measured image's rendered width, so pretext's rich-inline walker treats it as an atomic pill.</p>
+  </div>
+
+  <h2 class="footnote">Bonus</h2>
+  <p class="footnote">Not part of the pretext story — a standalone justified row packer that shares the same prepared measurements.</p>
+  <p class="footnote"><a href="/demos/justified-gallery.html">Justified gallery</a></p>
 </body>
 </html>

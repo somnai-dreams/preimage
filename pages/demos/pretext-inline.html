@@ -5,25 +5,61 @@
   <title>Preimage · pretext rich-inline</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font: 14px/1.55 -apple-system, system-ui, sans-serif; margin: 2rem; }
-    .bubble { background: #eef4ff; border-radius: 18px; padding: 14px 18px; max-width: 520px; position: relative; }
-    .row { position: relative; white-space: nowrap; }
-    .row span { position: absolute; font: 17px/24px Inter, -apple-system, system-ui, sans-serif; color: #111; }
-    .row img { position: absolute; border-radius: 4px; display: block; vertical-align: middle; }
-    .controls { margin-bottom: 1rem; }
+    :root { --bg: #fafafa; --border: #e5e5e5; --muted: #666; }
+    body { font: 15px/1.55 -apple-system, system-ui, sans-serif; margin: 2rem; color: #111; }
+    main { display: grid; grid-template-columns: 1fr 340px; gap: 2rem; align-items: start; }
+    h1 { margin: 0 0 0.25rem; font-size: 1.4rem; }
+    h2 { font-size: 0.95rem; margin: 1.25rem 0 0.3rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    p { margin: 0.4rem 0; }
+    code { background: #f0f0f0; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.92em; }
+    pre { background: #f0f0f0; padding: 0.6rem 0.75rem; border-radius: 4px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+    .controls { margin: 1rem 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
     #widthVal { font-variant-numeric: tabular-nums; }
+    .bubble { background: #eef4ff; border-radius: 18px; padding: 14px 18px; position: relative; }
+    .row { position: relative; }
+    .row span { position: absolute; font: 17px/24px Inter, -apple-system, system-ui, sans-serif; color: #111; white-space: pre; }
+    .row img { position: absolute; border-radius: 4px; display: block; }
+    aside { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.25rem; font-size: 13.5px; line-height: 1.5; }
+    aside h2 { margin-top: 0; }
+    input, select { font: inherit; padding: 4px 6px; }
   </style>
 </head>
 <body>
-  <h1>Pretext rich-inline — inline measured images in a chat bubble</h1>
-  <p>Preimage's <code>inlineImage()</code> returns a pretext <code>RichInlineItem</code> whose <code>extraWidth</code> reserves the measured image's rendered width. Pretext's rich-inline line walker treats it as an atomic pill and wraps around it naturally.</p>
-  <div class="controls">
-    <label>Bubble width
-      <input id="width" type="range" min="200" max="700" value="420" />
-      <span id="widthVal">420</span>px
-    </label>
-  </div>
-  <div class="bubble" id="bubble"></div>
+  <main>
+    <section>
+      <h1>Pretext rich-inline — inline images in a chat bubble</h1>
+      <p>Three tiny images interleaved with flowing text. Pretext's rich-inline walker treats each image as an atomic pill and wraps around it naturally. Resize the bubble — lines re-break and images shuffle to the right slots.</p>
+
+      <div class="controls">
+        <label>Bubble width
+          <input id="width" type="range" min="240" max="700" value="420" />
+          <span id="widthVal">420</span>px
+        </label>
+      </div>
+      <div class="bubble" id="bubble"></div>
+    </section>
+
+    <aside>
+      <h2>What this shows</h2>
+      <p>Pretext's <code>RichInlineItem</code> has a <code>text</code>, <code>font</code>, <code>break</code>, and <code>extraWidth</code>. The <code>extraWidth</code> field is caller-owned — it's how pretext lets pill chrome contribute to line width without needing a font.</p>
+      <p>Preimage's <code>inlineImage()</code> returns a <code>RichInlineItem</code> whose <code>text</code> is a zero-width space (survives pretext's whitespace trim, measures 0px wide) and whose <code>extraWidth</code> is the measured image's rendered width. Pretext packs it like any other atomic item.</p>
+
+      <h2>Without preimage</h2>
+      <p>Pretext's rich-inline is text-only. To mix in images you'd have to fork rich-inline, or stop using pretext inside the bubble. Either way you lose pretext's line-break accuracy for the text portions.</p>
+
+      <h2>With preimage</h2>
+<pre><code>const items = await resolveMixedInlineItems([
+  { text: 'Pushed a fix to ', font: FONT },
+  { kind: 'image', src: iconSrc,
+    options: { font: FONT, height: 20,
+               extraWidth: 6 } },
+  { text: ' preimage.', font: FONT },
+])
+const prepared = prepareRichInline(items)</code></pre>
+      <p>Iterate fragments with pretext's walker. Fragments whose source item is an <code>InlineImageItem</code> render as images, everything else as text.</p>
+    </aside>
+  </main>
+
   <script type="module" src="./pretext-inline.ts"></script>
 </body>
 </html>

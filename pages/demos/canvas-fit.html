@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · canvas fit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --bg: #fafafa; --border: #e5e5e5; --accent: #0063ff; --muted: #666; }
+    body { font: 15px/1.55 -apple-system, system-ui, sans-serif; margin: 2rem; color: #111; }
+    main { display: grid; grid-template-columns: 1fr 320px; gap: 2rem; align-items: start; }
+    h1 { margin: 0 0 0.25rem; font-size: 1.4rem; }
+    h2 { font-size: 0.95rem; margin: 1.25rem 0 0.3rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    p { margin: 0.4rem 0; }
+    code { background: #f0f0f0; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.92em; }
+    pre { background: #f0f0f0; padding: 0.6rem 0.75rem; border-radius: 4px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+    .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin: 1rem 0; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem; }
+    .canvas-wrap { background: #111; border-radius: 6px; overflow: hidden; position: relative; }
+    .canvas-wrap canvas { display: block; width: 100%; height: auto; }
+    .canvas-label { position: absolute; top: 8px; left: 10px; color: #fff; font: 12px/1 -apple-system, system-ui, sans-serif; padding: 4px 8px; background: rgba(0,0,0,0.6); border-radius: 3px; }
+    aside { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.25rem; font-size: 13.5px; line-height: 1.5; }
+    aside h2 { margin-top: 0; }
+    input, select { font: inherit; padding: 4px 6px; }
+    input[type="text"] { min-width: 320px; }
+    .stat { color: var(--muted); font-size: 12px; margin-top: 0.25rem; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <main>
+    <section>
+      <h1>Canvas fit — CSS <code>object-fit</code> for pixels CSS can't reach</h1>
+      <p>Drawing an image to a canvas is the clearest case where CSS does not help you. <code>drawImage(img, 0, 0, w, h)</code> stretches. <code>object-fit</code> is a CSS property; canvas does not honor it. You have to compute the fitted rect yourself.</p>
+
+      <div class="controls">
+        <label>Image
+          <input id="src" type="text" value="https://picsum.photos/seed/canvas/1600/900" />
+        </label>
+        <label>Fit
+          <select id="fit">
+            <option>contain</option>
+            <option selected>cover</option>
+            <option>fill</option>
+            <option>scale-down</option>
+            <option>none</option>
+          </select>
+        </label>
+        <button id="go">Draw</button>
+      </div>
+
+      <div class="pair">
+        <div>
+          <div class="canvas-wrap">
+            <canvas id="naive" width="480" height="270"></canvas>
+            <div class="canvas-label">naive <code>drawImage(img, 0, 0, 480, 270)</code></div>
+          </div>
+          <div class="stat" id="naiveStat">—</div>
+        </div>
+        <div>
+          <div class="canvas-wrap">
+            <canvas id="fitted" width="480" height="270"></canvas>
+            <div class="canvas-label">preimage <code>fitRect</code></div>
+          </div>
+          <div class="stat" id="fittedStat">—</div>
+        </div>
+      </div>
+    </section>
+
+    <aside>
+      <h2>What this shows</h2>
+      <p>Left canvas: what happens when you forget fit math — a 1600×900 image crammed into a 480×270 box. The image stretches and squeezes. Right canvas: the same image, drawn at the rect <code>fitRect()</code> returns for the chosen fit mode. Centered, preserved aspect ratio, same numbers the browser would apply to a DOM <code>&lt;img&gt;</code>.</p>
+
+      <h2>Without preimage</h2>
+      <p>You hand-roll the fit math every time. Every canvas-based renderer (chart libraries, game engines, PDF/SVG exporters, custom avatar generators) re-derives the same <code>min(boxW/natW, boxH/natH)</code> ladder. Often incorrectly; often without the measurement cache.</p>
+
+      <h2>With preimage</h2>
+<pre><code>const p = await prepare(src)
+const r = layout(p, 480, 270, 'cover')
+ctx.drawImage(img, r.offsetX, r.offsetY, r.width, r.height)</code></pre>
+      <p>One decode, cached aspect ratio, arithmetic on every resize. All five CSS fit modes supported.</p>
+    </aside>
+  </main>
+
+  <script type="module" src="./canvas-fit.ts"></script>
+</body>
+</html>

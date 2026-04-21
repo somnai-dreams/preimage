@@ -5,38 +5,79 @@
   <title>Preimage · pretext float</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font: 15px/1.55 -apple-system, system-ui, sans-serif; margin: 2rem; }
-    .controls { margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-    .stage { position: relative; background: #fafafa; border: 1px solid #eee; padding: 1.25rem; }
+    :root { --bg: #fafafa; --border: #e5e5e5; --muted: #666; }
+    body { font: 15px/1.55 -apple-system, system-ui, sans-serif; margin: 2rem; color: #111; }
+    main { display: grid; grid-template-columns: 1fr 340px; gap: 2rem; align-items: start; }
+    h1 { margin: 0 0 0.25rem; font-size: 1.4rem; }
+    h2 { font-size: 0.95rem; margin: 1.25rem 0 0.3rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    p { margin: 0.4rem 0; }
+    code { background: #f0f0f0; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.92em; }
+    pre { background: #f0f0f0; padding: 0.6rem 0.75rem; border-radius: 4px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+    .controls { margin: 1rem 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    .stage { position: relative; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 1.25rem; }
     .column { position: relative; }
     .col-line { position: absolute; white-space: pre; font: 17px/26px Inter, -apple-system, system-ui, sans-serif; color: #111; }
-    .col-float img { position: absolute; border-radius: 4px; display: block; }
-    .stats { font-size: 12px; color: #555; margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
+    .col-float img { position: absolute; border-radius: 4px; display: block; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+    .stats { font-size: 12px; color: var(--muted); margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
+    aside { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.25rem; font-size: 13.5px; line-height: 1.5; }
+    aside h2 { margin-top: 0; }
+    input, select { font: inherit; padding: 4px 6px; }
   </style>
 </head>
 <body>
-  <h1>Pretext float — text flows around a measured image</h1>
-  <p>Preimage's <code>flowColumnWithFloats</code> drives pretext's <code>layoutNextLineRange</code> cursor loop, narrowing the available line width while a floated figure is active.</p>
-  <div class="controls">
-    <label>Column width
-      <input id="width" type="range" min="320" max="900" value="640" />
-      <span id="widthVal">640</span>px
-    </label>
-    <label>Float side
-      <select id="side">
-        <option value="right" selected>right</option>
-        <option value="left">left</option>
-      </select>
-    </label>
-    <label>Float top
-      <input id="top" type="range" min="0" max="200" value="26" />
-      <span id="topVal">26</span>px
-    </label>
-  </div>
-  <div class="stage">
-    <div id="column" class="column"></div>
-    <div class="stats" id="stats">—</div>
-  </div>
+  <main>
+    <section>
+      <h1>Pretext float — text wraps around a measured image</h1>
+      <p>Drag the sliders. Each move re-flows the paragraph and re-positions the figure. The only things running are pretext's line-break arithmetic and preimage's <code>fitRect</code>. No DOM measurement, no <code>getBoundingClientRect</code>, no decode in the loop.</p>
+
+      <div class="controls">
+        <label>Column width
+          <input id="width" type="range" min="320" max="900" value="640" />
+          <span id="widthVal">640</span>px
+        </label>
+        <label>Float side
+          <select id="side">
+            <option value="right" selected>right</option>
+            <option value="left">left</option>
+          </select>
+        </label>
+        <label>Float top
+          <input id="top" type="range" min="0" max="200" value="26" />
+          <span id="topVal">26</span>px
+        </label>
+      </div>
+
+      <div class="stage">
+        <div id="column" class="column"></div>
+        <div class="stats" id="stats">—</div>
+      </div>
+    </section>
+
+    <aside>
+      <h2>What this shows</h2>
+      <p>Pretext's <code>layoutNextLineRange(prepared, cursor, maxWidth)</code> cursor loop exists specifically so a caller can narrow the available width line by line. Its README shows an example with a floated image — but stops at "you bring the image's width and height from somewhere."</p>
+      <p>Preimage's <code>flowColumnWithFloats</code> is the "somewhere." It solves each float's rect from the current column width, then drives pretext's cursor with the correct <code>maxWidth</code> on every line.</p>
+
+      <h2>Without preimage</h2>
+      <p>You load the <code>&lt;img&gt;</code>, wait for <code>onload</code>, read <code>naturalWidth</code>/<code>naturalHeight</code>, decide how to fit it to the column, then write the cursor loop yourself. On canvas/SVG/WebGL render targets, CSS <code>float</code> isn't available at all — the driver is the only path.</p>
+
+      <h2>With preimage</h2>
+<pre><code>const image = await prepare(src)
+const text = prepareWithSegments(article, FONT)
+
+const { items, totalHeight } =
+  flowColumnWithFloats({
+    text,
+    columnWidth,
+    lineHeight: 26,
+    floats: [{ image, side: 'right',
+               top: 26, maxWidth: 280,
+               maxHeight: 220, gapX: 16 }],
+  })</code></pre>
+      <p><code>items</code> is a flat stream of <code>{ kind: 'line' }</code> and <code>{ kind: 'float' }</code> placements with absolute <code>(x, y, width, height)</code>. Render to DOM, canvas, SVG, or WebGL — the math is the same.</p>
+    </aside>
+  </main>
+
   <script type="module" src="./pretext-float.ts"></script>
 </body>
 </html>
