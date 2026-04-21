@@ -73,6 +73,62 @@ const prepared = await prepare(cloudinaryUrl)  // no network — URL parsed
 
 Built-ins: `cloudinaryParser`, `shopifyParser`, `picsumParser`, `unsplashParser`. The `queryParamDimensionParser` helper builds a parser for any CDN that uses query-string keys. Custom parsers are just `(url: string) => { width, height } | null` functions — register as many as you need.
 
+## Dominant color
+
+Opt into a one-pixel color average on any `prepare()` call. The browser's native resampler does the averaging via `createImageBitmap(blob, { resizeWidth: 1, resizeHeight: 1 })` — cheaper and more accurate than sampling in JS. The result is stored on the measurement as a CSS string (`rgb(...)` or `rgba(...)`), ready to drop into `background-color`.
+
+```ts
+import { prepare, getMeasurement } from '@somnai-dreams/preimage'
+
+const prepared = await prepare('/hero.jpg', { extractDominantColor: true })
+// dimensions resolve immediately; color lands asynchronously
+requestIdleCallback(() => {
+  const { dominantColor } = getMeasurement(prepared)
+  if (dominantColor !== undefined) heroEl.style.backgroundColor = dominantColor
+})
+```
+
+The color extraction runs after dimensions resolve, so `prepare()`'s returned promise is never delayed by it. For callers that already have a blob, `extractDominantColorFromBlob(blob)` is exposed directly.
+
+## Managed concurrency with `PrepareQueue`
+
+Browsers cap parallel requests per origin (6 for HTTP/1.1). Firing `prepare()` for 200 tiles means the later tiles queue inside the browser's network stack, where you can't reorder them. `PrepareQueue` is an application-level queue that holds requests before they hit the network and lets you `boost(url)` to move a URL to the front when it scrolls into view.
+
+```ts
+import { PrepareQueue } from '@somnai-dreams/preimage'
+
+const queue = new PrepareQueue({ concurrency: 6 })
+
+for (const tile of tiles) {
+  tile.prepared = queue.enqueue(tile.src)
+}
+
+// User scrolls to tile 50 before tile 10 has even started:
+queue.boost(tiles[50].src)   // jumps the application queue immediately
+```
+
+Duplicate `enqueue()` calls for the same URL share one in-flight prepare (normalized by URL). `clear()` drops the pending backlog; in-flight work continues.
+
+## Off-main-thread decode with `DecodePool`
+
+`createImageBitmap(blob)` decodes off the main thread. For canvas/WebGL apps (scrubbable timelines, map tiles, photo editors), drawing from a cached `ImageBitmap` is a single main-thread blit — no decode cost on the hot path. `DecodePool` wraps `createImageBitmap` with a concurrency cap, an LRU cache of decoded bitmaps, and in-flight dedupe.
+
+```ts
+import { DecodePool } from '@somnai-dreams/preimage'
+
+const pool = new DecodePool({ concurrency: 4, maxCacheEntries: 64 })
+
+function paint() {
+  for (const frame of visibleFrames) {
+    const bitmap = pool.peek(frame.src)     // non-blocking; null if not yet decoded
+    if (bitmap !== null) ctx.drawImage(bitmap, frame.x, frame.y)
+    else void pool.get(frame.src)           // kick off the decode for next paint
+  }
+}
+```
+
+Bitmaps evicted by LRU have `.close()` called to release GPU memory immediately. `release(src)` forces release before eviction; `clear()` closes everything.
+
 ## Installation
 
 ```sh
@@ -180,6 +236,24 @@ recordKnownMeasurement(src, w, h, { orientation?, decoded? }?): ImageMeasurement
 measureFromSvgText(svgText): { width, height } | null
 readExifOrientation(buffer): OrientationCode | null
 clearCache(): void
+
+// Dominant color (opt-in via prepare({extractDominantColor: true}))
+extractDominantColorFromBlob(blob): Promise<string | null>
+extractDominantRgbaFromBlob(blob): Promise<RGBA | null>
+rgbaToCss({ r, g, b, a }): string
+
+// Managed concurrency + decode pool
+new PrepareQueue({ concurrency? })
+  queue.enqueue(src, options?): Promise<PreparedImage>
+  queue.boost(src): boolean
+  queue.clear(): void
+  queue.pendingCount / queue.inflightCount
+
+new DecodePool({ concurrency?, maxCacheEntries?, imageBitmapOptions? })
+  pool.get(src): Promise<ImageBitmap>
+  pool.peek(src): ImageBitmap | null
+  pool.release(src): boolean
+  pool.clear(): void
 ```
 
 ### Pretext integration (`@somnai-dreams/preimage/pretext`)

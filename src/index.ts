@@ -40,6 +40,17 @@ export {
 } from './url-dimensions.js'
 
 export {
+  extractDominantColorFromBlob,
+  extractDominantRgbaFromBlob,
+  rgbaToCss,
+  type RGBA,
+} from './dominant-color.js'
+
+export { PrepareQueue, type PrepareQueueOptions } from './prepare-queue.js'
+
+export { DecodePool, type DecodePoolOptions } from './decode-pool.js'
+
+export {
   measureImage,
   measureImages,
   peekImageMeasurement,

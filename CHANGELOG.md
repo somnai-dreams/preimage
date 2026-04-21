@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.6
+
+Three value-adds for image-heavy pages.
+
+- **Dominant color extraction.** `prepare(url, { extractDominantColor: true })` asynchronously populates `measurement.dominantColor` (CSS `rgb`/`rgba` string) once the bytes are available. Implemented via `createImageBitmap(blob, { resizeWidth: 1, resizeHeight: 1, resizeQuality: 'low' })` + canvas `getImageData` — the browser's native resampler does the averaging. Useful as a placeholder background color while the image decodes: the box shows the average color until the full image paints, and the color persists after load so out-of-viewport tiles still contribute a palette hint. New exports: `extractDominantColorFromBlob`, `extractDominantRgbaFromBlob`, `rgbaToCss`, `RGBA`.
+- **`PrepareQueue` for managed concurrency.** Browsers cap parallel requests per origin (6 for HTTP/1.1); firing `prepare()` for 200 tiles means later tiles queue inside the browser's network stack where you can't reorder them. `PrepareQueue` is an application-level queue that holds requests before they hit the network and lets you `boost(url)` to move a URL to the front when it scrolls into view. Deduplicates by normalized URL. Default concurrency 6.
+- **`DecodePool` for off-main-thread decode.** `createImageBitmap(blob)` decodes off the main thread; `DecodePool` adds a concurrency cap (default 4), an LRU cache of decoded `ImageBitmap`s (default 64 entries), and in-flight dedupe. For canvas/WebGL apps (scrubbable timelines, map tiles, photo editors), drawing from a cached `ImageBitmap` is a single main-thread blit — no decode cost on the hot path. Bitmaps evicted by LRU have `.close()` called to release GPU memory immediately.
+
 ## 0.0.5
 
 - **Added URL-pattern dimension extraction.** Many CDNs encode intrinsic dimensions directly in the URL (Cloudinary's `w_400,h_300`, Shopify's `_400x300.jpg`, picsum's `/800/600`, Unsplash `?w=400&h=300`). `prepare(url)` now consults a pluggable registry of `UrlDimensionParser`s before hitting the network — a match skips the network entirely and resolves dimensions in microseconds.

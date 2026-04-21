@@ -30,6 +30,7 @@ import {
 } from './measurement.js'
 import { MAX_HEADER_BYTES, probeImageBytes, type ProbedDimensions } from './probe.js'
 import { parseUrlDimensions } from './url-dimensions.js'
+import { extractDominantColorFromBlob } from './dominant-color.js'
 
 // --- Opaque prepared handle ---
 
@@ -73,6 +74,12 @@ export type PrepareOptions = MeasureOptions & {
   // minimize bandwidth at the cost of a second fetch if the caller later
   // renders the image.
   completeStream?: boolean
+  // Extract a single averaged dominant color once the bytes are
+  // available. Stored on the measurement as `dominantColor` (CSS
+  // rgb/rgba string). Useful as a background placeholder before the
+  // image paints. Requires `createImageBitmap`; adds no latency to
+  // `prepare()`'s returned promise — the color lands asynchronously.
+  extractDominantColor?: boolean
 }
 
 // --- Public API ---
@@ -226,8 +233,10 @@ async function streamAndProbe(
 
   // Dimensions resolved. Return the measurement immediately. Continue
   // reading the stream in the background (unless the caller opted out)
-  // so the bytes are reusable for render via a blob URL.
-  const completeStream = options.completeStream !== false
+  // so the bytes are reusable for render via a blob URL. Dominant-color
+  // extraction also needs the full bytes, so force drain when asked.
+  const completeStream =
+    options.completeStream !== false || options.extractDominantColor === true
   const analysis = analyzeImage(src)
   const measurement = recordKnownMeasurement(key, probed.width, probed.height, {
     orientation: options.orientation ?? 1,
@@ -235,7 +244,7 @@ async function streamAndProbe(
   void analysis
 
   if (completeStream && !streamDone) {
-    void drain(reader).then((rest) => {
+    void drain(reader).then(async (rest) => {
       const contentType = response.headers.get('content-type')
       const blob = new Blob(
         [...chunks, ...rest] as BlobPart[],
@@ -244,6 +253,13 @@ async function streamAndProbe(
       const blobUrl = URL.createObjectURL(blob)
       const cachedEntry = peekImageMeasurement(key)
       if (cachedEntry !== null) cachedEntry.blobUrl = blobUrl
+      if (options.extractDominantColor === true) {
+        const color = await extractDominantColorFromBlob(blob)
+        if (color !== null) {
+          const entry = peekImageMeasurement(key)
+          if (entry !== null) entry.dominantColor = color
+        }
+      }
     })
   } else if (!streamDone) {
     void reader.cancel().catch(() => {
@@ -266,10 +282,21 @@ async function prepareFromBlob(blob: Blob, options: PrepareOptions): Promise<Pre
       orientation: options.orientation ?? 1,
     })
     measurement.blobUrl = url
+    if (options.extractDominantColor === true) {
+      void extractDominantColorFromBlob(blob).then((color) => {
+        if (color !== null) measurement.dominantColor = color
+      })
+    }
     return wrap(measurement)
   }
 
-  return wrap(await fallbackFromBlob(url, blob, options))
+  const measurement = await fallbackFromBlob(url, blob, options)
+  if (options.extractDominantColor === true) {
+    void extractDominantColorFromBlob(blob).then((color) => {
+      if (color !== null) measurement.dominantColor = color
+    })
+  }
+  return wrap(measurement)
 }
 
 // --- Fallback decode ---
