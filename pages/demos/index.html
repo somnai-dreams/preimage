@@ -24,6 +24,8 @@
     <a href="./masonry">Masonry</a>
     <a href="./editorial">Editorial</a>
     <a href="./ttfs">TTFS</a>
+    <a href="./dominant-color">Dominant color</a>
+    <a href="./decode-pool">Decode pool</a>
     <a href="./canvas-fit">Canvas fit</a>
     <a href="./pretext-float">Pretext float</a>
     <a href="./pretext-inline">Pretext inline</a>
@@ -63,6 +65,21 @@
         <a class="demo-card" href="./canvas-fit">
           <h3>Canvas fit modes</h3>
           <p>Draw an image into a canvas at the correct <code>object-fit</code> rect. Compares a naive stretched <code>drawImage</code> against <code>layout()</code>-computed placement.</p>
+        </a>
+        <a class="demo-card" href="./decode-pool">
+          <h3>Decode pool on a canvas timeline</h3>
+          <p>Scrub a 16-frame photo timeline. Left: <code>img.src = url</code> per scrub, with a main-thread decode on every tick. Right: <code>DecodePool</code> warms every frame off-main-thread once, then scrub is a single blit.</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="demo-section">
+      <h2>Deferred extras</h2>
+      <p class="intro">Useful side-products <code>prepare()</code> can produce while the bytes are in flight, exposed as opt-ins.</p>
+      <div class="demo-list">
+        <a class="demo-card" href="./dominant-color">
+          <h3>Dominant-color placeholders</h3>
+          <p><code>prepare(url, { extractDominantColor: true })</code> populates each tile's averaged color asynchronously. The tile's box shows the color until the full image paints, so half-loaded scrolling doesn't feel skeletal.</p>
         </a>
       </div>
     </section>

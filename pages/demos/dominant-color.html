@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · dominant color</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./demo-styles.css" />
+  <style>
+    .tile-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .tile { position: relative; border-radius: var(--radius-sm); overflow: hidden; background: var(--surface-muted); }
+    .tile .fill { position: absolute; inset: 0; transition: background-color 180ms ease; }
+    .tile img { position: relative; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 320ms ease-out; }
+    .tile img.loaded { opacity: 1; }
+    .tile.no-color .fill { background: var(--surface-muted); }
+    .tile-foot { display: flex; justify-content: space-between; align-items: center; padding: 6px 2px 0; font-size: 11px; color: var(--text-soft); font-variant-numeric: tabular-nums; }
+    .tile-foot .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; border: 1px solid var(--border); vertical-align: middle; margin-right: 4px; }
+    .panels.two { gap: 24px; }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="./">preimage demos</a>
+    <a href="./masonry">Masonry</a>
+    <a href="./editorial">Editorial</a>
+    <a href="./ttfs">TTFS</a>
+    <a href="./dominant-color" aria-current="page">Dominant color</a>
+    <a href="./decode-pool">Decode pool</a>
+    <a href="./canvas-fit">Canvas fit</a>
+    <a href="./pretext-float">Pretext float</a>
+    <a href="./pretext-inline">Pretext inline</a>
+    <span class="spacer"></span>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page">
+    <header class="page-header">
+      <h1>Dominant color — placeholder backgrounds before the pixels arrive</h1>
+      <p>Each tile's dimensions arrive in ~150ms via <code>prepare()</code>'s byte probe; the averaged dominant color lands a moment later, once the stream has fully drained. The left panel leaves each tile's background at the page's default grey. The right panel paints the dominant color behind the image the moment it arrives — so an empty tile already evokes the photo about to fill it, and half-loaded scrolling feels less skeletal.</p>
+    </header>
+
+    <div class="controls">
+      <button id="run" class="primary">Run</button>
+      <span class="controls-label">Cache-bust</span>
+      <div class="segmented" role="radiogroup" aria-label="Cache-bust">
+        <label><input type="radio" name="cache" value="on" checked> On</label>
+        <label><input type="radio" name="cache" value="off"> Off</label>
+      </div>
+      <span id="meta" class="meta"></span>
+    </div>
+
+    <div class="panels two">
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Without <code>extractDominantColor</code></h2>
+          <span class="badge reflow">grey wait</span>
+        </div>
+        <p class="panel-sub">tile backgrounds stay at the page default until the full image paints</p>
+        <div class="panel-stat" id="plainStat"></div>
+        <div id="plain" class="tile-grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">With <code>prepare({ extractDominantColor: true })</code></h2>
+          <span class="badge stable">colored wait</span>
+        </div>
+        <p class="panel-sub">1×1 native resample arrives after dimensions · painted as each tile's background</p>
+        <div class="panel-stat" id="coloredStat"></div>
+        <div id="colored" class="tile-grid"></div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="./dominant-color.ts"></script>
+</body>
+</html>

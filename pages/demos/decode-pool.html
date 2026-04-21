@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · decode pool</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./demo-styles.css" />
+  <style>
+    .canvas-wrap { position: relative; background: #0b0b0c; border-radius: var(--radius-md); overflow: hidden; }
+    .canvas-wrap canvas { display: block; width: 100%; height: 320px; }
+    .scrub { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface-muted); border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted); }
+    .scrub input[type=range] { flex: 1; }
+    .scrub .frame-label { min-width: 60px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
+    .hud { position: absolute; top: 8px; left: 10px; right: 10px; display: flex; justify-content: space-between; color: #e4e4e7; font-size: 11px; font-variant-numeric: tabular-nums; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+    .hud .tag.jank { color: #fca5a5; }
+    .hud .tag.smooth { color: #86efac; }
+    .panel-title.darkbg { color: var(--text); }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="./">preimage demos</a>
+    <a href="./masonry">Masonry</a>
+    <a href="./editorial">Editorial</a>
+    <a href="./ttfs">TTFS</a>
+    <a href="./dominant-color">Dominant color</a>
+    <a href="./decode-pool" aria-current="page">Decode pool</a>
+    <a href="./canvas-fit">Canvas fit</a>
+    <a href="./pretext-float">Pretext float</a>
+    <a href="./pretext-inline">Pretext inline</a>
+    <span class="spacer"></span>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page">
+    <header class="page-header">
+      <h1>Decode pool — scrubbing a photo timeline on a canvas</h1>
+      <p>Sixteen frames, rendered to a canvas as you drag the slider. The left panel calls <code>drawImage</code> on an <code>&lt;img&gt;</code> whose <code>src</code> is set on every scrub — the browser decodes on demand, on the main thread. The right panel warms a <code>DecodePool</code>, then draws from cached <code>ImageBitmap</code>s — every frame is a single blit. Watch the <em>frame time</em> reading while you drag quickly.</p>
+    </header>
+
+    <div class="controls">
+      <button id="run" class="primary">Load frames</button>
+      <span class="controls-label">Cache-bust</span>
+      <div class="segmented" role="radiogroup" aria-label="Cache-bust">
+        <label><input type="radio" name="cache" value="on" checked> On</label>
+        <label><input type="radio" name="cache" value="off"> Off</label>
+      </div>
+      <span id="meta" class="meta"></span>
+    </div>
+
+    <div class="panels two">
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Decode on scrub — <code>img.src = url</code></h2>
+          <span class="badge reflow">jank</span>
+        </div>
+        <p class="panel-sub">browser decodes each frame on the main thread, every scrub</p>
+        <div class="panel-stat" id="naiveStat"></div>
+        <div class="canvas-wrap">
+          <div class="hud">
+            <span id="naiveFrameTag">frame 1</span>
+            <span id="naiveTimeTag" class="tag">—</span>
+          </div>
+          <canvas id="naiveCanvas"></canvas>
+          <div class="scrub">
+            <span>frame</span>
+            <input type="range" id="naiveSlider" min="0" max="15" value="0" step="1" />
+            <span id="naiveFrameLabel" class="frame-label">1 / 16</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Pre-decoded — <code>DecodePool</code></h2>
+          <span class="badge stable">smooth</span>
+        </div>
+        <p class="panel-sub">bitmaps decoded once off-main-thread · scrub is a single blit</p>
+        <div class="panel-stat" id="pooledStat"></div>
+        <div class="canvas-wrap">
+          <div class="hud">
+            <span id="pooledFrameTag">frame 1</span>
+            <span id="pooledTimeTag" class="tag">—</span>
+          </div>
+          <canvas id="pooledCanvas"></canvas>
+          <div class="scrub">
+            <span>frame</span>
+            <input type="range" id="pooledSlider" min="0" max="15" value="0" step="1" />
+            <span id="pooledFrameLabel" class="frame-label">1 / 16</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="./decode-pool.ts"></script>
+</body>
+</html>
