@@ -1,0 +1,61 @@
+{
+  "name": "@somnai-dreams/preimage",
+  "version": "0.0.1",
+  "description": "Fast, accurate & comprehensive image loading, measurement & gallery layout",
+  "keywords": [
+    "image-layout",
+    "image-measurement",
+    "image-loading",
+    "gallery",
+    "masonry",
+    "justified-layout",
+    "object-fit",
+    "aspect-ratio"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/somnai-dreams/preimage.git"
+  },
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/layout.js",
+  "types": "./dist/layout.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/layout.d.ts",
+      "import": "./dist/layout.js",
+      "default": "./dist/layout.js"
+    },
+    "./rich-gallery": {
+      "types": "./dist/rich-gallery.d.ts",
+      "import": "./dist/rich-gallery.js",
+      "default": "./dist/rich-gallery.js"
+    },
+    "./demos/*": "./pages/demos/*",
+    "./assets/*": "./pages/assets/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "CHANGELOG.md",
+    "dist",
+    "src",
+    "!src/layout.test.ts",
+    "!src/test-data.ts",
+    "pages/demos",
+    "pages/assets"
+  ],
+  "scripts": {
+    "build:package": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc",
+    "prepack": "rm -rf dist && tsc -p tsconfig.build.json",
+    "start": "HOST=${HOST:-0.0.0.0}; PORT=3000; bun pages/*.html pages/demos/*.html --host=$HOST:$PORT",
+    "start:windows": "bun pages/*.html pages/demos/*.html --host=0.0.0.0:3000"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  }
+}

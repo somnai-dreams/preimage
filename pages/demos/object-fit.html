@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · object-fit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font: 14px/1.5 -apple-system, system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+    .box { position: relative; width: 320px; height: 180px; background: #111; color: #fff; margin-bottom: 1rem; overflow: hidden; }
+    .box img { position: absolute; }
+    .label { font-size: 12px; margin-bottom: 0.25rem; color: #444; }
+    input { font: inherit; padding: 4px 6px; width: 420px; margin-right: 8px; }
+    label { display: inline-flex; align-items: center; gap: 0.4rem; margin-right: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>object-fit</h1>
+  <p>Enter an image URL. Preimage measures it once via <code>prepare()</code>, then lays it out with five different fit modes — pure arithmetic, no DOM reads.</p>
+  <p>
+    <input id="src" value="https://picsum.photos/seed/preimage/1600/900" />
+    <button id="go">Measure</button>
+  </p>
+  <p class="label" id="natural">—</p>
+  <div id="grid"></div>
+  <script type="module" src="./object-fit.ts"></script>
+</body>
+</html>

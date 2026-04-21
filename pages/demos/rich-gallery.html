@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · rich-gallery</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font: 14px/1.5 -apple-system, system-ui, sans-serif; margin: 2rem; }
+    .row { margin-bottom: 10px; display: flex; gap: 8px; align-items: flex-start; }
+    .chip { display: inline-flex; align-items: center; padding: 0 10px; background: #eef; border-radius: 10px; }
+    .frag { position: relative; overflow: hidden; background: #222; border-radius: 4px; }
+    .frag img { width: 100%; height: 100%; display: block; }
+    #widthVal { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <h1>Rich-gallery inline flow</h1>
+  <p>Atomic image+chip pairs with <code>break: 'never'</code>, per-item <code>extraWidth</code> for chrome, and cross-item gap collapse — streamed one row at a time.</p>
+  <p>
+    <label>Max width
+      <input id="width" type="range" min="200" max="900" value="540" />
+      <span id="widthVal">540</span>px
+    </label>
+  </p>
+  <div id="out"></div>
+  <script type="module" src="./rich-gallery.ts"></script>
+</body>
+</html>
