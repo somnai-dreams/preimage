@@ -11,6 +11,16 @@ Preimage answers that question. It loads and decodes images once (via `HTMLImage
 
 Plus the primitives those adapters are built on (`prepare`, `layout`, `fitRect`, EXIF orientation, SVG viewBox extraction), plus a standalone justified-gallery row packer for pure image grids.
 
+## Demos at a glance
+
+| | |
+|---|---|
+| **[Pretext float](./pages/demos/pretext-float.html)** — paragraph wrapping around a measured figure. Column width, float side, and float top are live-editable; every change re-flows on pure arithmetic. | ![pretext float](./pages/assets/screenshots/pretext-float.png) |
+| **[Pretext rich-inline](./pages/demos/pretext-inline.html)** — chat bubble with three inline icon images. Resizing the bubble re-breaks the lines and shuffles the icons to their new slots. | ![pretext inline](./pages/assets/screenshots/pretext-inline.png) |
+| **[Canvas fit](./pages/demos/canvas-fit.html)** — `drawImage` stretch vs `layout()` fit math. The standalone (no-pretext) case where canvas can't fall back on CSS `object-fit`. | ![canvas fit](./pages/assets/screenshots/canvas-fit.png) |
+
+Run them live with `bun install && bun start` and open [`/demos`](http://localhost:3000/).
+
 ## Installation
 
 ```sh
