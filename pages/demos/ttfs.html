@@ -39,6 +39,11 @@
 
   <div class="controls">
     <button id="run">Run</button>
+    <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:12px;color:var(--muted);">
+      Simulated network latency
+      <input id="latency" type="range" min="0" max="2000" step="100" />
+      <span id="latencyValue" style="font-variant-numeric:tabular-nums;min-width:3rem;display:inline-block;"></span>
+    </label>
     <span id="meta" class="sub"></span>
   </div>
 

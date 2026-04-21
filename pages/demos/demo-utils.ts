@@ -4,55 +4,33 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-// Track real Cumulative Layout Shift, scoped to a single panel. Uses the
-// Layout Instability API (`PerformanceObserver` with type 'layout-shift'),
-// which reports spec-defined CLS values with per-entry `sources` node
-// references. We attribute an entry to the panel if any source node is
-// descendant of that panel.
+// Count visible layout shifts on a panel by observing its height changes.
+// Simpler and more reliable for these demos than the Layout Instability
+// API: PerformanceObserver's layout-shift entries batch within a frame
+// and its source-attribution filters out shifts whose node set doesn't
+// overlap the panel — and browsers disagree on what populates sources.
+// Height deltas on the panel's inner grid/container reflect the exact
+// shifts a viewer would notice: images loading at natural size push the
+// panel height outward, each push is a shift.
 export type ShiftMonitor = {
-  cls: () => number // the accumulated layout-shift value for this panel
+  shifts: () => number
   stop: () => void
 }
 
-export function observeLayoutShifts(panel: HTMLElement): ShiftMonitor {
-  let cls = 0
-  // Some browsers (Safari < 17) still don't expose 'layout-shift'. Fall
-  // back gracefully so the demo still runs; cls just stays at 0.
-  if (typeof PerformanceObserver === 'undefined') {
-    return { cls: () => cls, stop: () => {} }
-  }
-  let observer: PerformanceObserver | null = null
-  try {
-    observer = new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        // LayoutShift is not in the standard PerformanceEntry lib types yet.
-        const shift = entry as PerformanceEntry & {
-          value: number
-          hadRecentInput: boolean
-          sources?: Array<{ node?: Node | null }>
-        }
-        if (shift.hadRecentInput) continue
-        const sources = shift.sources
-        if (sources !== undefined && sources.length > 0) {
-          let attributed = false
-          for (const s of sources) {
-            if (s.node !== null && s.node !== undefined && panel.contains(s.node)) {
-              attributed = true
-              break
-            }
-          }
-          if (!attributed) continue
-        }
-        cls += shift.value
-      }
-    })
-    observer.observe({ type: 'layout-shift', buffered: true })
-  } catch {
-    // 'layout-shift' entryType not supported; silent no-op.
-  }
+export function observeShifts(panel: HTMLElement): ShiftMonitor {
+  let shifts = 0
+  let lastHeight = panel.getBoundingClientRect().height
+  const observer = new ResizeObserver(() => {
+    const h = panel.getBoundingClientRect().height
+    if (Math.abs(h - lastHeight) > 0.5) {
+      shifts++
+      lastHeight = h
+    }
+  })
+  observer.observe(panel)
   return {
-    cls: () => cls,
-    stop: () => observer?.disconnect(),
+    shifts: () => shifts,
+    stop: () => observer.disconnect(),
   }
 }
 
@@ -74,4 +52,29 @@ export async function loadImgWithLatency(
     else img.onload = done
     img.src = url
   })
+}
+
+// Wire up a latency slider that lives in the demo's control bar. Returns
+// a getter the demo calls at the start of each run to pick up the
+// current slider value.
+export type LatencyControl = {
+  read: () => number
+}
+
+export function wireLatencySlider(
+  sliderId: string,
+  valueId: string,
+  defaultMs: number,
+): LatencyControl {
+  const slider = document.getElementById(sliderId) as HTMLInputElement | null
+  const valueEl = document.getElementById(valueId)
+  if (slider === null || valueEl === null) {
+    return { read: () => defaultMs }
+  }
+  slider.value = String(defaultMs)
+  valueEl.textContent = `${defaultMs}ms`
+  slider.addEventListener('input', () => {
+    valueEl.textContent = `${slider.value}ms`
+  })
+  return { read: () => Number(slider.value) }
 }

@@ -1,6 +1,6 @@
 import { prepare, getMeasurement } from '../../src/index.js'
 import { loadPhoto, latencyFor, PICSUM_PHOTOS } from './photo-source.js'
-import { loadImgWithLatency, observeLayoutShifts, sleep } from './demo-utils.js'
+import { loadImgWithLatency, observeShifts, sleep, wireLatencySlider } from './demo-utils.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -13,6 +13,8 @@ const e3 = document.getElementById('e3')!
 
 const PANEL_WIDTH = 280
 const MAX_FRAME_HEIGHT = 220
+
+const latencyControl = wireLatencySlider('latency', 'latencyValue', 800)
 
 type Event = { label: string; t: number; note?: string }
 
@@ -27,7 +29,7 @@ function setFrame(host: HTMLElement, width: number, height: number, label: strin
   return frame
 }
 
-function renderEvents(host: HTMLElement, events: Event[], cls: number): void {
+function renderEvents(host: HTMLElement, events: Event[], shifts: number): void {
   host.innerHTML = ''
   for (const ev of events) {
     const row = document.createElement('div')
@@ -43,12 +45,12 @@ function renderEvents(host: HTMLElement, events: Event[], cls: number): void {
   const row = document.createElement('div')
   row.className = 'event'
   const label = document.createElement('span')
-  label.textContent = 'layout shift (CLS)'
+  label.textContent = 'visible shifts'
   const time = document.createElement('span')
   time.innerHTML =
-    cls > 0.0001
-      ? `<span class="shift-marker">${cls.toFixed(3)}</span>`
-      : `<b>0.000</b>`
+    shifts > 0
+      ? `<span class="shift-marker">${shifts}</span>`
+      : `<b>0</b>`
   row.appendChild(label)
   row.appendChild(time)
   host.appendChild(row)
@@ -62,11 +64,11 @@ function renderEvents(host: HTMLElement, events: Event[], cls: number): void {
 // via its byte-probe after the first chunk would have arrived (modelled
 // here as ~10% of the total latency).
 
-async function runNaive(blob: Blob, latencyMs: number): Promise<{ events: Event[]; cls: number }> {
+async function runNaive(blob: Blob, latencyMs: number): Promise<{ events: Event[]; shifts: number }> {
   const host = f1
   host.innerHTML = ''
   const stage = host.parentElement!
-  const monitor = observeLayoutShifts(stage)
+  const monitor = observeShifts(stage)
   const t0 = performance.now()
   const img = document.createElement('img')
   img.style.maxWidth = `${PANEL_WIDTH}px`
@@ -78,7 +80,7 @@ async function runNaive(blob: Blob, latencyMs: number): Promise<{ events: Event[
     { label: 'image painted', t: performance.now() - t0 },
   ]
   monitor.stop()
-  return { events, cls: monitor.cls() }
+  return { events, shifts: monitor.shifts() }
 }
 
 async function runNative(
@@ -86,11 +88,11 @@ async function runNative(
   declaredWidth: number,
   declaredHeight: number,
   latencyMs: number,
-): Promise<{ events: Event[]; cls: number }> {
+): Promise<{ events: Event[]; shifts: number }> {
   const host = f2
   host.innerHTML = ''
   const stage = host.parentElement!
-  const monitor = observeLayoutShifts(stage)
+  const monitor = observeShifts(stage)
   const t0 = performance.now()
   const scale = PANEL_WIDTH / declaredWidth
   const frameH = Math.min(declaredHeight * scale, MAX_FRAME_HEIGHT)
@@ -104,17 +106,17 @@ async function runNative(
   await loadImgWithLatency(img, blob, latencyMs)
   events.push({ label: 'image painted', t: performance.now() - t0 })
   monitor.stop()
-  return { events, cls: monitor.cls() }
+  return { events, shifts: monitor.shifts() }
 }
 
 async function runPreimage(
   blob: Blob,
   latencyMs: number,
-): Promise<{ events: Event[]; cls: number }> {
+): Promise<{ events: Event[]; shifts: number }> {
   const host = f3
   host.innerHTML = ''
   const stage = host.parentElement!
-  const monitor = observeLayoutShifts(stage)
+  const monitor = observeShifts(stage)
   const t0 = performance.now()
   // Simulate: the first bytes arrive quickly (~10% of the total transfer
   // on a streaming connection), enough for the header probe. prepare()
@@ -138,7 +140,7 @@ async function runPreimage(
   await loadImgWithLatency(img, blob, remainingDelay)
   events.push({ label: 'image painted', t: performance.now() - t0 })
   monitor.stop()
-  return { events, cls: monitor.cls() }
+  return { events, shifts: monitor.shifts() }
 }
 
 async function run(): Promise<void> {
@@ -154,12 +156,12 @@ async function run(): Promise<void> {
 
   const photo = PICSUM_PHOTOS[0]!
   const loaded = await loadPhoto(photo, 200)
-  const latencyMs = latencyFor([loaded])
+  const latencyMs = latencyControl.read()
+  void latencyFor // retained export; slider overrides the default
   metaEl.textContent =
     `${photo.caption ?? photo.seed} · ${photo.width}×${photo.height} · ${(loaded.blob.size / 1024 / 1024).toFixed(2)} MB · ` +
-    (loaded.origin === 'picsum'
-      ? 'picsum.photos (live — real network latency)'
-      : `picsum offline — canvas fallback, simulating ${latencyMs}ms transfer`)
+    (loaded.origin === 'picsum' ? 'picsum.photos (live)' : 'picsum offline — canvas fallback') +
+    ` · simulating ${latencyMs}ms transfer per image`
 
   runButton.textContent = 'Running…'
 
@@ -169,9 +171,9 @@ async function run(): Promise<void> {
     runPreimage(loaded.blob, latencyMs),
   ])
 
-  renderEvents(e1, naive.events, naive.cls)
-  renderEvents(e2, native.events, native.cls)
-  renderEvents(e3, preimaged.events, preimaged.cls)
+  renderEvents(e1, naive.events, naive.shifts)
+  renderEvents(e2, native.events, native.shifts)
+  renderEvents(e3, preimaged.events, preimaged.shifts)
 
   runButton.textContent = 'Run again'
   runButton.disabled = false

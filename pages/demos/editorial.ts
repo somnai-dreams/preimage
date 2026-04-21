@@ -3,7 +3,7 @@ import { prepareWithSegments, materializeLineRange } from '@chenglou/pretext'
 import { prepare, getMeasurement } from '../../src/index.js'
 import { flowColumnWithFloats } from '../../src/pretext.js'
 import { loadPhotos, latencyFor, type PhotoDescriptor } from './photo-source.js'
-import { loadImgWithLatency, observeLayoutShifts, sleep } from './demo-utils.js'
+import { loadImgWithLatency, observeShifts, sleep, wireLatencySlider } from './demo-utils.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -31,6 +31,8 @@ const FIGURES: readonly PhotoDescriptor[] = [
 ]
 
 const FIGURE_TOPS = [0, 170, 330]
+
+const latencyControl = wireLatencySlider('latency', 'latencyValue', 800)
 
 function buildArticleHtml(
   panel: HTMLElement,
@@ -69,32 +71,32 @@ function buildArticleHtml(
   return imgs
 }
 
-async function renderNaive(blobs: Blob[], latencyMs: number): Promise<{ ms: number; cls: number }> {
+async function renderNaive(blobs: Blob[], latencyMs: number): Promise<{ ms: number; shifts: number }> {
   const t0 = performance.now()
-  const monitor = observeLayoutShifts(naivePanel.parentElement!)
+  const monitor = observeShifts(naivePanel.parentElement!)
   const imgs = buildArticleHtml(naivePanel, false, FIGURES)
   await Promise.all(imgs.map((img, i) => loadImgWithLatency(img, blobs[i]!, latencyMs)))
   monitor.stop()
-  return { ms: performance.now() - t0, cls: monitor.cls() }
+  return { ms: performance.now() - t0, shifts: monitor.shifts() }
 }
 
-async function renderNative(blobs: Blob[], latencyMs: number): Promise<{ ms: number; cls: number; frameReadyAt: number }> {
+async function renderNative(blobs: Blob[], latencyMs: number): Promise<{ ms: number; shifts: number; frameReadyAt: number }> {
   const t0 = performance.now()
-  const monitor = observeLayoutShifts(nativePanel.parentElement!)
+  const monitor = observeShifts(nativePanel.parentElement!)
   const imgs = buildArticleHtml(nativePanel, true, FIGURES)
   const frameReadyAt = performance.now() - t0
   await Promise.all(imgs.map((img, i) => loadImgWithLatency(img, blobs[i]!, latencyMs)))
   monitor.stop()
-  return { ms: performance.now() - t0, cls: monitor.cls(), frameReadyAt }
+  return { ms: performance.now() - t0, shifts: monitor.shifts(), frameReadyAt }
 }
 
 async function renderMeasured(
   blobs: Blob[],
   latencyMs: number,
-): Promise<{ ms: number; cls: number; prepareMs: number; lineCount: number }> {
+): Promise<{ ms: number; shifts: number; prepareMs: number; lineCount: number }> {
   const t0 = performance.now()
   measuredPanel.innerHTML = ''
-  const monitor = observeLayoutShifts(measuredPanel.parentElement!)
+  const monitor = observeShifts(measuredPanel.parentElement!)
   await document.fonts.ready
   const probeDelay = Math.round(latencyMs * 0.1)
   if (probeDelay > 0) await sleep(probeDelay)
@@ -166,7 +168,7 @@ async function renderMeasured(
     }),
   )
   monitor.stop()
-  return { ms: performance.now() - t0, cls: monitor.cls(), prepareMs, lineCount: result.lineCount }
+  return { ms: performance.now() - t0, shifts: monitor.shifts(), prepareMs, lineCount: result.lineCount }
 }
 
 async function run(): Promise<void> {
@@ -182,13 +184,13 @@ async function run(): Promise<void> {
   const loaded = await loadPhotos(FIGURES)
   const blobs = loaded.map((l) => l.blob)
   const picsumCount = loaded.filter((l) => l.origin === 'picsum').length
-  const latencyMs = latencyFor(loaded)
+  const latencyMs = latencyControl.read()
+  void latencyFor
   const totalMB = blobs.reduce((a, b) => a + b.size, 0) / 1024 / 1024
   metaEl.textContent =
     `${FIGURES.length} photos · ${totalMB.toFixed(1)} MB · ` +
-    (picsumCount > 0
-      ? `${picsumCount}/${blobs.length} from picsum.photos (real network)`
-      : `picsum offline — simulating ${latencyMs}ms per-image transfer so frames precede images visibly`)
+    (picsumCount > 0 ? `${picsumCount}/${blobs.length} from picsum.photos` : 'picsum offline — canvas fallbacks') +
+    ` · simulating ${latencyMs}ms transfer per image`
 
   runButton.textContent = 'Rendering…'
   naiveStat.textContent = 'rendering…'
@@ -201,9 +203,9 @@ async function run(): Promise<void> {
     renderMeasured(blobs, latencyMs),
   ])
 
-  naiveStat.textContent = `loaded in ${naive.ms.toFixed(0)}ms · CLS ${naive.cls.toFixed(3)}`
-  nativeStat.textContent = `frames at t=${native.frameReadyAt.toFixed(0)}ms · loaded in ${native.ms.toFixed(0)}ms · CLS ${native.cls.toFixed(3)}`
-  measuredStat.textContent = `frames at t=${measured.prepareMs.toFixed(0)}ms · ${measured.lineCount} lines placed · loaded in ${measured.ms.toFixed(0)}ms · CLS ${measured.cls.toFixed(3)}`
+  naiveStat.textContent = `loaded in ${naive.ms.toFixed(0)}ms · ${naive.shifts} visible shifts`
+  nativeStat.textContent = `frames at t=${native.frameReadyAt.toFixed(0)}ms · loaded in ${native.ms.toFixed(0)}ms · ${native.shifts} visible shifts`
+  measuredStat.textContent = `frames at t=${measured.prepareMs.toFixed(0)}ms · ${measured.lineCount} lines placed · loaded in ${measured.ms.toFixed(0)}ms · ${measured.shifts} visible shifts`
 
   runButton.textContent = 'Run again'
   runButton.disabled = false
