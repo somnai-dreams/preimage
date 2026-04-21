@@ -9,7 +9,7 @@ import {
   picsumUrl,
   type PhotoDescriptor,
 } from './photo-source.js'
-import { observeShifts, paintDominantColorBehind } from './demo-utils.js'
+import { observeShifts } from './demo-utils.js'
 
 const metaEl = document.getElementById('meta')!
 const naivePanel = document.getElementById('naive')!
@@ -144,7 +144,7 @@ async function runMeasured(): Promise<void> {
 
   const t0 = performance.now()
   const [prepared] = await Promise.all([
-    Promise.all(urls.map((u) => prepare(u, { extractDominantColor: true }))),
+    Promise.all(urls.map((u) => prepare(u))),
     document.fonts.ready,
   ])
   const preparedMs = performance.now() - t0
@@ -190,7 +190,6 @@ async function runMeasured(): Promise<void> {
       fig.appendChild(img)
       measuredPanel.appendChild(fig)
       figImgs.push({ img, itemIndex: item.itemIndex })
-      void paintDominantColorBehind(prepared[item.itemIndex]!, fig)
     }
   }
   const laidOutMs = performance.now() - t0

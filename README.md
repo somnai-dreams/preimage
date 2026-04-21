@@ -73,23 +73,6 @@ const prepared = await prepare(cloudinaryUrl)  // no network — URL parsed
 
 Built-ins: `cloudinaryParser`, `shopifyParser`, `picsumParser`, `unsplashParser`. The `queryParamDimensionParser` helper builds a parser for any CDN that uses query-string keys. Custom parsers are just `(url: string) => { width, height } | null` functions — register as many as you need.
 
-## Dominant color
-
-Opt into a one-pixel color average on any `prepare()` call. The browser's native resampler does the averaging via `createImageBitmap(blob, { resizeWidth: 1, resizeHeight: 1 })` — cheaper and more accurate than sampling in JS. The result is stored on the measurement as a CSS string (`rgb(...)` or `rgba(...)`), ready to drop into `background-color`.
-
-```ts
-import { prepare, getMeasurement } from '@somnai-dreams/preimage'
-
-const prepared = await prepare('/hero.jpg', { extractDominantColor: true })
-// dimensions resolve immediately; color lands asynchronously
-requestIdleCallback(() => {
-  const { dominantColor } = getMeasurement(prepared)
-  if (dominantColor !== undefined) heroEl.style.backgroundColor = dominantColor
-})
-```
-
-The color extraction runs after dimensions resolve, so `prepare()`'s returned promise is never delayed by it. For callers that already have a blob, `extractDominantColorFromBlob(blob)` is exposed directly.
-
 ## Managed concurrency with `PrepareQueue`
 
 Browsers cap parallel requests per origin (6 for HTTP/1.1). Firing `prepare()` for 200 tiles means the later tiles queue inside the browser's network stack, where you can't reorder them. `PrepareQueue` is an application-level queue that holds requests before they hit the network and lets you `boost(url)` to move a URL to the front when it scrolls into view.
@@ -236,11 +219,6 @@ recordKnownMeasurement(src, w, h, { orientation?, decoded? }?): ImageMeasurement
 measureFromSvgText(svgText): { width, height } | null
 readExifOrientation(buffer): OrientationCode | null
 clearCache(): void
-
-// Dominant color (opt-in via prepare({extractDominantColor: true}))
-extractDominantColorFromBlob(blob): Promise<string | null>
-extractDominantRgbaFromBlob(blob): Promise<RGBA | null>
-rgbaToCss({ r, g, b, a }): string
 
 // Managed concurrency + decode pool
 new PrepareQueue({ concurrency? })

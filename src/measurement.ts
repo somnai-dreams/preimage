@@ -50,12 +50,6 @@ export type ImageMeasurement = {
   // same bytes without triggering a second fetch. Undefined for the
   // classic HTMLImageElement.decode() fallback path.
   blobUrl?: string
-  // CSS color string (rgb/rgba) representing the averaged dominant color
-  // of the image. Populated only when the caller opted in via
-  // `prepare({extractDominantColor: true})`. Useful as a placeholder
-  // background while the image decodes, and persists after load so
-  // offscreen images still contribute a palette hint.
-  dominantColor?: string
 }
 
 export type EngineProfile = {

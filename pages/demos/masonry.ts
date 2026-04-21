@@ -6,7 +6,7 @@ import {
   picsumUrl,
   type PhotoDescriptor,
 } from './photo-source.js'
-import { observeShifts, paintDominantColorBehind } from './demo-utils.js'
+import { observeShifts } from './demo-utils.js'
 
 const countSlider = document.getElementById('countSlider') as HTMLInputElement
 const countVal = document.getElementById('countVal')!
@@ -185,9 +185,7 @@ async function runMeasured(): Promise<void> {
   // library's work is everything after t0: measure dims, solve
   // layout, commit DOM.
   const t0 = performance.now()
-  const prepared = await Promise.all(
-    urls.map((u) => prepare(u, { extractDominantColor: true })),
-  )
+  const prepared = await Promise.all(urls.map((u) => prepare(u)))
   const measuredMs = performance.now() - t0
 
   const panelWidth = measuredPanel.getBoundingClientRect().width
@@ -209,7 +207,6 @@ async function runMeasured(): Promise<void> {
     container.appendChild(img)
     frag.appendChild(container)
     tiles.push({ container, img })
-    void paintDominantColorBehind(prepared[i]!, container)
   }
   measuredPanel.appendChild(frag)
   const laidOutMs = performance.now() - t0

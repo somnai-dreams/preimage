@@ -6,7 +6,6 @@ import {
   picsumUrl,
   type PhotoDescriptor,
 } from './photo-source.js'
-import { waitForDominantColor } from './demo-utils.js'
 
 const metaEl = document.getElementById('meta')!
 const runNaiveBtn = document.getElementById('runNaive') as HTMLButtonElement
@@ -26,8 +25,6 @@ const naiveTimeTag = document.getElementById('naiveTimeTag')!
 const poolTimeTag = document.getElementById('poolTimeTag')!
 const naiveEmpty = document.getElementById('naiveEmpty')!
 const poolEmpty = document.getElementById('poolEmpty')!
-const naiveCanvasWrap = naiveCanvas.parentElement!
-const poolCanvasWrap = poolCanvas.parentElement!
 
 const FRAME_COUNT = 16
 
@@ -140,7 +137,6 @@ async function runNaive(): Promise<void> {
   naiveFrameTag.textContent = '—'
   naiveTimeTag.textContent = '—'
   naiveTimeTag.className = 'tag'
-  naiveCanvasWrap.style.backgroundColor = ''
 
   const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
@@ -154,14 +150,10 @@ async function runNaive(): Promise<void> {
     img.src = u
     return img
   })
-  const colorByIndex: Array<string | undefined> = new Array(urls.length)
   const naturalSizes = await Promise.all(
-    urls.map(async (u, i) => {
-      const prepared = await prepare(u, { extractDominantColor: true })
+    urls.map(async (u) => {
+      const prepared = await prepare(u)
       const m = getMeasurement(prepared)
-      void waitForDominantColor(prepared).then((color) => {
-        if (color !== null) colorByIndex[i] = color
-      })
       return { w: m.displayWidth, h: m.displayHeight }
     }),
   )
@@ -172,9 +164,6 @@ async function runNaive(): Promise<void> {
 
   const draw = async (i: number): Promise<void> => {
     const t = performance.now()
-    const color = colorByIndex[i]
-    if (color !== undefined) naiveCanvasWrap.style.backgroundColor = color
-
     const img = images[i]!
     if (!img.complete || img.naturalWidth === 0) {
       await new Promise<void>((res) => {
@@ -231,8 +220,6 @@ async function runPool(): Promise<void> {
   poolFrameTag.textContent = '—'
   poolTimeTag.textContent = '—'
   poolTimeTag.className = 'tag'
-  poolCanvasWrap.style.backgroundColor = ''
-
   const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
   setMeta(useLive, cacheBust)
@@ -243,13 +230,8 @@ async function runPool(): Promise<void> {
     concurrency: 4,
     maxCacheEntries: FRAME_COUNT,
   })
-  const colorByIndex: Array<string | undefined> = new Array(urls.length)
   const naturalSizes = await Promise.all(
-    urls.map(async (u, i) => {
-      const prepared = await prepare(u, { extractDominantColor: true })
-      void waitForDominantColor(prepared).then((color) => {
-        if (color !== null) colorByIndex[i] = color
-      })
+    urls.map(async (u) => {
       const bitmap = await pool.get(u)
       return { w: bitmap.width, h: bitmap.height }
     }),
@@ -261,8 +243,6 @@ async function runPool(): Promise<void> {
 
   const draw = async (i: number): Promise<void> => {
     const t = performance.now()
-    const color = colorByIndex[i]
-    if (color !== undefined) poolCanvasWrap.style.backgroundColor = color
     const bitmap = await pool.get(urls[i]!)
     const { w, h } = sizeCanvas(poolCanvas)
     const size = naturalSizes[i]!

@@ -6,7 +6,7 @@ import {
   picsumUrl,
   type PhotoDescriptor,
 } from './photo-source.js'
-import { observeShifts, waitForDominantColor } from './demo-utils.js'
+import { observeShifts } from './demo-utils.js'
 
 const metaEl = document.getElementById('meta')!
 const f1 = document.getElementById('f1')!
@@ -200,7 +200,7 @@ async function runPreimage(): Promise<void> {
   f3.style.width = ''
   f3.style.height = ''
   r3.innerHTML = ''
-  e3.innerHTML = `<div class="row"><span>dims known (prepare)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>dominant color at</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div>`
+  e3.innerHTML = `<div class="row"><span>dims known (prepare)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div>`
 
   const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
@@ -208,17 +208,10 @@ async function runPreimage(): Promise<void> {
   const url = await resolveUrl(useLive, cacheBust, 'preimage')
 
   const t0 = performance.now()
-  const prepared = await prepare(url, { extractDominantColor: true })
+  const prepared = await prepare(url)
   const m = getMeasurement(prepared)
   const preparedAt = performance.now() - t0
   const frame = sizedFrame(f3, m.naturalWidth, m.naturalHeight)
-  let colorAt = 0
-  const colorPromise = waitForDominantColor(prepared).then((color) => {
-    if (color === null) return null
-    frame.style.backgroundColor = color
-    colorAt = performance.now() - t0
-    return color
-  })
   const img = document.createElement('img')
   frame.appendChild(img)
   const stage = f3.parentElement!
@@ -236,12 +229,10 @@ async function runPreimage(): Promise<void> {
     img.src = m.blobUrl ?? url
   })
   const paintedAt = performance.now() - t0
-  const color = await colorPromise
   monitor.stop()
   const events: Event[] = [
     { label: 'dims known (prepare)', t: preparedAt, note: `${m.naturalWidth}×${m.naturalHeight}` },
     { label: 'image painted', t: paintedAt },
-    { label: 'dominant color at', t: colorAt, note: color ?? 'unavailable' },
   ]
   renderEvents(e3, events, monitor.shifts())
   r3.innerHTML = `dims in <b>${preparedAt.toFixed(0)}ms</b> · painted at <b>${paintedAt.toFixed(0)}ms</b> · ${monitor.shifts()} shifts`

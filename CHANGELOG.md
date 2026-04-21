@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.7
+
+- **Removed dominant-color extraction.** `prepare({extractDominantColor: true})`, `measurement.dominantColor`, and the `extractDominantColorFromBlob` / `extractDominantRgbaFromBlob` / `rgbaToCss` exports are gone. The extraction ran on the fully-assembled blob *after* the stream drain, so the color arrived at roughly the same moment the real image paints — it couldn't function as a loading placeholder, which was the only story the feature was advertised for. Color extraction is a real problem worth solving but doesn't belong in an image-measurement library. The code is preserved on the `feat/dominant-color` branch for anyone who wants to build a proper standalone color library (the compelling version extracts color from the partial bytes already streamed for dimension probing — progressive-JPEG DC coefficients, AVIF preview layers — which nobody ships).
+
 ## 0.0.6
 
 Three value-adds for image-heavy pages.
