@@ -1,6 +1,7 @@
 import { prepare, getMeasurement } from '../../src/index.js'
 import { packGallery, type GalleryItem } from '../../src/gallery.js'
-import { loadPhotos, PICSUM_PHOTOS, type PhotoDescriptor } from './photo-source.js'
+import { loadPhotos, latencyFor, PICSUM_PHOTOS, type PhotoDescriptor } from './photo-source.js'
+import { loadImgWithLatency, observeLayoutShifts, sleep } from './demo-utils.js'
 
 const runButton = document.getElementById('run') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -15,53 +16,29 @@ const PANEL_WIDTH = 280
 const ROW_HEIGHT = 110
 const GAP = 6
 
-function observeShifts(panel: HTMLElement): { shifts: () => number; stop: () => void } {
-  let shifts = 0
-  let lastHeight = panel.getBoundingClientRect().height
-  const observer = new ResizeObserver(() => {
-    const h = panel.getBoundingClientRect().height
-    if (Math.abs(h - lastHeight) > 0.5) {
-      shifts++
-      lastHeight = h
-    }
-  })
-  observer.observe(panel)
-  return { shifts: () => shifts, stop: () => observer.disconnect() }
-}
-
-async function renderNaive(blobs: Blob[]): Promise<{ ms: number; shifts: number }> {
+async function renderNaive(blobs: Blob[], latencyMs: number): Promise<{ ms: number; cls: number }> {
   const t0 = performance.now()
   naivePanel.innerHTML = ''
-  const monitor = observeShifts(naivePanel)
+  const monitor = observeLayoutShifts(naivePanel.parentElement!)
   const imgs = blobs.map(() => {
     const img = document.createElement('img')
     img.alt = ''
     naivePanel.appendChild(img)
     return img
   })
-  for (let i = 0; i < blobs.length; i++) imgs[i]!.src = URL.createObjectURL(blobs[i]!)
-  await Promise.all(
-    imgs.map(
-      (img) =>
-        new Promise<void>((resolve) => {
-          if (img.complete && img.naturalWidth > 0) resolve()
-          else img.onload = () => resolve()
-        }),
-    ),
-  )
+  await Promise.all(imgs.map((img, i) => loadImgWithLatency(img, blobs[i]!, latencyMs)))
   monitor.stop()
-  return { ms: performance.now() - t0, shifts: monitor.shifts() }
+  return { ms: performance.now() - t0, cls: monitor.cls() }
 }
 
 async function renderNative(
   blobs: Blob[],
   photos: readonly PhotoDescriptor[],
-): Promise<{ ms: number; shifts: number; frameReadyAt: number }> {
+  latencyMs: number,
+): Promise<{ ms: number; cls: number; frameReadyAt: number }> {
   const t0 = performance.now()
   nativePanel.innerHTML = ''
-  const monitor = observeShifts(nativePanel)
-  // Build all the frames first so the caller-declared aspects reserve
-  // space immediately — this is what <img width height> is designed for.
+  const monitor = observeLayoutShifts(nativePanel.parentElement!)
   const imgs: HTMLImageElement[] = []
   for (let i = 0; i < blobs.length; i++) {
     const p = photos[i]!
@@ -76,30 +53,24 @@ async function renderNative(
     nativePanel.appendChild(frame)
     imgs.push(img)
   }
-  // Reserve-at-t=0 is the whole point of the native strategy.
   const frameReadyAt = performance.now() - t0
-  for (let i = 0; i < blobs.length; i++) imgs[i]!.src = URL.createObjectURL(blobs[i]!)
-  await Promise.all(
-    imgs.map(
-      (img) =>
-        new Promise<void>((resolve) => {
-          const done = (): void => {
-            img.classList.add('loaded')
-            resolve()
-          }
-          if (img.complete && img.naturalWidth > 0) done()
-          else img.onload = done
-        }),
-    ),
-  )
+  await Promise.all(imgs.map((img, i) => loadImgWithLatency(img, blobs[i]!, latencyMs)))
   monitor.stop()
-  return { ms: performance.now() - t0, shifts: monitor.shifts(), frameReadyAt }
+  return { ms: performance.now() - t0, cls: monitor.cls(), frameReadyAt }
 }
 
-async function renderMeasured(blobs: Blob[]): Promise<{ ms: number; shifts: number; prepareMs: number }> {
+async function renderMeasured(
+  blobs: Blob[],
+  latencyMs: number,
+): Promise<{ ms: number; cls: number; prepareMs: number }> {
   const t0 = performance.now()
   measuredPanel.innerHTML = ''
-  const monitor = observeShifts(measuredPanel)
+  const monitor = observeLayoutShifts(measuredPanel.parentElement!)
+  // In a real network scenario prepare streams from the first-arriving
+  // bytes. Model that: wait ~10% of the simulated transfer before
+  // measurement returns.
+  const probeDelay = Math.round(latencyMs * 0.1)
+  if (probeDelay > 0) await sleep(probeDelay)
   const prepared = await Promise.all(blobs.map((b) => prepare(b)))
   const prepareMs = performance.now() - t0
 
@@ -116,14 +87,12 @@ async function renderMeasured(blobs: Blob[]): Promise<{ ms: number; shifts: numb
     rowEl.className = 'row'
     rowEl.style.height = `${row.height}px`
     for (const p of row.placements) {
-      const url = getMeasurement(prepared[p.itemIndex]!).blobUrl ?? ''
       const item = document.createElement('div')
       item.className = 'item'
       item.style.left = `${p.x}px`
       item.style.width = `${p.width}px`
       item.style.height = `${p.height}px`
       const img = document.createElement('img')
-      img.src = url
       item.appendChild(img)
       rowEl.appendChild(item)
       imgs.push(img)
@@ -131,23 +100,38 @@ async function renderMeasured(blobs: Blob[]): Promise<{ ms: number; shifts: numb
     measuredPanel.appendChild(rowEl)
   }
 
-  // Fade the photos in when the browser finishes decoding each, so the
-  // frames visibly precede the filled imagery.
+  // Remaining bytes arrive over the rest of the simulated transfer, then
+  // each image's cached blobUrl can actually resolve in the DOM. (In
+  // the live-picsum case latencyMs == 0, so this is ~instant.)
+  const remainingDelay = Math.max(0, latencyMs - probeDelay)
   await Promise.all(
-    imgs.map(
-      (img) =>
-        new Promise<void>((resolve) => {
-          const done = (): void => {
-            img.classList.add('loaded')
-            resolve()
-          }
-          if (img.complete && img.naturalWidth > 0) done()
-          else img.onload = done
-        }),
-    ),
+    imgs.map((img, i) => {
+      const url = getMeasurement(prepared[i]!).blobUrl ?? URL.createObjectURL(blobs[i]!)
+      return loadImgWithLatencyFromUrl(img, url, remainingDelay)
+    }),
   )
   monitor.stop()
-  return { ms: performance.now() - t0, shifts: monitor.shifts(), prepareMs }
+  return { ms: performance.now() - t0, cls: monitor.cls(), prepareMs }
+}
+
+// Same shape as loadImgWithLatency but takes a pre-resolved URL (blobUrl
+// from getMeasurement) instead of a raw Blob. The measurement already
+// created the URL; we just defer assignment.
+async function loadImgWithLatencyFromUrl(
+  img: HTMLImageElement,
+  url: string,
+  latencyMs: number,
+): Promise<void> {
+  if (latencyMs > 0) await sleep(latencyMs)
+  return await new Promise<void>((resolve) => {
+    const done = (): void => {
+      img.classList.add('loaded')
+      resolve()
+    }
+    if (img.complete && img.naturalWidth > 0) done()
+    else img.onload = done
+    img.src = url
+  })
 }
 
 async function run(): Promise<void> {
@@ -156,19 +140,20 @@ async function run(): Promise<void> {
   naivePanel.innerHTML = ''
   nativePanel.innerHTML = ''
   measuredPanel.innerHTML = ''
-  naivePanel.style.minHeight = '500px'
-  nativePanel.style.minHeight = '500px'
-  measuredPanel.style.minHeight = '500px'
   naiveStat.textContent = 'loading…'
   nativeStat.textContent = 'loading…'
   measuredStat.textContent = 'loading…'
 
   const loaded = await loadPhotos(PICSUM_PHOTOS)
   const blobs = loaded.map((l) => l.blob)
-  const origins = loaded.map((l) => l.origin)
-  const picsumCount = origins.filter((o) => o === 'picsum').length
+  const picsumCount = loaded.filter((l) => l.origin === 'picsum').length
+  const latencyMs = latencyFor(loaded)
   const totalMB = blobs.reduce((a, b) => a + b.size, 0) / 1024 / 1024
-  metaEl.textContent = `${PICSUM_PHOTOS.length} photos · ${totalMB.toFixed(1)} MB · ${picsumCount > 0 ? `${picsumCount}/${blobs.length} from picsum.photos` : 'picsum offline — using canvas fallbacks at the same aspects'}`
+  metaEl.textContent =
+    `${PICSUM_PHOTOS.length} photos · ${totalMB.toFixed(1)} MB · ` +
+    (picsumCount > 0
+      ? `${picsumCount}/${blobs.length} from picsum.photos (real network)`
+      : `picsum offline — simulating ${latencyMs}ms per-image transfer so frames precede images visibly`)
 
   runButton.textContent = 'Rendering…'
   naiveStat.textContent = 'rendering…'
@@ -176,17 +161,14 @@ async function run(): Promise<void> {
   measuredStat.textContent = 'rendering…'
 
   const [naive, native, measured] = await Promise.all([
-    renderNaive(blobs),
-    renderNative(blobs, PICSUM_PHOTOS),
-    renderMeasured(blobs),
+    renderNaive(blobs, latencyMs),
+    renderNative(blobs, PICSUM_PHOTOS, latencyMs),
+    renderMeasured(blobs, latencyMs),
   ])
 
-  naivePanel.style.minHeight = ''
-  nativePanel.style.minHeight = ''
-  measuredPanel.style.minHeight = ''
-  naiveStat.textContent = `fully loaded in ${naive.ms.toFixed(0)}ms · ${naive.shifts} layout shifts`
-  nativeStat.textContent = `frames reserved at t=${native.frameReadyAt.toFixed(0)}ms · fully loaded at ${native.ms.toFixed(0)}ms · ${native.shifts} layout shifts`
-  measuredStat.textContent = `measured in ${measured.prepareMs.toFixed(0)}ms · fully loaded at ${measured.ms.toFixed(0)}ms · ${measured.shifts} layout shifts`
+  naiveStat.textContent = `loaded in ${naive.ms.toFixed(0)}ms · CLS ${naive.cls.toFixed(3)}`
+  nativeStat.textContent = `frames at t=${native.frameReadyAt.toFixed(0)}ms · loaded in ${native.ms.toFixed(0)}ms · CLS ${native.cls.toFixed(3)}`
+  measuredStat.textContent = `frames at t=${measured.prepareMs.toFixed(0)}ms · loaded in ${measured.ms.toFixed(0)}ms · CLS ${measured.cls.toFixed(3)}`
 
   runButton.textContent = 'Run again'
   runButton.disabled = false

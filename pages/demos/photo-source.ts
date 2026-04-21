@@ -86,10 +86,15 @@ async function generateFallback(
   })
 }
 
+export type LoadedPhoto = {
+  blob: Blob
+  origin: 'picsum' | 'fallback'
+}
+
 export async function loadPhoto(
   p: PhotoDescriptor,
   fallbackHue: number,
-): Promise<{ blob: Blob; origin: 'picsum' | 'fallback' }> {
+): Promise<LoadedPhoto> {
   try {
     const res = await fetch(picsumUrl(p), { mode: 'cors' })
     if (!res.ok) throw new Error(`status ${res.status}`)
@@ -108,8 +113,19 @@ export async function loadPhoto(
 
 export async function loadPhotos(
   photos: readonly PhotoDescriptor[],
-): Promise<Array<{ blob: Blob; origin: 'picsum' | 'fallback' }>> {
+): Promise<LoadedPhoto[]> {
   return await Promise.all(
     photos.map((p, i) => loadPhoto(p, (i * 43) % 360)),
   )
+}
+
+// When the live picsum URL is reachable the network provides its own
+// transfer latency — the demo shows reality. When the fallback path is
+// used (picsum blocked, offline, CI sandbox), the blob is already in
+// memory and decodes in a couple of ms, collapsing the frame-before-
+// image story into a single tick. This helper returns a sensible
+// simulated delay so the demo reads correctly either way.
+export function latencyFor(loaded: readonly LoadedPhoto[]): number {
+  const anyLive = loaded.some((l) => l.origin === 'picsum')
+  return anyLive ? 0 : 600
 }
