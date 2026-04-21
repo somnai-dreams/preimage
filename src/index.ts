@@ -26,6 +26,20 @@ export {
 export { fitRect, type FittedRect, type ObjectFit } from './fit.js'
 
 export {
+  registerUrlDimensionParser,
+  registerCommonUrlDimensionParsers,
+  clearUrlDimensionParsers,
+  parseUrlDimensions,
+  queryParamDimensionParser,
+  cloudinaryParser,
+  shopifyParser,
+  picsumParser,
+  unsplashParser,
+  type UrlDimensions,
+  type UrlDimensionParser,
+} from './url-dimensions.js'
+
+export {
   measureImage,
   measureImages,
   peekImageMeasurement,

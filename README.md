@@ -48,6 +48,31 @@ await prepare('/hero.jpg', { strategy: 'image-element' })
 
 Covers **PNG, JPEG, WebP, GIF, BMP, SVG** via pure byte parsers. **AVIF / HEIC / anything unknown** falls back transparently to `createImageBitmap(blob)` — still faster than a round trip because the bytes are already buffered, just without the first-2KB shortcut. `strategy` accepts `'auto'` (default), `'stream'` (require streaming, error on failure), or `'image-element'` (force classic path).
 
+## URL-pattern dimension extraction
+
+Many CDNs encode intrinsic dimensions directly in the URL — Cloudinary's `w_400,h_300/` transform segments, Shopify's `_400x300.jpg` suffix, picsum's `/800/600` path, Unsplash's `?w=400&h=300` query. If `prepare(url)` can read the dimensions straight out of the URL, it skips the network entirely and resolves them in microseconds. Parsers are opt-in via a pluggable registry:
+
+```ts
+import {
+  prepare,
+  registerCommonUrlDimensionParsers,
+  registerUrlDimensionParser,
+  queryParamDimensionParser,
+} from '@somnai-dreams/preimage'
+
+// Register every vendor parser the library ships with.
+registerCommonUrlDimensionParsers()
+
+// Or register individually.
+registerUrlDimensionParser(
+  queryParamDimensionParser((u) => u.includes('my-cdn.example.com/'), 'width', 'height'),
+)
+
+const prepared = await prepare(cloudinaryUrl)  // no network — URL parsed
+```
+
+Built-ins: `cloudinaryParser`, `shopifyParser`, `picsumParser`, `unsplashParser`. The `queryParamDimensionParser` helper builds a parser for any CDN that uses query-string keys. Custom parsers are just `(url: string) => { width, height } | null` functions — register as many as you need.
+
 ## Installation
 
 ```sh

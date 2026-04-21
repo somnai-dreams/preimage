@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.5
+
+- **Added URL-pattern dimension extraction.** Many CDNs encode intrinsic dimensions directly in the URL (Cloudinary's `w_400,h_300`, Shopify's `_400x300.jpg`, picsum's `/800/600`, Unsplash `?w=400&h=300`). `prepare(url)` now consults a pluggable registry of `UrlDimensionParser`s before hitting the network — a match skips the network entirely and resolves dimensions in microseconds.
+- New exports: `registerUrlDimensionParser`, `registerCommonUrlDimensionParsers`, `clearUrlDimensionParsers`, `parseUrlDimensions`, `queryParamDimensionParser`, plus the built-in vendor parsers `cloudinaryParser`, `shopifyParser`, `picsumParser`, `unsplashParser`. Built-ins are opt-in — users register whichever match their traffic.
+
 ## 0.0.4
 
 - Removed `@somnai-dreams/preimage/gallery`. Row packing isn't part of preimage's remit — it's a layout concern that lives at the caller. Deleted `src/gallery.ts` and dropped the subpath export.

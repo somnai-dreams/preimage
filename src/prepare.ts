@@ -29,6 +29,7 @@ import {
   type MeasureOptions,
 } from './measurement.js'
 import { MAX_HEADER_BYTES, probeImageBytes, type ProbedDimensions } from './probe.js'
+import { parseUrlDimensions } from './url-dimensions.js'
 
 // --- Opaque prepared handle ---
 
@@ -142,6 +143,19 @@ async function prepareFromUrl(src: string, options: PrepareOptions): Promise<Pre
   const key = normalizeSrc(src)
   const cached = peekImageMeasurement(key)
   if (cached !== null) return wrap(cached)
+
+  // URL-pattern extraction: if a registered parser can read dims
+  // straight out of the URL (Cloudinary w_/h_, Shopify _WxH, picsum
+  // /W/H, etc), skip the network entirely. This is strictly cheaper
+  // than any strategy — microseconds of string parsing vs a round trip
+  // — so it runs regardless of the strategy hint.
+  const urlDims = parseUrlDimensions(src)
+  if (urlDims !== null) {
+    const measurement = recordKnownMeasurement(key, urlDims.width, urlDims.height, {
+      orientation: options.orientation ?? 1,
+    })
+    return wrap(measurement)
+  }
 
   const strategy = options.strategy ?? 'auto'
 
