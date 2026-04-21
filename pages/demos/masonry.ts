@@ -121,12 +121,30 @@ async function renderNaive(urls: readonly string[]): Promise<{ ms: number; shift
   return { ms: performance.now() - t0, shifts: monitor.shifts() }
 }
 
-async function renderMeasured(urls: readonly string[]): Promise<{
+type Mode = 'batch' | 'progressive'
+
+type BatchResult = {
+  mode: 'batch'
   ms: number
   prepareMs: number
   shifts: number
   totalHeight: number
-}> {
+}
+
+type ProgressiveResult = {
+  mode: 'progressive'
+  ms: number
+  firstPlacedMs: number
+  lastPlacedMs: number
+  totalHeight: number
+}
+
+function getMode(): Mode {
+  const checked = document.querySelector<HTMLInputElement>('input[name="mode"]:checked')
+  return (checked?.value === 'batch' ? 'batch' : 'progressive')
+}
+
+async function renderMeasuredBatch(urls: readonly string[]): Promise<BatchResult> {
   measuredPanel.innerHTML = ''
   const t0 = performance.now()
   const prepared = await Promise.all(urls.map((u) => prepare(u)))
@@ -139,7 +157,6 @@ async function renderMeasured(urls: readonly string[]): Promise<{
   const { placements, totalHeight } = layoutMasonry(aspects, panelWidth, COLUMNS, GAP)
   measuredPanel.style.height = `${totalHeight}px`
 
-  const items: HTMLDivElement[] = []
   const imgs: HTMLImageElement[] = []
   for (let i = 0; i < placements.length; i++) {
     const p = placements[i]!
@@ -152,7 +169,6 @@ async function renderMeasured(urls: readonly string[]): Promise<{
     const img = document.createElement('img')
     item.appendChild(img)
     measuredPanel.appendChild(item)
-    items.push(item)
     imgs.push(img)
   }
 
@@ -175,10 +191,103 @@ async function renderMeasured(urls: readonly string[]): Promise<{
     }),
   )
   monitor.stop()
-  return { ms: performance.now() - t0, prepareMs, shifts: monitor.shifts(), totalHeight }
+  return {
+    mode: 'batch',
+    ms: performance.now() - t0,
+    prepareMs,
+    shifts: monitor.shifts(),
+    totalHeight,
+  }
+}
+
+// Progressive: each frame is placed the instant its own prepare()
+// resolves, using whichever column is currently shortest. Nothing
+// waits for the slowest image. Existing frames never move once
+// placed, so the layout is still stable frame-by-frame — it just
+// grows as bytes arrive.
+async function renderMeasuredProgressive(urls: readonly string[]): Promise<ProgressiveResult> {
+  measuredPanel.innerHTML = ''
+  measuredPanel.style.height = '0px'
+  const t0 = performance.now()
+  const panelWidth = measuredPanel.getBoundingClientRect().width
+  const colWidth = (panelWidth - GAP * (COLUMNS - 1)) / COLUMNS
+  const heights = new Array<number>(COLUMNS).fill(0)
+  let firstPlacedMs = 0
+  let lastPlacedMs = 0
+
+  await Promise.all(
+    urls.map((url) =>
+      prepare(url).then((p) => {
+        const now = performance.now() - t0
+        if (firstPlacedMs === 0) firstPlacedMs = now
+        lastPlacedMs = now
+
+        const aspect = getMeasurement(p).aspectRatio
+        let shortest = 0
+        for (let c = 1; c < COLUMNS; c++) {
+          if (heights[c]! < heights[shortest]!) shortest = c
+        }
+        const x = shortest * (colWidth + GAP)
+        const y = heights[shortest]!
+        const h = colWidth / aspect
+        heights[shortest] = y + h + GAP
+        measuredPanel.style.height = `${Math.max(...heights)}px`
+
+        const item = document.createElement('div')
+        item.className = 'item framed'
+        item.style.left = `${x}px`
+        item.style.top = `${y}px`
+        item.style.width = `${colWidth}px`
+        item.style.height = `${h}px`
+        const img = document.createElement('img')
+        item.appendChild(img)
+        measuredPanel.appendChild(item)
+
+        const cachedUrl = getMeasurement(p).blobUrl ?? url
+        return new Promise<void>((resolve) => {
+          const done = (): void => {
+            img.classList.add('loaded')
+            resolve()
+          }
+          if (img.complete && img.naturalWidth > 0) done()
+          else {
+            img.onload = done
+            img.onerror = done
+          }
+          img.src = cachedUrl
+        })
+      }),
+    ),
+  )
+
+  return {
+    mode: 'progressive',
+    ms: performance.now() - t0,
+    firstPlacedMs,
+    lastPlacedMs,
+    totalHeight: Math.max(...heights),
+  }
+}
+
+function renderMeasured(
+  urls: readonly string[],
+  mode: Mode,
+): Promise<BatchResult | ProgressiveResult> {
+  return mode === 'batch' ? renderMeasuredBatch(urls) : renderMeasuredProgressive(urls)
+}
+
+const measuredSubEl = document.getElementById('measuredSub')!
+
+function setMeasuredSub(mode: Mode): void {
+  measuredSubEl.textContent =
+    mode === 'batch'
+      ? 'all dimensions probed in parallel · layout committed before paint'
+      : 'each frame placed the moment its dimensions arrive · layout grows as bytes stream in'
 }
 
 async function run(): Promise<void> {
+  const mode = getMode()
+  setMeasuredSub(mode)
   runButton.disabled = true
   runButton.textContent = 'Checking network…'
   naivePanel.innerHTML = ''
@@ -200,19 +309,28 @@ async function run(): Promise<void> {
 
   runButton.textContent = 'Running…'
 
-  const [naive, measured] = await Promise.all([renderNaive(urls), renderMeasured(urls)])
+  const [naive, measured] = await Promise.all([renderNaive(urls), renderMeasured(urls, mode)])
 
   naiveStat.innerHTML = [
     metric('loaded at', `${naive.ms.toFixed(0)}ms`),
     metric('visible shifts', String(naive.shifts), naive.shifts > 0),
   ].join('')
 
-  measuredStat.innerHTML = [
-    metric('frame placed at', `${measured.prepareMs.toFixed(0)}ms`),
-    metric('fully loaded at', `${measured.ms.toFixed(0)}ms`),
-    metric('column height', `${Math.round(measured.totalHeight)}px`),
-    metric('visible shifts', String(measured.shifts), measured.shifts > 0),
-  ].join('')
+  if (measured.mode === 'batch') {
+    measuredStat.innerHTML = [
+      metric('frames placed at', `${measured.prepareMs.toFixed(0)}ms`),
+      metric('fully loaded at', `${measured.ms.toFixed(0)}ms`),
+      metric('column height', `${Math.round(measured.totalHeight)}px`),
+      metric('visible shifts', String(measured.shifts), measured.shifts > 0),
+    ].join('')
+  } else {
+    measuredStat.innerHTML = [
+      metric('first frame at', `${measured.firstPlacedMs.toFixed(0)}ms`),
+      metric('last frame at', `${measured.lastPlacedMs.toFixed(0)}ms`),
+      metric('fully loaded at', `${measured.ms.toFixed(0)}ms`),
+      metric('column height', `${Math.round(measured.totalHeight)}px`),
+    ].join('')
+  }
 
   runButton.textContent = 'Run again'
   runButton.disabled = false
@@ -221,4 +339,11 @@ async function run(): Promise<void> {
 runButton.addEventListener('click', () => {
   void run()
 })
+
+// Update the right-panel subtitle immediately on toggle so the user
+// sees what the next Run will produce, without re-fetching 60 photos.
+for (const input of document.querySelectorAll<HTMLInputElement>('input[name="mode"]')) {
+  input.addEventListener('change', () => setMeasuredSub(getMode()))
+}
+
 void run()
