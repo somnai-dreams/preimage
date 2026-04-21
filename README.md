@@ -15,6 +15,8 @@ Plus the primitives those adapters are built on (`prepare`, `layout`, `fitRect`,
 
 | | |
 |---|---|
+| **[Masonry](./pages/demos/masonry.html)** — 24 fresh image Blobs into a grid. Left: naive `<img>` with no declared dims, ~12 layout shifts on first load. Right: `prepare()` + `packGallery`, zero shifts. | ![masonry](./pages/assets/screenshots/masonry.png) |
+| **[Editorial](./pages/demos/editorial.html)** — article with 3 floated figures. Left: naive HTML, text reflows as each figure loads. Right: pretext + preimage via `flowColumnWithFloats`, layout stable from first frame. | ![editorial](./pages/assets/screenshots/editorial.png) |
 | **[Pretext float](./pages/demos/pretext-float.html)** — paragraph wrapping around a measured figure. Column width, float side, and float top are live-editable; every change re-flows on pure arithmetic. | ![pretext float](./pages/assets/screenshots/pretext-float.png) |
 | **[Pretext rich-inline](./pages/demos/pretext-inline.html)** — chat bubble with three inline icon images. Resizing the bubble re-breaks the lines and shuffles the icons to their new slots. | ![pretext inline](./pages/assets/screenshots/pretext-inline.png) |
 | **[Canvas fit](./pages/demos/canvas-fit.html)** — `drawImage` stretch vs `layout()` fit math. The standalone (no-pretext) case where canvas can't fall back on CSS `object-fit`. | ![canvas fit](./pages/assets/screenshots/canvas-fit.png) |

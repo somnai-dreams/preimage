@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · editorial reflow comparison</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --bg: #fafafa; --border: #e5e5e5; --muted: #666; }
+    body { font: 15px/1.5 -apple-system, system-ui, sans-serif; margin: 1.5rem; color: #111; }
+    h1 { margin: 0 0 0.25rem; font-size: 1.35rem; }
+    p { margin: 0.35rem 0; }
+    code { background: #f0f0f0; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.92em; }
+    .controls { margin: 1rem 0; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    button { font: inherit; padding: 6px 14px; background: #0063ff; color: #fff; border: 0; border-radius: 3px; cursor: pointer; }
+    button:disabled { background: #bbb; cursor: not-allowed; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem; align-items: start; }
+    .panel { border: 1px solid var(--border); border-radius: 6px; padding: 1rem; background: #fff; }
+    .panel h2 { margin: 0 0 0.25rem; font-size: 0.95rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .panel .stat { font-size: 12px; color: var(--muted); margin-bottom: 0.5rem; font-variant-numeric: tabular-nums; min-height: 1.2em; }
+    .naive-article { line-height: 1.55; font-size: 15px; }
+    .naive-article .fig { float: right; width: 40%; margin: 0 0 10px 14px; }
+    .naive-article .fig img { width: 100%; display: block; background: #eee; }
+    .naive-article .fig figcaption { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .measured-article { position: relative; }
+    .measured-article .line { position: absolute; white-space: pre; font: 15px/24px -apple-system, system-ui, sans-serif; color: #111; }
+    .measured-article .fig { position: absolute; }
+    .measured-article .fig img { width: 100%; height: 100%; display: block; border-radius: 3px; }
+    .shift-indicator { display: inline-block; padding: 1px 6px; background: #ffecb3; border: 1px solid #f0c36d; color: #6b4f00; border-radius: 3px; font-size: 11px; margin-left: 0.5rem; }
+    .stable-indicator { display: inline-block; padding: 1px 6px; background: #cdeecc; border: 1px solid #80c082; color: #0d5f2e; border-radius: 3px; font-size: 11px; margin-left: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Editorial — article layout, with and without preimage</h1>
+  <p>Each run generates 3 fresh figure Blobs at different aspect ratios. Left: naive HTML with <code>&lt;figure&gt;</code> floats and no width/height attributes — text jumps as each image decodes. Right: pretext measures the text, preimage measures the figures, <code>flowColumnWithFloats</code> places everything in one synchronous pass.</p>
+
+  <div class="controls">
+    <button id="run">Run</button>
+    <span id="genInfo" style="font-size:12px;color:var(--muted);"></span>
+  </div>
+
+  <div class="pair">
+    <div class="panel">
+      <h2>Naive HTML floats <span id="naiveTag" class="shift-indicator">reflow</span></h2>
+      <div class="stat" id="naiveStat">—</div>
+      <div id="naive" class="naive-article"></div>
+    </div>
+    <div class="panel">
+      <h2>Pretext + preimage <span id="measuredTag" class="stable-indicator">stable</span></h2>
+      <div class="stat" id="measuredStat">—</div>
+      <div id="measured" class="measured-article"></div>
+    </div>
+  </div>
+
+  <script type="module" src="./editorial.ts"></script>
+</body>
+</html>

@@ -27,6 +27,18 @@ const targets = [
     wait: 6000,
   },
   {
+    name: 'masonry',
+    url: `${BASE}/masonry`,
+    viewport: { width: 1280, height: 900 },
+    wait: 9000,
+  },
+  {
+    name: 'editorial',
+    url: `${BASE}/editorial`,
+    viewport: { width: 1280, height: 900 },
+    wait: 8000,
+  },
+  {
     name: 'pretext-float',
     url: `${BASE}/pretext-float`,
     viewport: { width: 1280, height: 900 },

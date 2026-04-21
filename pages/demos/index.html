@@ -23,6 +23,19 @@
   <p>Preimage is a small library of two parts: a <strong>standalone image-measurement primitive</strong> (useful wherever CSS doesn't apply — canvas, SVG, WebGL), and a <strong>pretext integration</strong> that supplies the image dimensions pretext's text-layout loop assumes as input.</p>
   <p>The demos below are grouped the same way.</p>
 
+  <h2>Reflow comparisons — cache-cold first loads</h2>
+  <p>Fresh blob URLs per run, browser has never seen them. Shows the layout behavior difference between a naive approach that discovers dimensions as images arrive, and preimage + pretext laying out once with measured inputs.</p>
+
+  <div class="demo">
+    <h3><a href="./masonry">Masonry grid</a></h3>
+    <p>24 fresh images, varied aspect ratios, dropped into a 2-up side-by-side comparison. Left: naive <code>&lt;img&gt;</code>s — layout shifts as each one decodes. Right: <code>prepare()</code> → <code>packGallery()</code> — grid paints once at final dimensions.</p>
+  </div>
+
+  <div class="demo">
+    <h3><a href="./editorial">Editorial article with floats</a></h3>
+    <p>An article with 3 floated figures. Left: naive HTML — text reflows as each figure loads. Right: pretext measures the text, preimage measures the figures, <code>flowColumnWithFloats</code> lays out the column in one synchronous pass.</p>
+  </div>
+
   <h2>Without pretext</h2>
   <p>Strong case: drawing to canvas. The DOM has <code>object-fit</code> and <code>aspect-ratio</code> for free — you don't need a library. Canvas, SVG, and WebGL have neither.</p>
 
