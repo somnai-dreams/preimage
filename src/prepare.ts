@@ -38,6 +38,12 @@ function wrap(measurement: ImageMeasurement): PreparedImage {
   return { measurement } as unknown as InternalPreparedImage
 }
 
+// Exposed for adjacent modules (e.g. `prepare-fast.ts`) that need to mint a
+// PreparedImage from a measurement they obtained via a different code path.
+export function preparedFromMeasurement(measurement: ImageMeasurement): PreparedImage {
+  return wrap(measurement)
+}
+
 // --- Public API ---
 
 export type PrepareOptions = MeasureOptions & {

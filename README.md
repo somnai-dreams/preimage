@@ -18,8 +18,26 @@ Plus the primitives those adapters are built on (`prepare`, `layout`, `fitRect`,
 | **[Pretext float](./pages/demos/pretext-float.html)** — paragraph wrapping around a measured figure. Column width, float side, and float top are live-editable; every change re-flows on pure arithmetic. | ![pretext float](./pages/assets/screenshots/pretext-float.png) |
 | **[Pretext rich-inline](./pages/demos/pretext-inline.html)** — chat bubble with three inline icon images. Resizing the bubble re-breaks the lines and shuffles the icons to their new slots. | ![pretext inline](./pages/assets/screenshots/pretext-inline.png) |
 | **[Canvas fit](./pages/demos/canvas-fit.html)** — `drawImage` stretch vs `layout()` fit math. The standalone (no-pretext) case where canvas can't fall back on CSS `object-fit`. | ![canvas fit](./pages/assets/screenshots/canvas-fit.png) |
+| **[Time-to-first-sizing](./pages/demos/ttfs.html)** — `prepare()` vs `prepareFast()` on an 11MB PNG Blob. Byte-probe returns in ~700µs; `img.decode()` takes ~374ms. | ![ttfs](./pages/assets/screenshots/ttfs.png) |
 
 Run them live with `bun install && bun start` and open [`/demos`](http://localhost:3000/).
+
+## `prepareFast`: time-to-first-sizing
+
+The classic path (`prepare` → `HTMLImageElement.decode()`) waits for the image to fully transfer **and** fully decode before returning dimensions. For a 5MB hero photo on a 10 Mbps connection that's ~4 seconds. But dimensions live in the **first ~2KB** of every major format. `prepareFast` streams the fetch, parses the header as bytes arrive, and returns:
+
+```ts
+import { prepareFast, getMeasurement } from '@somnai-dreams/preimage'
+
+const prepared = await prepareFast('/hero.jpg')
+const m = getMeasurement(prepared)
+// m.naturalWidth / m.naturalHeight — available in ~150ms instead of ~4000ms
+// m.blobUrl — the streamed blob exposed as an object URL; <img src> reuses it
+```
+
+Also accepts `Blob`/`File` sources directly (drag-drop, file picker, clipboard, IndexedDB): slices the first 4KB, probes. No decode.
+
+Covers **PNG, JPEG, WebP, GIF, BMP, SVG** via pure byte parsers. **AVIF / HEIC / anything unknown** falls back transparently to `createImageBitmap(blob)` — still faster than a round trip because the bytes are already buffered, just without the first-2KB shortcut.
 
 ## Installation
 

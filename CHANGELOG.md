@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.3
+
+Time-to-first-sizing.
+
+- **Added `prepareFast(src: string | Blob, options?)`** — streaming fetch + header parse for URL sources, first-4KB slice + parse for Blob sources. Measured TTFS ~374ms → ~700µs on an 11MB in-memory PNG; for large remote images the delta is larger (the classic path also waits for full transfer).
+- **Added `probeImageBytes(bytes: Uint8Array)`** as a standalone public helper — covers PNG, JPEG, WebP (VP8 / VP8L / VP8X), GIF, BMP, SVG.
+- **Added `blobUrl` to `ImageMeasurement`** — when `prepareFast` streamed the bytes itself, it exposes an object URL so `<img src>` renders reuse the same bytes (no double fetch).
+- Automatic transparent fallback to `createImageBitmap(blob)` for AVIF / HEIC / anything without a header parser.
+
 ## 0.0.2
 
 Reshaped as a pretext companion, not a pretext parallel.

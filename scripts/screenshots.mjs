@@ -21,6 +21,12 @@ const targets = [
     wait: 2500,
   },
   {
+    name: 'ttfs',
+    url: `${BASE}/ttfs`,
+    viewport: { width: 1280, height: 720 },
+    wait: 6000,
+  },
+  {
     name: 'pretext-float',
     url: `${BASE}/pretext-float`,
     viewport: { width: 1280, height: 900 },

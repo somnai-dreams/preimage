@@ -11,9 +11,18 @@ export {
   measureAspect,
   measureNaturalSize,
   getMeasurement,
+  preparedFromMeasurement,
   type PreparedImage,
   type PrepareOptions,
 } from './prepare.js'
+
+export { prepareFast, type PrepareFastOptions } from './prepare-fast.js'
+
+export {
+  probeImageBytes,
+  MAX_HEADER_BYTES,
+  type ProbedDimensions,
+} from './probe.js'
 
 export { fitRect, type FittedRect, type ObjectFit } from './fit.js'
 

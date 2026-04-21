@@ -31,6 +31,11 @@
     <p>Draws an image to a canvas at the correct object-fit rect. Compares a naive <code>drawImage(img, 0, 0, w, h)</code> (stretched) against <code>layout(prepared, w, h, fit)</code> + <code>drawImage(img, r.x, r.y, r.w, r.h)</code> (correctly fit).</p>
   </div>
 
+  <div class="demo">
+    <h3><a href="./ttfs">Time-to-first-sizing: <code>prepare</code> vs <code>prepareFast</code></a></h3>
+    <p>Generates a 4000×3000 PNG Blob and measures how fast each API returns dimensions. <code>prepareFast</code> parses the IHDR header (~24 bytes) instead of waiting for a full decode.</p>
+  </div>
+
   <h2>With pretext</h2>
   <p>These are the demos that actually justify the library. Pretext's README describes two use-cases — text wrapping around a figure, and rich-inline flow with atomic pills — and deliberately stops short of computing the image dimensions for either. Preimage fills that gap.</p>
 
