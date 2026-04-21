@@ -2,10 +2,11 @@ import { prepareWithSegments, materializeLineRange } from '@chenglou/pretext'
 
 import { prepare } from '../../src/index.js'
 import { flowColumnWithFloats } from '../../src/pretext.js'
+import { SAMPLES } from './sample-images.js'
 
-const ARTICLE = `The figure on the right is a real image — preimage loaded it once via \`prepare()\`, cached its aspect ratio, and now every resize flows pretext's text lines around it with pure arithmetic. When the column narrows, the float narrows with it; when the image's bottom passes, the text returns to full width. No \`getBoundingClientRect\`, no layout reflow, no placeholder skeleton, no sudden image-pop-in shift. This is the one thing pretext's variable-width cursor loop was designed for, and the one thing pretext alone cannot give you — a concrete (width, height) rect for the figure that holds under resize.`
+const ARTICLE = `The figure on the right is a real image — preimage loaded it once via prepare(), cached its aspect ratio, and now every resize flows pretext's text lines around it with pure arithmetic. When the column narrows, the float narrows with it; when the image's bottom passes, the text returns to full width. No getBoundingClientRect, no layout reflow, no placeholder skeleton, no sudden image pop-in shift. This is the scenario pretext's variable-width cursor loop was designed for, and the one thing pretext alone does not give you — a concrete (width, height) rect for the figure that holds under resize.`
 
-const IMAGE_URL = 'https://picsum.photos/seed/float/800/600'
+const IMAGE_URL = SAMPLES.landscape4x3
 const FONT = '17px Inter, -apple-system, system-ui, sans-serif'
 const LINE_HEIGHT = 26
 

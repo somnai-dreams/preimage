@@ -42,7 +42,7 @@
     <aside>
       <h2>What this shows</h2>
       <p>Pretext's <code>RichInlineItem</code> has a <code>text</code>, <code>font</code>, <code>break</code>, and <code>extraWidth</code>. The <code>extraWidth</code> field is caller-owned — it's how pretext lets pill chrome contribute to line width without needing a font.</p>
-      <p>Preimage's <code>inlineImage()</code> returns a <code>RichInlineItem</code> whose <code>text</code> is a zero-width space (survives pretext's whitespace trim, measures 0px wide) and whose <code>extraWidth</code> is the measured image's rendered width. Pretext packs it like any other atomic item.</p>
+      <p>Preimage's <code>inlineImage()</code> returns a <code>RichInlineItem</code> whose <code>text</code> is a word joiner (U+2060 — invisible, zero-width, survives pretext's trim and segmentation) and whose <code>extraWidth</code> is the measured image's rendered width. Pretext packs it like any other atomic item.</p>
 
       <h2>Without preimage</h2>
       <p>Pretext's rich-inline is text-only. To mix in images you'd have to fork rich-inline, or stop using pretext inside the bubble. Either way you lose pretext's line-break accuracy for the text portions.</p>

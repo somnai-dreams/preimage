@@ -32,13 +32,17 @@
       <p>Drawing an image to a canvas is the clearest case where CSS does not help you. <code>drawImage(img, 0, 0, w, h)</code> stretches. <code>object-fit</code> is a CSS property; canvas does not honor it. You have to compute the fitted rect yourself.</p>
 
       <div class="controls">
-        <label>Image
-          <input id="src" type="text" value="https://picsum.photos/seed/canvas/1600/900" />
+        <label>Sample
+          <select id="sampleSel">
+            <option value="landscape16x9">16 : 9 landscape</option>
+            <option value="portrait3x4" selected>3 : 4 portrait</option>
+            <option value="square">1 : 1 square</option>
+          </select>
         </label>
         <label>Fit
           <select id="fit">
-            <option>contain</option>
-            <option selected>cover</option>
+            <option selected>contain</option>
+            <option>cover</option>
             <option>fill</option>
             <option>scale-down</option>
             <option>none</option>

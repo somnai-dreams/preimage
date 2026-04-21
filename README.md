@@ -84,7 +84,7 @@ walkRichInlineLineRanges(prepared, maxWidth, (range) => {
 })
 ```
 
-`inlineImage(src, options)` returns a `RichInlineItem` whose `text` is a single zero-width space (survives pretext's `[ \t\n\f\r]+` trim, measures 0px in every font we tested) and whose `extraWidth` is the measured image's rendered width plus any caller-supplied chrome. Pretext packs it as an atomic pill with `break: 'never'` by default.
+`inlineImage(src, options)` returns a `RichInlineItem` whose `text` is a single word joiner (U+2060 — invisible, zero-width, survives both pretext's `[ \t\n\f\r]+` trim and its soft-break-only drop) and whose `extraWidth` is the measured image's rendered width plus any caller-supplied chrome. Pretext packs it as an atomic pill with `break: 'never'` by default.
 
 The returned item also carries `imageDisplayWidth`, `imageDisplayHeight`, and a reference to the `PreparedImage`, so the caller has everything it needs to render the image at the fragment's computed position.
 
@@ -181,7 +181,7 @@ For anything else images can do in a browser, CSS and the platform already have 
 
 ## Caveats
 
-- The inline adapter's zero-width-space sentinel measures 0px in every font we've tested. If you hit a font that gives `​` a non-zero glyph width, the reserved width will be off by that amount. Report it.
+- The inline adapter's word-joiner (U+2060) sentinel measures 0px in every font we've tested. If you hit a font that gives `⁠` a non-zero glyph width, the reserved width will be off by that amount. Report it.
 - `flowColumnWithFloats` currently handles any number of floats, but a line's available width is always calculated as `columnWidth - (widest active left float) - (widest active right float) - gaps`. Side-by-side floats on the same side stack to the full width of the larger one, not sum to both — matching how CSS floats behave.
 - EXIF orientations 1–8 are respected for measurement axes; canvas rendering still needs to apply the transform manually. Browser `<img>` rendering applies it automatically.
 - SVG without an intrinsic size falls back to `300 × 150` (CSS default). Use `measureFromSvgText` for the viewBox if that matters.

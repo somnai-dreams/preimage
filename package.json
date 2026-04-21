@@ -62,6 +62,7 @@
   "devDependencies": {
     "@chenglou/pretext": "^0.0.5",
     "@types/bun": "latest",
+    "playwright": "^1.56.0",
     "typescript": "^5.6.0"
   },
   "peerDependencies": {

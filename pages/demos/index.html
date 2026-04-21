@@ -27,7 +27,7 @@
   <p>Strong case: drawing to canvas. The DOM has <code>object-fit</code> and <code>aspect-ratio</code> for free — you don't need a library. Canvas, SVG, and WebGL have neither.</p>
 
   <div class="demo">
-    <h3><a href="/demos/canvas-fit.html">Canvas fit</a></h3>
+    <h3><a href="./canvas-fit">Canvas fit</a></h3>
     <p>Draws an image to a canvas at the correct object-fit rect. Compares a naive <code>drawImage(img, 0, 0, w, h)</code> (stretched) against <code>layout(prepared, w, h, fit)</code> + <code>drawImage(img, r.x, r.y, r.w, r.h)</code> (correctly fit).</p>
   </div>
 
@@ -35,17 +35,17 @@
   <p>These are the demos that actually justify the library. Pretext's README describes two use-cases — text wrapping around a figure, and rich-inline flow with atomic pills — and deliberately stops short of computing the image dimensions for either. Preimage fills that gap.</p>
 
   <div class="demo">
-    <h3><a href="/demos/pretext-float.html">Float a figure in a pretext column</a></h3>
+    <h3><a href="./pretext-float">Float a figure in a pretext column</a></h3>
     <p>An article with a figure floated beside it. Preimage measures the image once; <code>flowColumnWithFloats</code> drives pretext's cursor loop, narrowing <code>maxWidth</code> while the float is active. Works on DOM, canvas, SVG, or WebGL targets.</p>
   </div>
 
   <div class="demo">
-    <h3><a href="/demos/pretext-inline.html">Inline images in a rich-inline chat bubble</a></h3>
+    <h3><a href="./pretext-inline">Inline images in a rich-inline chat bubble</a></h3>
     <p>A chat bubble mixing text and small inline images. Preimage's <code>inlineImage()</code> returns a pretext <code>RichInlineItem</code> whose <code>extraWidth</code> reserves the measured image's rendered width, so pretext's rich-inline walker treats it as an atomic pill.</p>
   </div>
 
   <h2 class="footnote">Bonus</h2>
   <p class="footnote">Not part of the pretext story — a standalone justified row packer that shares the same prepared measurements.</p>
-  <p class="footnote"><a href="/demos/justified-gallery.html">Justified gallery</a></p>
+  <p class="footnote"><a href="./justified-gallery">Justified gallery</a></p>
 </body>
 </html>

@@ -1,9 +1,10 @@
 import { prepare, layout, getMeasurement, type ObjectFit } from '../../src/index.js'
+import { SAMPLES } from './sample-images.js'
 
 const BOX_W = 480
 const BOX_H = 270
 
-const srcInput = document.getElementById('src') as HTMLInputElement
+const sampleSelect = document.getElementById('sampleSel') as HTMLSelectElement
 const fitSelect = document.getElementById('fit') as HTMLSelectElement
 const goButton = document.getElementById('go') as HTMLButtonElement
 const naiveCanvas = document.getElementById('naive') as HTMLCanvasElement
@@ -24,7 +25,8 @@ function sizeCanvasFor(canvas: HTMLCanvasElement, cssW: number, cssH: number): C
 }
 
 async function draw(): Promise<void> {
-  const src = srcInput.value.trim()
+  const key = sampleSelect.value as keyof typeof SAMPLES
+  const src = (SAMPLES[key] as string | undefined) ?? SAMPLES.landscape16x9
   const fit = fitSelect.value as ObjectFit
 
   const naiveCtx = sizeCanvasFor(naiveCanvas, BOX_W, BOX_H)
@@ -70,6 +72,9 @@ goButton.addEventListener('click', () => {
   void draw()
 })
 fitSelect.addEventListener('change', () => {
+  void draw()
+})
+sampleSelect.addEventListener('change', () => {
   void draw()
 })
 

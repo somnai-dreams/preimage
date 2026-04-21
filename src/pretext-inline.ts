@@ -7,10 +7,11 @@
 // caller-owned chrome; we can reserve the image's rendered width there.
 //
 // The one subtlety is that pretext drops items whose text trims to empty
-// via `[ \t\n\f\r]+` (so a bare `''` or `' '` would vanish). Using a
-// zero-width space `​` survives that trim and measures as 0px in every
-// normal font, so the item's total occupied width collapses cleanly to
-// `extraWidth`.
+// via `[ \t\n\f\r]+` (so a bare `''` or `' '` would vanish), AND it also
+// drops items whose analysis resolves to "soft-break only, no rendered
+// content" — which is how U+200B zero-width space ends up being skipped.
+// U+2060 WORD JOINER is explicitly a zero-width non-break character, so
+// it survives both gates.
 //
 // Usage:
 //   const icon = await inlineImage(iconSrc, { font: '17px Inter', height: 20 })
@@ -29,12 +30,20 @@ import type { RichInlineItem } from '@chenglou/pretext/rich-inline'
 
 import { prepare, getMeasurement, type PreparedImage } from './prepare.js'
 
-// Zero-width space. Survives pretext's `[ \t\n\f\r]+` trim (it is not in
-// that character class) and measures 0px wide in every font we tested. If a
-// caller hits a font that gives ZWSP a nonzero glyph width, the image's
+// Word joiner (U+2060). We need an invisible, zero-width character that
+// survives pretext's `[ \t\n\f\r]+` trim AND doesn't trip pretext's
+// rich-inline pipeline into treating the item as empty.
+//
+// U+200B (zero-width space) looks tempting but fails: pretext analyzes it
+// as a pure soft-break opportunity with no rendered content, so
+// `prepareRichInline` silently drops the item. U+2060 is explicitly a
+// "join without break" character: it measures 0px wide in every font we
+// tested, survives trim, and pretext keeps it as a real segment.
+//
+// If a caller hits a font that gives U+2060 a non-zero glyph width, the
 // reserved width will be off by that amount — report it as a font-specific
 // quirk.
-const INVISIBLE_SENTINEL = '​'
+const INVISIBLE_SENTINEL = '⁠'
 
 export const PREIMAGE_INLINE_MARKER = '__preimageInline' as const
 

@@ -6,6 +6,7 @@ import {
 
 import { getMeasurement } from '../../src/index.js'
 import { resolveMixedInlineItems, isInlineImageItem } from '../../src/pretext.js'
+import { SAMPLES } from './sample-images.js'
 
 const FONT = '17px Inter, -apple-system, system-ui, sans-serif'
 const LINE_HEIGHT = 24
@@ -22,19 +23,19 @@ async function boot(): Promise<void> {
     { text: 'Pushed a fix to ', font: FONT },
     {
       kind: 'image',
-      src: 'https://picsum.photos/seed/logo/80/80',
+      src: SAMPLES.icon(220, ''),
       options: { font: FONT, height: 20, extraWidth: 6, break: 'never' },
     },
     { text: ' preimage — the inline image uses ', font: FONT },
     {
       kind: 'image',
-      src: 'https://picsum.photos/seed/ring/80/80',
+      src: SAMPLES.icon(320, ''),
       options: { font: FONT, height: 20, extraWidth: 6, break: 'never' },
     },
     { text: " pretext's own rich-inline walker, with ", font: FONT },
     {
       kind: 'image',
-      src: 'https://picsum.photos/seed/spark/80/80',
+      src: SAMPLES.icon(30, ''),
       options: { font: FONT, height: 20, extraWidth: 6, break: 'never' },
     },
     { text: ' zero DOM reflow.', font: FONT },
