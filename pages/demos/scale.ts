@@ -252,10 +252,10 @@ async function runMeasured(): Promise<void> {
     { root: measuredScroll, rootMargin: '200px' },
   )
 
-  // Application-level queue. Holds the dimsOnly prepare() calls so
-  // the browser's 6-connection cap isn't fought over with the
-  // render-side fetches from the IntersectionObserver callback.
-  const queue = new PrepareQueue({ concurrency: 6 })
+  // Application-level queue. concurrency: 20 hits the sweet spot on
+  // HTTP/2 origins (this site is H2 under GitHub Pages); on HTTP/1.1
+  // the browser's 6-slot cap gatekeeps automatically with no penalty.
+  const queue = new PrepareQueue({ concurrency: 20 })
 
   await Promise.all(
     urls.map((url) =>

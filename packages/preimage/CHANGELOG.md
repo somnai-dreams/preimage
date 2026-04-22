@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+- **`PrepareQueue` default concurrency bumped from 6 → 20.** Sized for HTTP/2 origins, which is most modern deployment targets (GitHub Pages, Cloudflare, Vercel, Netlify, any CDN built in the last decade). On HTTP/1.1 origins the browser's 6-slot connection cap gatekeeps automatically — firing 20 means the browser accepts all into its own queue, runs 6 in parallel, serves the rest in FIFO order. Same throughput as the old default, no penalty. Callers who know they're on H1 and want to leave slots free for render-side fetches can pass `concurrency: 6` explicitly.
+- Scale demo now passes `concurrency: 20` explicitly rather than relying on the default, so the code reads as "here's the recommended setting for bulk workloads" rather than "here's a magic number."
+- README's `PrepareQueue` section rewritten around the protocol-awareness story.
+
 ## 0.1.0
 
 Breaking: `prepare(url)` now uses a native `<img>` element with `setTimeout(0)` polling of `naturalWidth` instead of a custom `fetch()` + stream-and-header-parse pipeline. The refactor pays off three things at once — it's smaller (~30% fewer lines in `src/`), format-agnostic (free AVIF/HEIC/anything-the-browser-supports), and **actually one fetch** for the common render case.

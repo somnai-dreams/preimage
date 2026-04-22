@@ -83,12 +83,12 @@ Parsers are `(url: string) => { width, height } | null` functions — register a
 
 ## `PrepareQueue`
 
-Browsers cap parallel requests per origin (6 for HTTP/1.1). Firing `prepare()` for 200 tiles means the later tiles queue inside the browser's network stack where you can't reorder them.
+Browsers cap parallel requests per origin (6 hardcoded for HTTP/1.1; HTTP/2 multiplexes many streams over one connection, typically ~100). Firing `prepare()` for 200 tiles means the later tiles queue inside the browser's network stack where you can't reorder them.
 
 ```ts
 import { PrepareQueue } from '@somnai-dreams/preimage'
 
-const queue = new PrepareQueue({ concurrency: 6 })
+const queue = new PrepareQueue({ concurrency: 20 })   // default is 20
 
 for (const tile of tiles) {
   tile.prepared = queue.enqueue(tile.src, { dimsOnly: true })
@@ -97,6 +97,8 @@ for (const tile of tiles) {
 // User scrolls to tile 50 before tile 10 has started:
 queue.boost(tiles[50].src)
 ```
+
+**Default concurrency is 20**, sized for HTTP/2 origins (any modern CDN — GitHub Pages, Cloudflare, Vercel, Netlify, etc). On HTTP/1.1 origins the browser's 6-slot cap gatekeeps automatically: we fire 20, the browser accepts all, runs 6 in parallel, queues the rest. Same throughput as setting `concurrency: 6` would give you — no penalty, no manual tuning. Set a lower value if you're knowingly on H1 and want to leave slots free for render-side fetches.
 
 Dedupes by normalized URL. `clear()` drops the pending backlog; in-flight work continues.
 

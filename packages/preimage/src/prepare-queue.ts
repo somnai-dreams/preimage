@@ -1,18 +1,25 @@
 // Managed concurrency for `prepare()`. Browsers cap parallel requests per
-// origin (typically 6 for HTTP/1.1, ~100 for HTTP/2 but with server-side
-// flow control pushing back). When a gallery page blindly fires
-// `prepare()` for 200 tiles, the later tiles queue inside the browser's
-// network stack for tens of seconds, and there's no way to reprioritize:
-// a tile that scrolls into view at t=5s is still stuck behind 194 tiles
-// that nobody is looking at.
+// origin (6 hardcoded for HTTP/1.1; HTTP/2 multiplexes many streams over
+// one connection, typically 100+ before server-side flow control pushes
+// back). When a gallery page blindly fires `prepare()` for 200 tiles,
+// later tiles queue inside the browser's network stack for tens of
+// seconds, and there's no way to reprioritize: a tile that scrolls into
+// view at t=5s is still stuck behind 194 tiles that nobody is looking at.
 //
 // `PrepareQueue` is an application-level queue that holds requests before
-// they hit the network. It caps concurrency at a configurable limit
-// (default 6, matching the HTTP/1.1 per-origin pool) and lets callers
-// reorder pending work: `boost(url)` moves a URL to the front so a
-// scroll-into-view trigger actually jumps the line.
+// they hit the network. It caps concurrency at a configurable limit and
+// lets callers reorder pending work: `boost(url)` moves a URL to the
+// front so a scroll-into-view trigger actually jumps the line.
 //
-//   const queue = new PrepareQueue({ concurrency: 6 })
+// The default concurrency is 20 — suited to HTTP/2 origins (most modern
+// CDNs, GitHub Pages, Cloudflare, Vercel, Netlify). On HTTP/1.1 origins
+// the browser's 6-slot cap gatekeeps automatically: we'd fire 20, the
+// browser accepts all into its network layer, runs 6 in parallel, queues
+// the rest. Same effective throughput as passing concurrency: 6, no
+// penalty, no manual tuning. Set a lower value if you know you're on
+// H1 and want to stop fighting the render side for connection slots.
+//
+//   const queue = new PrepareQueue({ concurrency: 20 })
 //   const p1 = queue.enqueue(url1)
 //   const p2 = queue.enqueue(url2)
 //   // ... user scrolls to url50 ...
@@ -49,7 +56,7 @@ export class PrepareQueue {
   private readonly shared = new Map<string, Promise<PreparedImage>>()
 
   constructor(options: PrepareQueueOptions = {}) {
-    const c = options.concurrency ?? 6
+    const c = options.concurrency ?? 20
     if (!Number.isFinite(c) || c < 1) {
       throw new RangeError(`PrepareQueue: concurrency must be a positive integer, got ${c}.`)
     }
