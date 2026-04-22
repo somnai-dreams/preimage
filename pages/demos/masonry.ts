@@ -49,16 +49,20 @@ function fmtMs(ms: number | null): string {
   return ms === null ? '—' : `${ms.toFixed(0)}ms`
 }
 
-function setRowValue(host: HTMLElement, selector: string, html: string): void {
-  const b = host.querySelector(`${selector} .value b`)
+function setRowValue(host: HTMLElement, nth: number, html: string): void {
+  const b = host.querySelector(`.row:nth-child(${nth}) .value b`)
   if (b !== null) b.innerHTML = html
 }
 
-function setShifts(host: HTMLElement, n: number): void {
-  const row = host.querySelector<HTMLElement>('.row.shift')
-  if (row === null) return
-  row.classList.toggle('has-shifts', n > 0)
-  row.querySelector('.value b')!.innerHTML = String(n)
+function fillStats(
+  host: HTMLElement,
+  firstReservedMs: number,
+  avgDimMs: number,
+  allReservedMs: number,
+): void {
+  setRowValue(host, 1, `<b>${fmtMs(firstReservedMs)}</b>`)
+  setRowValue(host, 2, `<b>${fmtMs(avgDimMs)}</b>`)
+  setRowValue(host, 3, `<b>${fmtMs(allReservedMs)}</b>`)
 }
 
 function resetStats(host: HTMLElement): void {
@@ -67,7 +71,6 @@ function resetStats(host: HTMLElement): void {
     const b = row.querySelector('.value b')
     if (b !== null) b.innerHTML = '—'
   }
-  host.querySelector<HTMLElement>('.row.shift')?.classList.remove('has-shifts')
 }
 
 // --- Layout: shortest-column fill ---
@@ -136,12 +139,23 @@ async function runNaive(): Promise<void> {
 
   const count = getCount()
   const cacheBust = getCacheBust()
+  const mode = getMode()
   setMeta(count, cacheBust)
   const urls = buildUrls(count, cacheBust)
 
-  // Click-to-layout timer. Naive: dims, space, and full load all land
-  // at the same onload moment per image — nothing reserves space
-  // ahead of the bytes.
+  if (mode === 'batch') {
+    await runNaiveBatch(urls)
+  } else {
+    await runNaiveProgressive(urls)
+  }
+
+  runNaiveBtn.disabled = false
+  runNaiveBtn.textContent = 'Run again'
+}
+
+// Progressive: standard browser behavior. Each <img> reserves space
+// the moment its own bytes have been decoded enough to know dims.
+async function runNaiveProgressive(urls: readonly string[]): Promise<void> {
   const t0 = performance.now()
   const imgs = urls.map(() => {
     const img = document.createElement('img')
@@ -149,31 +163,73 @@ async function runNaive(): Promise<void> {
     naivePanel.appendChild(img)
     return img
   })
-  const monitor = observeShifts(naivePanel)
   for (let i = 0; i < urls.length; i++) imgs[i]!.src = urls[i]!
+
+  let firstReservedMs: number | null = null
+  const dimTimes: number[] = []
   await Promise.all(
     imgs.map(
       (img) =>
         new Promise<void>((resolve) => {
-          if (img.complete && img.naturalWidth > 0) resolve()
+          const done = (): void => {
+            const t = performance.now() - t0
+            if (firstReservedMs === null) {
+              firstReservedMs = t
+              setRowValue(naiveStats, 1, `<b>${fmtMs(firstReservedMs)}</b>`)
+            }
+            dimTimes.push(t)
+            resolve()
+          }
+          if (img.complete && img.naturalWidth > 0) done()
           else {
-            img.onload = () => resolve()
-            img.onerror = () => resolve()
+            img.onload = done
+            img.onerror = done
           }
         }),
     ),
   )
-  monitor.stop()
-  const totalMs = performance.now() - t0
-  // Naive: dims and space both arrive per-image as each loads. There's
-  // no single "dims known" moment — report the last-image time as the
-  // one honest moment where everything is resolved.
-  setRowValue(naiveStats, '.row:nth-child(1)', `<b>${fmtMs(totalMs)}</b>`)
-  setRowValue(naiveStats, '.row:nth-child(2)', `<b>${fmtMs(totalMs)}</b>`)
-  setRowValue(naiveStats, '.row:nth-child(3)', `<b>${fmtMs(totalMs)}</b>`)
-  setShifts(naiveStats, monitor.shifts())
-  runNaiveBtn.disabled = false
-  runNaiveBtn.textContent = 'Run again'
+  const allReservedMs = performance.now() - t0
+  const avgMs = dimTimes.reduce((a, b) => a + b, 0) / dimTimes.length
+  fillStats(naiveStats, firstReservedMs ?? allReservedMs, avgMs, allReservedMs)
+}
+
+// Batch: load every image off-DOM, wait for all to decode, then
+// commit them to the panel in one shot. Until the last image is
+// done, the user sees an empty panel — the price of waiting for
+// "everything to be ready" without a measurement library.
+async function runNaiveBatch(urls: readonly string[]): Promise<void> {
+  const t0 = performance.now()
+  const imgs = urls.map((u) => {
+    const img = new Image()
+    img.alt = ''
+    img.src = u
+    return img
+  })
+  const dimTimes: number[] = []
+  await Promise.all(
+    imgs.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          const done = (): void => {
+            dimTimes.push(performance.now() - t0)
+            resolve()
+          }
+          if (img.complete && img.naturalWidth > 0) done()
+          else {
+            img.onload = done
+            img.onerror = done
+          }
+        }),
+    ),
+  )
+  // Now insert into the DOM. Space is reserved at this moment for
+  // every image at once.
+  for (const img of imgs) naivePanel.appendChild(img)
+  const allReservedMs = performance.now() - t0
+  const avgMs = dimTimes.reduce((a, b) => a + b, 0) / dimTimes.length
+  // First and All reserved are the same in batch — every tile lands
+  // at the same instant.
+  fillStats(naiveStats, allReservedMs, avgMs, allReservedMs)
 }
 
 // --- Measured runs ---
@@ -203,8 +259,17 @@ async function runMeasured(): Promise<void> {
 
 async function runMeasuredBatch(urls: readonly string[]): Promise<void> {
   const t0 = performance.now()
-  const prepared = await Promise.all(urls.map((u) => prepare(u)))
-  const dimsAt = performance.now() - t0
+  // Track each prepare()'s individual resolve time for the "average
+  // dim fetch" stat. Promise.all only gives us the all-done time.
+  const dimTimes: number[] = []
+  const prepared = await Promise.all(
+    urls.map((u) =>
+      prepare(u).then((p) => {
+        dimTimes.push(performance.now() - t0)
+        return p
+      }),
+    ),
+  )
 
   const panelWidth = measuredPanel.getBoundingClientRect().width
   const aspects = prepared.map((p) => getMeasurement(p).aspectRatio)
@@ -220,22 +285,34 @@ async function runMeasuredBatch(urls: readonly string[]): Promise<void> {
   }
   measuredPanel.appendChild(frag)
   const reservedAt = performance.now() - t0
-  // Report dims + space immediately; images load into already-reserved
-  // tiles and the "All tiles loaded" row fills when everything paints.
-  setRowValue(measuredStats, '.row:nth-child(1)', `<b>${fmtMs(dimsAt)}</b>`)
-  setRowValue(measuredStats, '.row:nth-child(2)', `<b>${fmtMs(reservedAt)}</b>`)
+  const avgDimMs = dimTimes.reduce((a, b) => a + b, 0) / dimTimes.length
+  // Report stats once tiles are placed. In batch every tile lands at
+  // the same moment so first/all reserved are identical.
+  fillStats(measuredStats, reservedAt, avgDimMs, reservedAt)
 
-  const monitor = observeShifts(measuredPanel)
+  // Force a paint so the empty (shimmering) boxes actually render
+  // before we kick off image loads — otherwise on fast networks the
+  // images arrive before the browser has had a chance to paint the
+  // placeholders, and the user never sees them.
+  await waitForPaint()
+
   await Promise.all(
     tiles.map((tile, i) => {
       const url = getMeasurement(prepared[i]!).blobUrl ?? urls[i]!
       return loadTileImage(tile, url)
     }),
   )
-  monitor.stop()
-  const loadedAt = performance.now() - t0
-  setRowValue(measuredStats, '.row:nth-child(3)', `<b>${fmtMs(loadedAt)}</b>`)
-  setShifts(measuredStats, monitor.shifts())
+}
+
+// Yield two animation frames: one to commit pending DOM mutations,
+// one to actually paint them. After this, any synchronous DOM read
+// reflects the painted state.
+function waitForPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve())
+    })
+  })
 }
 
 async function runMeasuredProgressive(urls: readonly string[]): Promise<void> {
@@ -246,11 +323,14 @@ async function runMeasuredProgressive(urls: readonly string[]): Promise<void> {
 
   let firstReservedMs: number | null = null
   let lastReservedMs: number | null = null
+  const dimTimes: number[] = []
 
-  const monitor = observeShifts(measuredPanel)
   await Promise.all(
-    urls.map((url, idx) =>
-      prepare(url).then((p) => {
+    urls.map((url) =>
+      prepare(url).then(async (p) => {
+        const dimMs = performance.now() - t0
+        dimTimes.push(dimMs)
+
         const aspect = getMeasurement(p).aspectRatio
         const h = colWidth / aspect
         let shortest = 0
@@ -268,24 +348,23 @@ async function runMeasuredProgressive(urls: readonly string[]): Promise<void> {
         const now = performance.now() - t0
         if (firstReservedMs === null) {
           firstReservedMs = now
-          setRowValue(measuredStats, '.row:nth-child(1)', `<b>${fmtMs(firstReservedMs)}</b>`)
+          setRowValue(measuredStats, 1, `<b>${fmtMs(firstReservedMs)}</b>`)
         }
         lastReservedMs = now
-        setRowValue(measuredStats, '.row:nth-child(2)', `<b>${fmtMs(lastReservedMs)}</b>`)
+        const avgSoFar = dimTimes.reduce((a, b) => a + b, 0) / dimTimes.length
+        setRowValue(measuredStats, 2, `<b>${fmtMs(avgSoFar)}</b>`)
+        setRowValue(measuredStats, 3, `<b>${fmtMs(lastReservedMs)}</b>`)
+
+        // Yield a paint so the new shimmer tile is visible before its
+        // own image starts loading (prevents the case where bytes
+        // arrive in the same microtask and skip the empty-box phase).
+        await waitForPaint()
 
         const src = getMeasurement(p).blobUrl ?? url
         return loadTileImage(tile, src)
       }),
     ),
   )
-  monitor.stop()
-  const loadedAt = performance.now() - t0
-  setRowValue(measuredStats, '.row:nth-child(3)', `<b>${fmtMs(loadedAt)}</b>`)
-  // Progressive grows the panel at the bottom as each tile lands —
-  // that's intentional, not a content-shift. Report 0 shifts because
-  // no existing tile moved.
-  void monitor.shifts
-  setShifts(measuredStats, 0)
 }
 
 // --- Controls ---

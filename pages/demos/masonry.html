@@ -77,8 +77,8 @@
         </div>
         <span class="controls-label">Placement</span>
         <div class="segmented" role="radiogroup" aria-label="Placement mode">
-          <label><input type="radio" name="mode" value="batch" checked> Wait for all</label>
-          <label><input type="radio" name="mode" value="progressive"> When size known</label>
+          <label><input type="radio" name="mode" value="progressive" checked> When size known</label>
+          <label><input type="radio" name="mode" value="batch"> Wait for all</label>
         </div>
         <span class="controls-label">Cache-bust</span>
         <div class="segmented" role="radiogroup" aria-label="Cache-bust">
@@ -98,10 +98,9 @@
           <button id="runNaive" class="primary">Run</button>
         </div>
         <div class="panel-stats stat-list" id="naiveStats">
-          <div class="row"><span class="label">Dims known</span><span class="value"><b>&mdash;</b></span></div>
-          <div class="row"><span class="label">Space reserved</span><span class="value"><b>&mdash;</b></span></div>
-          <div class="row"><span class="label">All tiles loaded</span><span class="value"><b>&mdash;</b></span></div>
-          <div class="row shift"><span class="label">Visible shifts</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">First space reserved</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Average dim fetch</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">All space reserved</span><span class="value"><b>&mdash;</b></span></div>
         </div>
         <div id="naive" class="naive-grid"></div>
       </section>
@@ -114,10 +113,9 @@
           <button id="runMeasured" class="primary">Run</button>
         </div>
         <div class="panel-stats stat-list" id="measuredStats">
-          <div class="row"><span class="label">Dims known</span><span class="value"><b>&mdash;</b></span></div>
-          <div class="row"><span class="label">Space reserved</span><span class="value"><b>&mdash;</b></span></div>
-          <div class="row"><span class="label">All tiles loaded</span><span class="value"><b>&mdash;</b></span></div>
-          <div class="row shift"><span class="label">Visible shifts</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">First space reserved</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Average dim fetch</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">All space reserved</span><span class="value"><b>&mdash;</b></span></div>
         </div>
         <div id="measured" class="packed"></div>
       </section>
