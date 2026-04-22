@@ -290,29 +290,12 @@ async function runMeasuredBatch(urls: readonly string[]): Promise<void> {
   // the same moment so first/all reserved are identical.
   fillStats(measuredStats, reservedAt, avgDimMs, reservedAt)
 
-  // Force a paint so the empty (shimmering) boxes actually render
-  // before we kick off image loads — otherwise on fast networks the
-  // images arrive before the browser has had a chance to paint the
-  // placeholders, and the user never sees them.
-  await waitForPaint()
-
   await Promise.all(
     tiles.map((tile, i) => {
       const url = getMeasurement(prepared[i]!).blobUrl ?? urls[i]!
       return loadTileImage(tile, url)
     }),
   )
-}
-
-// Yield two animation frames: one to commit pending DOM mutations,
-// one to actually paint them. After this, any synchronous DOM read
-// reflects the painted state.
-function waitForPaint(): Promise<void> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => resolve())
-    })
-  })
 }
 
 async function runMeasuredProgressive(urls: readonly string[]): Promise<void> {
@@ -327,7 +310,7 @@ async function runMeasuredProgressive(urls: readonly string[]): Promise<void> {
 
   await Promise.all(
     urls.map((url) =>
-      prepare(url).then(async (p) => {
+      prepare(url).then((p) => {
         const dimMs = performance.now() - t0
         dimTimes.push(dimMs)
 
@@ -354,11 +337,6 @@ async function runMeasuredProgressive(urls: readonly string[]): Promise<void> {
         const avgSoFar = dimTimes.reduce((a, b) => a + b, 0) / dimTimes.length
         setRowValue(measuredStats, 2, `<b>${fmtMs(avgSoFar)}</b>`)
         setRowValue(measuredStats, 3, `<b>${fmtMs(lastReservedMs)}</b>`)
-
-        // Yield a paint so the new shimmer tile is visible before its
-        // own image starts loading (prevents the case where bytes
-        // arrive in the same microtask and skip the empty-box phase).
-        await waitForPaint()
 
         const src = getMeasurement(p).blobUrl ?? url
         return loadTileImage(tile, src)
