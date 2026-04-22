@@ -1,4 +1,4 @@
-import { prepare, getMeasurement, getElement, clearCache } from '@somnai-dreams/preimage'
+import { prepare, clearCache } from '@somnai-dreams/preimage'
 import { recordKnownMeasurement } from '@somnai-dreams/preimage/core'
 import { packShortestColumn } from '@somnai-dreams/layout-algebra'
 import { newCacheBustToken } from './photo-source.js'
@@ -135,12 +135,11 @@ async function runCold(): Promise<void> {
           firstMs = performance.now() - t0
           setRowValue(coldStats, 2, `<b>${fmtMs(firstMs)}</b>`)
         }
-        const m = getMeasurement(p)
         return {
           url: e.url,
-          width: m.displayWidth,
-          height: m.displayHeight,
-          element: getElement(p),
+          width: p.width,
+          height: p.height,
+          element: p.element,
         }
       }),
     ),
@@ -183,15 +182,12 @@ async function runHydrated(): Promise<void> {
   const t0 = performance.now()
   const prepared = await Promise.all(
     entries.map((e) =>
-      prepare(e.url).then((p) => {
-        const m = getMeasurement(p)
-        return {
-          url: e.url,
-          width: m.displayWidth,
-          height: m.displayHeight,
-          element: getElement(p),
-        }
-      }),
+      prepare(e.url).then((p) => ({
+        url: e.url,
+        width: p.width,
+        height: p.height,
+        element: p.element,
+      })),
     ),
   )
   const layoutMs = performance.now() - t0

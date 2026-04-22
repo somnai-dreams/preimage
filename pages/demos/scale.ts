@@ -1,4 +1,4 @@
-import { PrepareQueue, getMeasurement } from '@somnai-dreams/preimage'
+import { PrepareQueue } from '@somnai-dreams/preimage'
 import { shortestColumnCursor } from '@somnai-dreams/layout-algebra'
 import { cycledUrls } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
@@ -244,7 +244,7 @@ async function runMeasured(): Promise<void> {
   await Promise.all(
     urls.map((url) =>
       queue.enqueue(url, { dimsOnly: true }).then((prepared) => {
-        const place = packer.add(getMeasurement(prepared).aspectRatio)
+        const place = packer.add(prepared.aspectRatio)
         measuredPanel.style.height = `${packer.totalHeight()}px`
 
         const container = document.createElement('div')

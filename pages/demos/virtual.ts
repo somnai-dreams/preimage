@@ -1,4 +1,4 @@
-import { PrepareQueue, getMeasurement } from '@somnai-dreams/preimage'
+import { PrepareQueue } from '@somnai-dreams/preimage'
 import { createVirtualTilePool } from '@somnai-dreams/preimage/virtual'
 import { shortestColumnCursor, type Placement } from '@somnai-dreams/layout-algebra'
 import { cycledUrls } from './photo-source.js'
@@ -276,7 +276,7 @@ async function runMeasured(): Promise<void> {
 
   const placePromises = urls.map((url) =>
     queue.enqueue(url, { dimsOnly: true }).then((prepared) => {
-      const aspect = getMeasurement(prepared).aspectRatio
+      const aspect = prepared.aspectRatio
       placements.push(packer.add(aspect))
       indexUrl.push(url)
       dimsProbed++

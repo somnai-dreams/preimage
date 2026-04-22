@@ -4,7 +4,12 @@
 // (aspect ratios, pixel counts) and returns placements. Usable from
 // Bun, Node, workers, SSR, anywhere — as long as the caller has
 // measured the images elsewhere.
+//
+// Convention across every config type below: `panelWidth` first,
+// `gap` second, algorithm-specific fields third. Same field means the
+// same thing in every config, same position.
 
+/** One item's absolute-positioned rectangle inside the layout panel. */
 export type Placement = {
   x: number
   y: number
@@ -13,18 +18,27 @@ export type Placement = {
 }
 
 // --- Shortest-column masonry packer ---
-//
-// Given a stream of aspect ratios and a fixed column count, drop
-// each item into whichever column is currently the shortest. Classic
-// Pinterest/Flickr-style masonry; tiles never move once placed, so
-// the layout is stable under incremental appending.
 
+/** Config for `packShortestColumn` and `shortestColumnCursor`. */
 export type ShortestColumnConfig = {
-  columns: number
-  gap: number
+  /** Inner width of the panel the layout will fill. */
   panelWidth: number
+  /** Horizontal and vertical gap between tiles. */
+  gap: number
+  /** Number of columns. The widest item fills a single column. */
+  columns: number
 }
 
+/** Batch shortest-column masonry: Pinterest/Flickr-style, each item
+ *  drops into the currently-shortest column. Tiles never move once
+ *  placed, so the layout is stable under incremental appending.
+ *
+ *  @example
+ *    const { placements, totalHeight } = packShortestColumn(
+ *      [1.5, 0.8, 1.2],
+ *      { panelWidth: 800, gap: 4, columns: 3 },
+ *    )
+ *    panel.style.height = `${totalHeight}px` */
 export function packShortestColumn(
   aspects: readonly number[],
   config: ShortestColumnConfig,
@@ -34,20 +48,26 @@ export function packShortestColumn(
   return { placements, totalHeight: cursor.totalHeight() }
 }
 
-// Cursor form — add one aspect at a time. Pretext-style: caller
-// holds state externally and drives the loop. Useful when aspects
-// arrive from an async stream (e.g. prepare() promises resolving
-// in a queue) and you want placements as-they-come rather than
-// accumulating into an array first.
-
+/** Cursor-form packer: items arrive one at a time, each `add()`
+ *  returns the new placement. Useful when aspects come from an async
+ *  source (e.g. `prepare()` resolves) and you want to render tiles
+ *  as-they-come. */
 export type PackingCursor = {
+  /** Place a new item; returns its `Placement`. Once placed, never moves. */
   add(aspect: number): Placement
+  /** Current total panel height. Grows monotonically as tiles are added. */
   totalHeight(): number
+  /** Snapshot placements + totalHeight at this moment. Useful for
+   *  pagination/export. */
   snapshot(): { placements: Placement[]; totalHeight: number }
+  /** Number of items placed so far. */
   count(): number
+  /** Reset to empty (same panel dimensions) so the cursor can be reused. */
   reset(): void
 }
 
+/** Streaming shortest-column packer. See `packShortestColumn` for the
+ *  batch form. */
 export function shortestColumnCursor(config: ShortestColumnConfig): PackingCursor {
   const { columns, gap, panelWidth } = config
   if (columns < 1 || !Number.isFinite(columns)) {
@@ -104,20 +124,30 @@ export function shortestColumnCursor(config: ShortestColumnConfig): PackingCurso
 // so their widths fit exactly. Rows have different heights between
 // rows but uniform height within a row — the opposite trade-off from
 // shortest-column masonry.
-//
-// Trailing row: if `lastRowJustified` is false (default), the last
-// row keeps `targetRowHeight` and whatever trailing whitespace is
-// left. If true, the last row is scaled up to fill the panel like
-// every other row — visually tidier but distorts the final tiles if
-// they're meant to be consumed as a "what's newest" stripe.
 
+/** Config for `packJustifiedRows`. */
 export type JustifiedRowsConfig = {
+  /** Inner width of the panel the layout will fill. */
   panelWidth: number
-  targetRowHeight: number
+  /** Horizontal and vertical gap between tiles. */
   gap: number
+  /** Target row height in pixels. Items in a full row are scaled so
+   *  widths fit exactly; the height settles near this value. */
+  targetRowHeight: number
+  /** If true, the last row is scaled up to fill `panelWidth` like every
+   *  other row. If false (default), the last row keeps `targetRowHeight`
+   *  and whatever trailing whitespace is left — the Flickr trailing-
+   *  strip look. */
   lastRowJustified?: boolean
 }
 
+/** Batch justified-rows packer.
+ *
+ *  @example
+ *    const { placements, totalHeight } = packJustifiedRows(
+ *      aspects,
+ *      { panelWidth: 800, gap: 4, targetRowHeight: 220 },
+ *    ) */
 export function packJustifiedRows(
   aspects: readonly number[],
   config: JustifiedRowsConfig,
@@ -244,37 +274,60 @@ function placeJustifiedRow(
 // single Placement; it returns the items (possibly zero) that this
 // add just finalized by closing the prior row.
 
+/** Config for `justifiedRowCursor`. Same fields as `JustifiedRowsConfig`
+ *  minus `lastRowJustified` — the trailing-row decision happens at
+ *  `finish(justifyLast)` time since the cursor doesn't know when the
+ *  caller considers the stream ended. */
 export type JustifiedRowsCursorConfig = {
+  /** Inner width of the panel the layout will fill. */
   panelWidth: number
-  targetRowHeight: number
+  /** Horizontal and vertical gap between tiles. */
   gap: number
+  /** Target row height in pixels. */
+  targetRowHeight: number
 }
 
+/** One finalized placement emitted when a row closes. */
 export type JustifiedRowClose = {
+  /** Index of the item in add-order. */
   index: number
   placement: Placement
 }
 
+/** Return value of `cursor.add(aspect)`. */
 export type JustifiedRowAddResult = {
-  // Items whose placements were finalized by this add. Empty when
-  // the new aspect fit into the open row without closing it. Non-
-  // empty when this add triggered a row close (the closed row's
-  // items are placed, then the new aspect opens a fresh row).
+  /** Items whose placements were finalized by this add. Empty when
+   *  the new aspect fit into the open row without closing it.
+   *  Non-empty when this add triggered a row close (the closed row's
+   *  items are placed, then the new aspect opens a fresh row). */
   closed: JustifiedRowClose[]
 }
 
+/** Cursor form of the justified-rows packer.
+ *
+ *  @example
+ *    const cur = justifiedRowCursor({ panelWidth: 800, gap: 4, targetRowHeight: 220 })
+ *    for (const aspect of aspects) {
+ *      const { closed } = cur.add(aspect)
+ *      for (const { index, placement } of closed) renderTile(index, placement)
+ *    }
+ *    for (const { index, placement } of cur.finish()) renderTile(index, placement) */
 export type JustifiedRowCursor = {
+  /** Buffer a new aspect. Returns any placements finalized by closing
+   *  the previous row (often empty; sometimes an N-item batch). */
   add(aspect: number): JustifiedRowAddResult
-  // Place the items still buffered in the open row and return their
-  // placements. `justifyLast: false` (default) leaves the trailing
-  // row at targetRowHeight; `true` scales it to fill panelWidth.
+  /** Place the items still buffered in the open row and return their
+   *  placements. `justifyLast: false` (default) leaves the trailing
+   *  row at targetRowHeight; `true` scales it to fill panelWidth. */
   finish(justifyLast?: boolean): JustifiedRowClose[]
+  /** Current placed content height (excludes the still-open row). */
   totalHeight(): number
+  /** Total items added, including those still buffered. */
   count(): number
-  // Number of items currently buffered in the open row (not yet
-  // placed). Useful for callers that want to show a placeholder for
-  // pending items.
+  /** Items buffered in the open row that haven't been placed yet.
+   *  Useful for callers that want to render a placeholder. */
   pendingCount(): number
+  /** Reset to empty so the cursor can be reused. */
   reset(): void
 }
 
@@ -366,25 +419,29 @@ export function justifiedRowCursor(config: JustifiedRowsCursorConfig): Justified
 }
 
 // --- Visibility query ---
-//
-// Given a set of placements and a vertical window [viewTop, viewBottom],
-// return the indices of placements that overlap. Optional `overscan`
-// widens the window above and below — useful for pre-mounting tiles
-// that are about to scroll into view so the user doesn't see blank
-// space during a fast scroll.
-//
-// Linear scan in placement order. For ~10k placements at 60Hz that's
-// under a millisecond per frame. Callers with larger sets or tighter
-// budgets can index by y-bucket externally; the math here doesn't
-// assume sortedness because shortest-column placements are emitted in
-// item-add order, not y-order.
 
+/** Vertical viewport window for `visibleIndices`. */
 export type VisibilityWindow = {
+  /** Top of the visible area in the placements' coordinate frame. */
   viewTop: number
+  /** Bottom of the visible area (viewTop + clientHeight). */
   viewBottom: number
+  /** Extra band above and below the viewport that still counts as
+   *  visible. Useful for pre-mounting tiles that are about to scroll
+   *  into view. */
   overscan?: number
 }
 
+/** Indices of placements that overlap a vertical window. Linear scan
+ *  in placement order. For ~10k placements at 60Hz this runs well
+ *  under a millisecond per frame.
+ *
+ *  @example
+ *    const visible = visibleIndices(placements, {
+ *      viewTop: scrollTop,
+ *      viewBottom: scrollTop + clientHeight,
+ *      overscan: 400,
+ *    }) */
 export function visibleIndices(
   placements: readonly Placement[],
   window: VisibilityWindow,

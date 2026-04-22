@@ -5,7 +5,6 @@ import {
   type RichInlineItem,
 } from '@chenglou/pretext/rich-inline'
 
-import { getMeasurement } from '@somnai-dreams/preimage'
 import {
   inlineImage,
   isInlineImageItem,
@@ -91,7 +90,7 @@ function renderBubble(items: readonly RichInlineItem[], width: number): void {
         container.style.height = `${imageItem.imageDisplayHeight}px`
         container.style.marginLeft = `${frag.gapBefore}px`
         const img = document.createElement('img')
-        img.src = getMeasurement(imageItem.image).src
+        img.src = imageItem.image.src
         if (img.complete && img.naturalWidth > 0) img.classList.add('loaded')
         else img.addEventListener('load', () => img.classList.add('loaded'), { once: true })
         container.appendChild(img)

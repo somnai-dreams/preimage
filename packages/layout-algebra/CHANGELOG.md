@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- **Normalized config shapes across every packer.** Every config now reads `{ panelWidth, gap, <algorithm-param>, ... }` — same fields in the same positions. Was inconsistent: `packShortestColumn` took `{ columns, gap, panelWidth }`; `packJustifiedRows` took `{ panelWidth, targetRowHeight, gap, lastRowJustified? }`. Field names unchanged, destructuring order doesn't affect JS runtime, but the type declarations now match so IDE tooltips and LLM completions are predictable.
+- **JSDoc on every public export** with short `@example` blocks.
+
 ## 0.3.0
 
 - **New: `justifiedRowCursor(config)`.** Streaming form of `packJustifiedRows`. `add(aspect)` buffers items into an open row and emits `{ closed: JustifiedRowClose[] }` — a batch of finalized placements — exactly when a row fills. `finish(justifyLast?)` flushes the trailing row. Output matches the batch packer byte-for-byte for the same input sequence; the difference is you can start rendering as soon as each row closes instead of waiting for all aspects to arrive. Masonry demo's rows + progressive combination now uses this path.

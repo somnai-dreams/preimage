@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0
+
+- **`PreparedImage` is flat.** `.width`, `.height`, `.aspectRatio`, `.src`, `.element`, `.measurement` are all directly readable. `(await prepare(url)).width` just works — no import of `getMeasurement`, no reaching through `.measurement.displayWidth`. The legacy helpers (`getMeasurement`, `getElement`, `measureAspect`, `measureNaturalSize`) are aliases and continue to work. AI-generated code coming off this API writes what humans would.
+- **JSDoc on every public export** in the main entry and `/core`. Short one-liners plus `@example` blocks so IDE tooltips and LLM context windows carry the usage shape.
+
 ## 0.6.2
 
 - **Fix: `createVirtualTilePool` visibility check now translates `contentContainer`'s offset within `scrollContainer`.** Previously the intersection math assumed `placement.y` and `scrollContainer.scrollTop` were in the same coordinate space, which only holds when `contentContainer` is a direct child flush with the scroll area's top. If callers put a header, padding, or sibling above `contentContainer`, tiles silently mis-mounted (treated as visible at `scrollTop = 0` when they were actually below the fold). Offset is measured once at setup via bounding rects and refreshed on scrollContainer resize.

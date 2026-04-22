@@ -27,49 +27,91 @@ import {
 import { MAX_HEADER_BYTES, probeImageBytes } from './probe.js'
 import { parseUrlDimensions } from './url-dimensions.js'
 
-// --- Opaque prepared handle ---
-
-declare const preparedImageBrand: unique symbol
-
-type PreparedImageCore = {
-  measurement: ImageMeasurement
-  element: HTMLImageElement | null
-}
+// --- Prepared handle ---
+//
+// The handle returned by `prepare()`. Flat, readable shape so callers can
+// do `(await prepare(url)).width` without reaching for a helper. The
+// legacy helpers (`getMeasurement`, `getElement`, `measureAspect`,
+// `measureNaturalSize`) still work — they now just read the same fields.
 
 export type PreparedImage = {
-  readonly [preparedImageBrand]: true
+  /** Display width in CSS pixels, after EXIF orientation. */
+  readonly width: number
+  /** Display height in CSS pixels, after EXIF orientation. */
+  readonly height: number
+  /** width / height. */
+  readonly aspectRatio: number
+  /** Normalized source key (hash stripped). Same key used in the cache. */
+  readonly src: string
+  /** Warmed `<img>` the library polled to measure, or null when the
+   *  measurement came from a non-`<img>` path (cache hit, URL-pattern
+   *  shortcut, `dimsOnly`, `prepareSync`). The element may still be
+   *  loading its bytes — `prepare` resolves at dims-known time, not
+   *  fully-loaded time. Reuse this for rendering to avoid a second
+   *  network fetch. */
+  readonly element: HTMLImageElement | null
+  /** Full measurement record (natural dims, orientation, analysis,
+   *  blobUrl). Use this when you need fields beyond the common
+   *  `.width` / `.height` / `.aspectRatio` triple. */
+  readonly measurement: ImageMeasurement
 }
-
-type InternalPreparedImage = PreparedImage & PreparedImageCore
 
 function wrap(
   measurement: ImageMeasurement,
   element: HTMLImageElement | null = null,
 ): PreparedImage {
-  return { measurement, element } as unknown as InternalPreparedImage
+  return {
+    width: measurement.displayWidth,
+    height: measurement.displayHeight,
+    aspectRatio: measurement.aspectRatio,
+    src: measurement.src,
+    element,
+    measurement,
+  }
 }
 
-// Exposed for adjacent modules that need to mint a PreparedImage from a
-// measurement they obtained via a different code path.
+/** Mint a `PreparedImage` from a measurement obtained through a
+ *  different code path (e.g. an adjacent module's probe). Exposed for
+ *  library integrators; most callers should use `prepare()` instead. */
 export function preparedFromMeasurement(measurement: ImageMeasurement): PreparedImage {
   return wrap(measurement, null)
 }
 
 // --- Public types ---
 
+/** Options for `prepare()`. */
 export type PrepareOptions = MeasureOptions & {
+  /** Explicit EXIF orientation override (1–8). Otherwise read from the
+   *  image bytes (for Blob sources) or inferred as 1. */
   orientation?: OrientationCode
-  // If true, abort the image load after dimensions are known by clearing
-  // the <img>'s src. The returned PreparedImage has no warmed element —
-  // callers that later decide to render must fetch the image themselves.
-  // Trades bandwidth for the time-to-dims window: useful when planning
-  // a layout from many URLs where most won't be rendered (off-screen
-  // tiles, image catalogs, SSR precompute).
+  /** If true, abort the image load after dimensions are known by clearing
+   *  the `<img>`'s `src`. The returned `PreparedImage` has no warmed
+   *  element — callers that later decide to render must fetch the image
+   *  themselves. Trades bandwidth for the time-to-dims window: useful
+   *  when planning a layout from many URLs where most won't be rendered
+   *  (off-screen tiles, image catalogs, SSR precompute). */
   dimsOnly?: boolean
 }
 
 // --- Public API ---
 
+/** Prepare an image for layout: measure its dimensions, return a flat
+ *  handle whose `.width`, `.height`, `.aspectRatio` are immediately
+ *  readable. The caller can reuse `handle.element` (if non-null) as
+ *  the rendered `<img>` to share one network fetch between probe and
+ *  paint.
+ *
+ *  @example
+ *    const img = await prepare('/photo.jpg')
+ *    console.log(img.width, img.height, img.aspectRatio)
+ *    // Reuse the warmed <img> for zero extra fetches:
+ *    container.appendChild(img.element ?? new Image(...))
+ *
+ *  @example
+ *    // Measure many URLs cheaply, then pick which to fully fetch:
+ *    const probed = await Promise.all(
+ *      urls.map(u => prepare(u, { dimsOnly: true }))
+ *    ) */
 export async function prepare(
   src: string | Blob,
   options: PrepareOptions = {},
@@ -83,6 +125,13 @@ export async function prepare(
   throw new TypeError('prepare: src must be a string URL or a Blob.')
 }
 
+/** Synchronous counterpart to `prepare()` when dimensions are already
+ *  known (SSR manifest, server-sent image metadata, declared width and
+ *  height attrs). No network, no polling — just writes into the cache
+ *  and returns the handle.
+ *
+ *  @example
+ *    const img = prepareSync('/photo.jpg', 1920, 1080) */
 export function prepareSync(
   src: string,
   width: number,
@@ -92,51 +141,58 @@ export function prepareSync(
   return wrap(recordKnownMeasurement(src, width, height, options), null)
 }
 
+/** Fit a `PreparedImage` into a max-width and optional max-height box.
+ *  Pure arithmetic — no DOM reads. Returns `{ x, y, width, height }`.
+ *
+ *  @example
+ *    const p = await prepare(url)
+ *    const { width, height } = layout(p, 400)            // fit in 400px wide
+ *    const rect = layout(p, 400, 300, 'cover')           // cover 400×300 */
 export function layout(
   prepared: PreparedImage,
   maxWidth: number,
   maxHeight?: number,
   fit: ObjectFit = 'contain',
 ): FittedRect {
-  const m = (prepared as unknown as InternalPreparedImage).measurement
   return fitRect(
-    m.displayWidth,
-    m.displayHeight,
+    prepared.width,
+    prepared.height,
     Math.max(0, maxWidth),
     maxHeight != null ? Math.max(0, maxHeight) : Infinity,
     fit,
   )
 }
 
+/** Shorthand for `layout(prepared, maxWidth)` — fit by width, contain. */
 export function layoutForWidth(prepared: PreparedImage, maxWidth: number): FittedRect {
   return layout(prepared, maxWidth, undefined, 'contain')
 }
 
+/** Shorthand for fitting by height while preserving aspect ratio. */
 export function layoutForHeight(prepared: PreparedImage, maxHeight: number): FittedRect {
-  const m = (prepared as unknown as InternalPreparedImage).measurement
-  return layout(prepared, maxHeight * m.aspectRatio, maxHeight, 'contain')
+  return layout(prepared, maxHeight * prepared.aspectRatio, maxHeight, 'contain')
 }
 
+/** Alias for `prepared.aspectRatio`. Kept for ergonomic reads. */
 export function measureAspect(prepared: PreparedImage): number {
-  return (prepared as unknown as InternalPreparedImage).measurement.aspectRatio
+  return prepared.aspectRatio
 }
 
+/** Alias for `{ width: prepared.width, height: prepared.height }`. */
 export function measureNaturalSize(prepared: PreparedImage): { width: number; height: number } {
-  const m = (prepared as unknown as InternalPreparedImage).measurement
-  return { width: m.displayWidth, height: m.displayHeight }
+  return { width: prepared.width, height: prepared.height }
 }
 
+/** Alias for `prepared.measurement` — the full measurement record. */
 export function getMeasurement(prepared: PreparedImage): ImageMeasurement {
-  return (prepared as unknown as InternalPreparedImage).measurement
+  return prepared.measurement
 }
 
-// Return the warmed <img> the library used to measure the URL, or null
-// if the caller opted into `dimsOnly`, used a Blob source, or used
-// `prepareSync`. The element may still be loading its bytes when
-// returned — the prepare() promise resolves at dims-known time, not
-// fully-loaded time. Use this for render to avoid a second fetch.
+/** Alias for `prepared.element` — the warmed `<img>` the library polled
+ *  to measure, or null. Reuse for rendering to share one network fetch
+ *  between probe and paint. */
 export function getElement(prepared: PreparedImage): HTMLImageElement | null {
-  return (prepared as unknown as InternalPreparedImage).element
+  return prepared.element
 }
 
 // --- URL path: <img> + poll naturalWidth ---

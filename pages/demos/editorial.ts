@@ -2,8 +2,6 @@ import { prepareWithSegments, materializeLineRange } from '@chenglou/pretext'
 
 import {
   prepare,
-  getMeasurement,
-  getElement,
   preparedFromMeasurement,
   recordKnownMeasurement,
   type PreparedImage,
@@ -378,10 +376,7 @@ async function runMeasured(): Promise<void> {
     document.fonts.ready,
   ])
 
-  const dims: FigureDims[] = prepared.map((p) => {
-    const m = getMeasurement(p)
-    return { width: m.displayWidth, height: m.displayHeight }
-  })
+  const dims: FigureDims[] = prepared.map((p) => ({ width: p.width, height: p.height }))
   const result = flowArticle(dims, urls, 'editorial-measured')
   const { figs } = renderFlow(measuredPanel, result)
   const flowMs = performance.now() - t0
@@ -394,7 +389,7 @@ async function runMeasured(): Promise<void> {
     figs.map((fig, i) => {
       const placeholder = fig.querySelector('img') as HTMLImageElement | null
       if (placeholder === null) return Promise.resolve()
-      const warmed = getElement(prepared[i]!)
+      const warmed = prepared[i]!.element
       const img = warmed ?? placeholder
       if (warmed === null) img.src = urls[i]!
       // If the warmed <img> (or the newly-set src) already has bytes,

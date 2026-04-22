@@ -1,4 +1,4 @@
-import { prepare, getMeasurement } from '@somnai-dreams/preimage'
+import { prepare } from '@somnai-dreams/preimage'
 
 const dropArea = document.getElementById('dropArea')!
 const pickBtn = document.getElementById('pickBtn') as HTMLButtonElement
@@ -114,13 +114,12 @@ async function addMeasured(file: File): Promise<void> {
   // <img> element's attrs before insert, so the browser reserves
   // the correct box from the first frame.
   const prepared = await prepare(file)
-  const m = getMeasurement(prepared)
-  const displayWidth = m.aspectRatio * IMAGE_HEIGHT
+  const displayWidth = prepared.aspectRatio * IMAGE_HEIGHT
   const img = document.createElement('img')
   img.alt = ''
   img.width = Math.round(displayWidth)
   img.height = IMAGE_HEIGHT
-  img.src = m.blobUrl ?? URL.createObjectURL(file)
+  img.src = prepared.measurement.blobUrl ?? URL.createObjectURL(file)
   measuredPanel.appendChild(img)
   measuredPanel.appendChild(document.createTextNode(' '))
   measuredCount++

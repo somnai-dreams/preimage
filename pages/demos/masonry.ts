@@ -1,4 +1,4 @@
-import { prepare, getMeasurement, getElement } from '@somnai-dreams/preimage'
+import { prepare } from '@somnai-dreams/preimage'
 import {
   justifiedRowCursor,
   packJustifiedRows,
@@ -282,7 +282,7 @@ async function runMeasuredBatch(urls: readonly string[], layout: Layout): Promis
   )
 
   const panelWidth = measuredPanel.getBoundingClientRect().width
-  const aspects = prepared.map((p) => getMeasurement(p).aspectRatio)
+  const aspects = prepared.map((p) => p.aspectRatio)
   const { placements, totalHeight } =
     layout === 'rows'
       ? packJustifiedRows(aspects, {
@@ -300,7 +300,7 @@ async function runMeasuredBatch(urls: readonly string[], layout: Layout): Promis
   const tiles: Tile[] = []
   const frag = document.createDocumentFragment()
   for (let i = 0; i < placements.length; i++) {
-    const img = imgForPrepared(urls[i]!, getElement(prepared[i]!))
+    const img = imgForPrepared(urls[i]!, prepared[i]!.element)
     const tile = createTile(placements[i]!, img)
     frag.appendChild(tile.container)
     tiles.push(tile)
@@ -363,10 +363,10 @@ async function runMeasuredProgressive(urls: readonly string[], layout: Layout): 
     urls.map((url) =>
       prepare(url).then((p) => {
         dimTimes.push(performance.now() - t0)
-        const aspect = getMeasurement(p).aspectRatio
+        const aspect = p.aspectRatio
         const idx = addOrder++
         urlByIdx[idx] = url
-        warmedByIdx[idx] = getElement(p)
+        warmedByIdx[idx] = p.element
 
         if (column !== null) {
           const place = column.add(aspect)

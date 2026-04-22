@@ -1,4 +1,4 @@
-import { DecodePool, prepare, getMeasurement } from '@somnai-dreams/preimage'
+import { DecodePool, prepare } from '@somnai-dreams/preimage'
 import { newCacheBustToken, photoUrl, takePhotos, type Photo } from './photo-source.js'
 
 const metaEl = document.getElementById('meta')!
@@ -132,8 +132,7 @@ async function runNaive(): Promise<void> {
   const naturalSizes = await Promise.all(
     urls.map(async (u) => {
       const prepared = await prepare(u)
-      const m = getMeasurement(prepared)
-      return { w: m.displayWidth, h: m.displayHeight }
+      return { w: prepared.width, h: prepared.height }
     }),
   )
   const setupMs = performance.now() - t0
