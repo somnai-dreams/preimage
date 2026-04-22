@@ -14,16 +14,11 @@
     .count-control .count-val { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; min-width: 2ch; text-align: right; }
 
     .masonry-pair { gap: 20px; }
-    .panel-run { margin: 4px 0 12px; }
-    .panel-run button { font: inherit; font-weight: 500; padding: 7px 14px; background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm); cursor: pointer; transition: background 120ms; }
-    .panel-run button:hover:not(:disabled) { background: var(--accent-hover); }
-    .panel-run button:disabled { background: var(--border-strong); cursor: not-allowed; }
-    .panel-stats { border-top: 1px solid var(--border); padding-top: 10px; margin-bottom: 14px; }
 
     /* Naive grid: stock <img> tags in a CSS column layout. No reserved
        space, so the column grows as each image finishes decoding. */
     .naive-grid { column-count: 3; column-gap: 6px; }
-    .naive-grid img { width: 100%; display: block; margin-bottom: 6px; break-inside: avoid; }
+    .naive-grid img { width: 100%; display: block; margin-bottom: 6px; break-inside: avoid; outline: var(--image-outline); outline-offset: -1px; }
 
     /* Measured grid: absolutely-positioned tiles over a container
        whose height is computed from the measured aspect ratios.
@@ -38,17 +33,13 @@
       background: #e4e7eb;
       animation: tile-shimmer 1.3s ease-in-out infinite;
     }
-    .packed .item.has-image { animation: none; }
+    .packed .item.has-image { animation: none; outline: var(--image-outline); outline-offset: -1px; }
     .packed .item img {
       position: absolute; inset: 0; width: 100%; height: 100%;
       object-fit: cover; display: block;
       opacity: 0; transition: opacity 240ms ease-out;
     }
     .packed .item img.loaded { opacity: 1; }
-    @keyframes tile-shimmer {
-      0%, 100% { background-color: #e4e7eb; }
-      50%      { background-color: #d4d8de; }
-    }
   </style>
 </head>
 <body>

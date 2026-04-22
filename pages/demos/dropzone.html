@@ -40,10 +40,12 @@
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       cursor: pointer;
+      transition-property: border-color, color, scale;
+      transition-duration: 120ms;
+      transition-timing-function: var(--press);
     }
     .drop-area button:hover { border-color: var(--accent); color: var(--accent); }
-
-    .panel-stats { border-top: 1px solid var(--border); padding-top: 10px; margin-bottom: 14px; }
+    .drop-area button:active { scale: 0.96; }
 
     /* Both flows use the same inline layout. The only difference is
        whether each inline <img> has its width declared before the
@@ -62,7 +64,8 @@
       vertical-align: middle;
       margin: 0 4px;
       border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
+      outline: var(--image-outline);
+      outline-offset: -1px;
     }
     /* Measured images have width set in the style attribute too, so
        the browser reserves their box before bytes decode. */

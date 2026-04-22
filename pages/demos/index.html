@@ -12,8 +12,9 @@
     .demo-section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-soft); margin: 0 0 10px; font-weight: 600; }
     .demo-section p.intro { color: var(--text-muted); margin: 0 0 14px; max-width: 68ch; font-size: 14px; }
     .demo-list { display: grid; gap: 10px; }
-    .demo-card { display: block; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; color: var(--text); text-decoration: none; background: var(--surface); transition: border-color 120ms, box-shadow 120ms; }
-    .demo-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); }
+    .demo-card { display: block; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; color: var(--text); text-decoration: none; background: var(--surface); transition-property: border-color, box-shadow, translate; transition-duration: 160ms; transition-timing-function: var(--press); }
+    .demo-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); translate: 0 -1px; }
+    .demo-card:active { translate: 0 0; }
     .demo-card h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--accent); }
     .demo-card p { margin: 0; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
   </style>

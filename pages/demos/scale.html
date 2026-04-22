@@ -13,16 +13,9 @@
     .count-control input[type=range] { width: 200px; }
     .count-control .count-val { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; min-width: 3ch; text-align: right; }
 
-    .panel-run { margin: 4px 0 12px; }
-    .panel-run button { font: inherit; font-weight: 500; padding: 7px 14px; background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm); cursor: pointer; transition: background 120ms; }
-    .panel-run button:hover:not(:disabled) { background: var(--accent-hover); }
-    .panel-run button:disabled { background: var(--border-strong); cursor: not-allowed; }
-    .panel-stats { border-top: 1px solid var(--border); padding-top: 10px; margin-bottom: 14px; }
-
     .scroll-box {
       height: 600px;
       overflow-y: auto;
-      border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       background: var(--surface-muted);
       position: relative;
@@ -30,7 +23,7 @@
 
     /* Naive: stock <img> tags in a CSS column layout. */
     .naive-grid { column-count: 4; column-gap: 4px; padding: 4px; }
-    .naive-grid img { width: 100%; display: block; margin-bottom: 4px; break-inside: avoid; }
+    .naive-grid img { width: 100%; display: block; margin-bottom: 4px; break-inside: avoid; outline: var(--image-outline); outline-offset: -1px; }
 
     /* Measured: absolutely-positioned tiles, shimmer while waiting
        for IntersectionObserver to commit a full load. */
@@ -42,17 +35,13 @@
       background: #e4e7eb;
     }
     .packed .item.pending { animation: tile-shimmer 1.3s ease-in-out infinite; }
-    .packed .item.has-image { animation: none; }
+    .packed .item.has-image { animation: none; outline: var(--image-outline); outline-offset: -1px; }
     .packed .item img {
       position: absolute; inset: 0; width: 100%; height: 100%;
       object-fit: cover; display: block;
       opacity: 0; transition: opacity 180ms ease-out;
     }
     .packed .item img.loaded { opacity: 1; }
-    @keyframes tile-shimmer {
-      0%, 100% { background-color: #e4e7eb; }
-      50%      { background-color: #d4d8de; }
-    }
   </style>
 </head>
 <body>

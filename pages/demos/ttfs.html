@@ -10,14 +10,10 @@
     .ttfs-stage { display: flex; flex-direction: column; gap: 10px; }
     .ttfs-frame { max-width: 100%; min-height: 180px; border-radius: var(--radius-sm); overflow: hidden; position: relative; }
     .ttfs-frame.empty { background: var(--surface-muted); }
-    .ttfs-frame img { max-width: 100%; height: auto; display: block; }
+    .ttfs-frame img { max-width: 100%; height: auto; display: block; outline: var(--image-outline); outline-offset: -1px; }
     .ttfs-frame.measured img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 240ms ease-out; }
     .ttfs-frame.measured img.loaded { opacity: 1; }
     .ttfs-below { color: var(--text-muted); font-size: 12.5px; line-height: 1.55; }
-    .panel-run { margin: 4px 0 14px; }
-    .panel-run button { font: inherit; font-weight: 500; padding: 7px 14px; background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm); cursor: pointer; transition: background 120ms; }
-    .panel-run button:hover:not(:disabled) { background: var(--accent-hover); }
-    .panel-run button:disabled { background: var(--border-strong); cursor: not-allowed; }
     .events { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; }
   </style>
 </head>

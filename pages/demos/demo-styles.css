@@ -13,11 +13,13 @@
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
   --reflow: #b91c1c;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --image-outline: 1px solid rgba(0, 0, 0, 0.08);
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 10px;
+  --press: cubic-bezier(0.2, 0, 0, 1);
 }
 
 * {
@@ -81,12 +83,17 @@ body {
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: pointer;
-  transition: border-color 120ms, color 120ms, background 120ms;
+  transition-property: border-color, color, background, scale;
+  transition-duration: 120ms;
+  transition-timing-function: var(--press);
   font-variant-numeric: tabular-nums;
 }
 .demo-nav .warm-btn:hover:not(:disabled) {
   border-color: var(--accent);
   color: var(--text);
+}
+.demo-nav .warm-btn:active:not(:disabled) {
+  scale: 0.96;
 }
 .demo-nav .warm-btn:disabled {
   cursor: progress;
@@ -110,12 +117,14 @@ body {
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 .page-header p {
   margin: 0 0 20px;
   color: var(--text-muted);
   max-width: 68ch;
   font-size: 14px;
+  text-wrap: pretty;
 }
 
 /* Controls bar */
@@ -149,14 +158,42 @@ button.primary {
   border: 0;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 120ms;
+  transition-property: background, scale;
+  transition-duration: 120ms;
+  transition-timing-function: var(--press);
 }
 button.primary:hover:not(:disabled) {
   background: var(--accent-hover);
 }
+button.primary:active:not(:disabled) {
+  scale: 0.96;
+}
 button.primary:disabled {
   background: var(--border-strong);
   cursor: not-allowed;
+}
+
+/* Per-panel Run buttons. Most demos render one Run per panel so the user
+   can feel each side's click-to-layout delay independently. The panel
+   variant just adds framing margins — the button itself reuses .primary. */
+.panel-run {
+  margin: 4px 0 12px;
+}
+.panel-stats {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-bottom: 14px;
+}
+
+/* Shimmering placeholder used by every demo that reserves space before
+   the image pixels arrive. Apply on the tile element while pending; add
+   .has-image (or remove .pending) to halt the animation. */
+@keyframes tile-shimmer {
+  0%, 100% { background-color: #e4e7eb; }
+  50%      { background-color: #d4d8de; }
+}
+.tile-shimmer {
+  animation: tile-shimmer 1.3s ease-in-out infinite;
 }
 
 .segmented {
@@ -215,6 +252,14 @@ button.primary:disabled {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+/* Subtle outline on image thumbnails so edges read crisp on white
+   surface-muted tiles. Use `outline` (not `border`) to avoid any
+   layout contribution — the image still fits its reserved box. */
+.photo-outline {
+  outline: var(--image-outline);
+  outline-offset: -1px;
 }
 .panel-header {
   display: flex;
