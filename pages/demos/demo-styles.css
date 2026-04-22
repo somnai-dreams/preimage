@@ -72,6 +72,30 @@ body {
   font-size: 12px;
   color: var(--text-soft);
 }
+.demo-nav .warm-btn {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 120ms, color 120ms, background 120ms;
+  font-variant-numeric: tabular-nums;
+}
+.demo-nav .warm-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.demo-nav .warm-btn:disabled {
+  cursor: progress;
+  color: var(--text-soft);
+}
+.demo-nav .warm-btn.done {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 /* Page container */
 
