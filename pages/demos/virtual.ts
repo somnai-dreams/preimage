@@ -194,6 +194,35 @@ async function runMeasured(): Promise<void> {
   const placements: Placement[] = []
   const indexUrl: string[] = []
 
+  // Image-loading gate. Tiles always mount immediately (slot visible,
+  // shimmer running) so the layout grows as fast as dim probes
+  // resolve. But we delay the actual <img> fetch inside each slot
+  // until enough placements exist to cover the first screen — that
+  // way dim probes have all 20 concurrent slots to themselves during
+  // the initial rush, and full image fetches only start competing
+  // once there's a whole screen to show.
+  const firstScreenThreshold = measuredScroll.clientHeight + OVERSCAN
+  let imageLoadsStarted = false
+  // Tiles that mounted before the gate opened and still need an <img>
+  // attached. Keyed by placement index so unmount can clean up.
+  const tilesAwaitingImage = new Map<number, HTMLElement>()
+
+  function attachImage(idx: number, el: HTMLElement): void {
+    const img = new Image()
+    img.alt = ''
+    img.addEventListener(
+      'load',
+      () => {
+        img.classList.add('loaded')
+        el.classList.add('has-image')
+        el.classList.remove('pending')
+      },
+      { once: true },
+    )
+    img.src = indexUrl[idx]!
+    el.appendChild(img)
+  }
+
   const pool = createVirtualTilePool({
     scrollContainer: measuredScroll,
     contentContainer: measuredPanel,
@@ -206,23 +235,16 @@ async function runMeasured(): Promise<void> {
       el.style.height = `${place.height}px`
       el.dataset['idx'] = String(idx)
 
-      const img = new Image()
-      img.alt = ''
-      img.addEventListener(
-        'load',
-        () => {
-          img.classList.add('loaded')
-          el.classList.add('has-image')
-          el.classList.remove('pending')
-        },
-        { once: true },
-      )
-      img.src = indexUrl[idx]!
-      el.appendChild(img)
+      if (imageLoadsStarted) {
+        attachImage(idx, el)
+      } else {
+        tilesAwaitingImage.set(idx, el)
+      }
 
       setRowValue(measuredStats, 1, `<b>${fmtCount(pool.activeCount)}</b>`)
     },
-    unmount: (_idx, el) => {
+    unmount: (idx, el) => {
+      tilesAwaitingImage.delete(idx)
       // Cancel any in-flight image fetch before discarding the <img>.
       // Removing the element from the DOM alone doesn't stop the
       // browser from finishing the request in the background.
@@ -235,6 +257,15 @@ async function runMeasured(): Promise<void> {
     },
   })
 
+  function openImageGate(): void {
+    if (imageLoadsStarted) return
+    imageLoadsStarted = true
+    // Drain the backlog — every tile that mounted as a shimmer slot
+    // during the pre-gate window gets its <img> attached now.
+    for (const [idx, el] of tilesAwaitingImage) attachImage(idx, el)
+    tilesAwaitingImage.clear()
+  }
+
   // Fire every prepare(dimsOnly) through the queue. concurrency: 20
   // is the H2 sweet spot; on H1 the browser's 6-slot cap gatekeeps
   // automatically with no penalty. Each prepare reads ~4KB of header
@@ -244,16 +275,6 @@ async function runMeasured(): Promise<void> {
 
   let firstPlacedMs: number | null = null
   let dimsProbed = 0
-
-  // Don't start mounting tiles (and kicking off their full-image
-  // fetches) until we've packed enough placements to cover the first
-  // screen. Until that threshold, dim probes run unopposed for
-  // connection slots — so the first screen of real images starts
-  // loading from a state where 20+ parallel GETs are available
-  // instead of sharing with in-flight probes.
-  const firstScreenThreshold =
-    measuredScroll.clientHeight + OVERSCAN
-  let mountingStarted = false
 
   const placePromises = urls.map((url) =>
     queue.enqueue(url, { dimsOnly: true }).then((prepared) => {
@@ -266,20 +287,20 @@ async function runMeasured(): Promise<void> {
       // "how much layout exists so far." After the last probe resolves,
       // the height is final and stays put.
       measuredPanel.style.height = `${packer.totalHeight()}px`
+      pool.setPlacements(placements)
 
-      // Gate the tile-pool: feed placements only once the first
-      // screen is covered (or this is the final tile, whichever
-      // comes first). After the gate opens, every subsequent resolve
-      // feeds normally so new tiles mount as they scroll into view.
-      if (!mountingStarted && packer.totalHeight() >= firstScreenThreshold) {
-        mountingStarted = true
+      // Open the image-load gate once the first screen is packed.
+      // From this point on, newly-visible tiles attach images
+      // immediately, and anything still pending from the pre-gate
+      // window starts fetching now.
+      if (!imageLoadsStarted && packer.totalHeight() >= firstScreenThreshold) {
+        openImageGate()
       }
-      if (mountingStarted) pool.setPlacements(placements)
 
       dimsProbed++
       setRowValue(measuredStats, 2, `<b>${fmtCount(dimsProbed)} / ${fmtCount(urls.length)}</b>`)
 
-      if (mountingStarted && firstPlacedMs === null) {
+      if (firstPlacedMs === null) {
         firstPlacedMs = performance.now() - t0
         setRowValue(measuredStats, 3, `<b>${fmtMs(firstPlacedMs)}</b>`)
       }
@@ -287,10 +308,9 @@ async function runMeasured(): Promise<void> {
   )
   await Promise.all(placePromises)
 
-  // Final safety net: if the whole layout is shorter than the first
-  // screen (count small enough that the gate never triggered), mount
-  // everything now.
-  if (!mountingStarted) pool.setPlacements(placements)
+  // If the whole layout is shorter than the first screen (small
+  // count), the threshold never triggered. Open the gate now.
+  openImageGate()
 
   const allPlacedMs = performance.now() - t0
   setRowValue(measuredStats, 4, `<b>${fmtMs(allPlacedMs)}</b>`)
