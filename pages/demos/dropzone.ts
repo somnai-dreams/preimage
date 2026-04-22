@@ -1,4 +1,4 @@
-import { prepare, getMeasurement } from '../../src/index.js'
+import { prepare, getMeasurement } from '@somnai-dreams/preimage'
 
 const dropArea = document.getElementById('dropArea')!
 const pickBtn = document.getElementById('pickBtn') as HTMLButtonElement

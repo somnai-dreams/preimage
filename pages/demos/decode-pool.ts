@@ -1,4 +1,4 @@
-import { DecodePool, prepare, getMeasurement } from '../../src/index.js'
+import { DecodePool, prepare, getMeasurement } from '@somnai-dreams/preimage'
 import { newCacheBustToken, photoUrl, takePhotos, type Photo } from './photo-source.js'
 
 const metaEl = document.getElementById('meta')!

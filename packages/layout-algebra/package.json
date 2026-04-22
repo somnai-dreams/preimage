@@ -1,0 +1,43 @@
+{
+  "name": "@somnai-dreams/layout-algebra",
+  "version": "0.0.1",
+  "description": "Pure-function layout primitives for aspect-ratio-aware image grids, justified rows, and masonry packing. DOM-free, SSR-safe.",
+  "keywords": [
+    "layout",
+    "masonry",
+    "justified-layout",
+    "grid",
+    "aspect-ratio",
+    "packing"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/somnai-dreams/preimage.git",
+    "directory": "packages/layout-algebra"
+  },
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit -p tsconfig.build.json",
+    "prepack": "rm -rf dist && tsc -p tsconfig.build.json"
+  }
+}

@@ -1,4 +1,4 @@
-import { prepare, getMeasurement, getElement } from '../../src/index.js'
+import { prepare, getMeasurement, getElement } from '@somnai-dreams/preimage'
 import { newCacheBustToken, photoUrl, takePhotos, PHOTO_COUNT } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
 

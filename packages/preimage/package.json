@@ -1,0 +1,55 @@
+{
+  "name": "@somnai-dreams/preimage",
+  "version": "0.1.0",
+  "description": "Measured images for pretext: float figures and inline images in pretext-flowed text, without triggering DOM reflow",
+  "keywords": [
+    "pretext",
+    "image-measurement",
+    "image-loading",
+    "aspect-ratio",
+    "object-fit",
+    "float",
+    "article-layout",
+    "rich-inline",
+    "gallery"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/somnai-dreams/preimage.git",
+    "directory": "packages/preimage"
+  },
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./pretext": {
+      "types": "./dist/pretext.d.ts",
+      "import": "./dist/pretext.js",
+      "default": "./dist/pretext.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "CHANGELOG.md",
+    "dist",
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit -p tsconfig.build.json",
+    "prepack": "rm -rf dist && tsc -p tsconfig.build.json"
+  },
+  "peerDependencies": {
+    "@chenglou/pretext": "^0.0.5"
+  }
+}

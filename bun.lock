@@ -10,6 +10,14 @@
         "playwright": "^1.56.0",
         "typescript": "^5.6.0",
       },
+    },
+    "packages/layout-algebra": {
+      "name": "@somnai-dreams/layout-algebra",
+      "version": "0.0.1",
+    },
+    "packages/preimage": {
+      "name": "@somnai-dreams/preimage",
+      "version": "0.1.0",
       "peerDependencies": {
         "@chenglou/pretext": "^0.0.5",
       },
@@ -17,6 +25,10 @@
   },
   "packages": {
     "@chenglou/pretext": ["@chenglou/pretext@0.0.5", "", {}, "sha512-A8GZN10REdFGsyuiUgLV8jjPDDFMg5GmgxGWV0I3igxBOnzj+jgz2VMmVD7g+SFyoctfeqHFxbNatKSzVRWtRg=="],
+
+    "@somnai-dreams/layout-algebra": ["@somnai-dreams/layout-algebra@workspace:packages/layout-algebra"],
+
+    "@somnai-dreams/preimage": ["@somnai-dreams/preimage@workspace:packages/preimage"],
 
     "@types/bun": ["@types/bun@1.3.12", "", { "dependencies": { "bun-types": "1.3.12" } }, "sha512-DBv81elK+/VSwXHDlnH3Qduw+KxkTIWi7TXkAeh24zpi5l0B2kUg9Ga3tb4nJaPcOFswflgi/yAvMVBPrxMB+A=="],
 

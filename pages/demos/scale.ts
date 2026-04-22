@@ -1,4 +1,4 @@
-import { PrepareQueue, getMeasurement } from '../../src/index.js'
+import { PrepareQueue, getMeasurement } from '@somnai-dreams/preimage'
 import { cycledUrls } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
 

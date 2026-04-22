@@ -1,6 +1,6 @@
 import { readdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { probeImageBytes, MAX_HEADER_BYTES } from '../src/probe.js'
+import { probeImageBytes, MAX_HEADER_BYTES } from '../packages/preimage/src/probe.js'
 
 const DIR = 'pages/assets/demos/photos'
 

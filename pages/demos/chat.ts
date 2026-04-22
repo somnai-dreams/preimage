@@ -5,12 +5,12 @@ import {
   type RichInlineItem,
 } from '@chenglou/pretext/rich-inline'
 
-import { getMeasurement } from '../../src/index.js'
+import { getMeasurement } from '@somnai-dreams/preimage'
 import {
   inlineImage,
   isInlineImageItem,
   type InlineImageItem,
-} from '../../src/pretext.js'
+} from '@somnai-dreams/preimage/pretext'
 import { photoUrl, PHOTOS } from './photo-source.js'
 
 const widthSlider = document.getElementById('widthSlider') as HTMLInputElement

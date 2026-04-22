@@ -7,8 +7,8 @@ import {
   preparedFromMeasurement,
   recordKnownMeasurement,
   type PreparedImage,
-} from '../../src/index.js'
-import { flowColumnWithFloats } from '../../src/pretext.js'
+} from '@somnai-dreams/preimage'
+import { flowColumnWithFloats } from '@somnai-dreams/preimage/pretext'
 import { newCacheBustToken, photoUrl, PHOTOS, type Photo } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
 

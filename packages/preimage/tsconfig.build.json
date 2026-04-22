@@ -14,17 +14,12 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "skipLibCheck": true,
-    "noEmit": true,
-    "allowImportingTsExtensions": false,
-    "paths": {
-      "@somnai-dreams/preimage": ["./packages/preimage/src/index.ts"],
-      "@somnai-dreams/preimage/pretext": ["./packages/preimage/src/pretext.ts"],
-      "@somnai-dreams/layout-algebra": ["./packages/layout-algebra/src/index.ts"]
-    }
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": false
   },
-  "include": [
-    "packages/preimage/src/**/*.ts",
-    "packages/layout-algebra/src/**/*.ts",
-    "pages/**/*.ts"
-  ]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
 }
