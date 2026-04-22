@@ -6,28 +6,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="./demo-styles.css" />
   <style>
+    .page.wide { max-width: 1500px; }
+
     .panel-run { margin: 4px 0 12px; }
     .panel-run button { font: inherit; font-weight: 500; padding: 7px 14px; background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm); cursor: pointer; transition: background 120ms; }
     .panel-run button:hover:not(:disabled) { background: var(--accent-hover); }
     .panel-run button:disabled { background: var(--border-strong); cursor: not-allowed; }
     .panel-stats { border-top: 1px solid var(--border); padding-top: 10px; margin-bottom: 14px; }
 
-    .article { font-size: 14px; line-height: 1.6; color: var(--text); position: relative; }
-    .article .line { position: absolute; white-space: pre; font: 14px/22px -apple-system, 'SF Pro Text', 'Inter', system-ui, sans-serif; color: var(--text); }
-    .article .fig {
+    /* Naive HTML + CSS float column — browser-managed layout. */
+    .naive-article { font-size: 14px; line-height: 1.6; color: var(--text); }
+    .naive-article p { margin: 0 0 0.8em; }
+    .naive-article figure { margin: 0 0 6px 14px; float: right; width: 44%; }
+    .naive-article figure figcaption { font-size: 11px; color: var(--text-soft); margin-top: 4px; }
+    .naive-article figure img { width: 100%; display: block; }
+
+    /* Pretext columns — absolute positioning driven by flowColumnWithFloats. */
+    .pretext-article { font-size: 14px; line-height: 1.6; color: var(--text); position: relative; }
+    .pretext-article .line { position: absolute; white-space: pre; font: 14px/22px -apple-system, 'SF Pro Text', 'Inter', system-ui, sans-serif; color: var(--text); }
+    .pretext-article .fig {
       position: absolute;
       border-radius: var(--radius-sm);
       overflow: hidden;
       background: #e4e7eb;
       animation: fig-shimmer 1.3s ease-in-out infinite;
     }
-    .article .fig.has-image { animation: none; }
-    .article .fig img {
+    .pretext-article .fig.has-image { animation: none; }
+    .pretext-article .fig img {
       position: absolute; inset: 0; width: 100%; height: 100%;
       object-fit: cover; display: block;
       opacity: 0; transition: opacity 240ms ease-out;
     }
-    .article .fig img.loaded { opacity: 1; }
+    .pretext-article .fig img.loaded { opacity: 1; }
     @keyframes fig-shimmer {
       0%, 100% { background-color: #e4e7eb; }
       50%      { background-color: #d4d8de; }
@@ -45,10 +55,10 @@
     <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
   </nav>
 
-  <main class="page">
+  <main class="page wide">
     <header class="page-header">
-      <h1>Editorial — same layout engine, different measurement</h1>
-      <p>Same article, same three floated figures, same <code>flowColumnWithFloats</code> engine on both sides. The only difference is where the figure dimensions come from. Left: native <code>&lt;img&gt;</code> with dims read after <code>onload</code> — pretext has to re-run its flow each time a figure loads, so text shifts under existing lines. Right: <code>prepare()</code> returns dims from the first ~2KB of each image, so pretext flows once with correct rects and nothing moves.</p>
+      <h1>Editorial — three approaches to floated figures</h1>
+      <p>Same article, same three figures, three strategies. <strong>Naive</strong>: stock HTML <code>&lt;figure&gt;</code> with CSS <code>float: right</code> — browser manages everything, text reflows as each image decodes. <strong>Pretext + native <code>&lt;img&gt;</code></strong>: <code>flowColumnWithFloats</code> for text, but dims come from polling each <code>&lt;img&gt;</code>'s <code>naturalWidth</code> — pretext re-flows every time a figure's dims arrive. <strong>Pretext + preimage</strong>: <code>prepare()</code> batches the dim-fetch, pretext flows once with all dims known. Each panel has its own Run button.</p>
     </header>
 
     <div class="controls">
@@ -60,7 +70,22 @@
       <span id="meta" class="meta"></span>
     </div>
 
-    <div class="panels two">
+    <div class="panels three">
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Naive HTML + <code>float</code></h2>
+        </div>
+        <div class="panel-run">
+          <button id="runNaive" class="primary">Run</button>
+        </div>
+        <div class="panel-stats stat-list" id="naiveStats">
+          <div class="row"><span class="label">First figure loaded</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Last figure loaded</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row shift"><span class="label">Visible shifts</span><span class="value"><b>&mdash;</b></span></div>
+        </div>
+        <div id="naive" class="naive-article"></div>
+      </section>
+
       <section class="panel">
         <div class="panel-header">
           <h2 class="panel-title">Pretext + native <code>&lt;img&gt;</code></h2>
@@ -74,7 +99,7 @@
           <div class="row"><span class="label">Final flow</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row shift"><span class="label">Visible shifts</span><span class="value"><b>&mdash;</b></span></div>
         </div>
-        <div id="native" class="article"></div>
+        <div id="native" class="pretext-article"></div>
       </section>
 
       <section class="panel">
@@ -90,7 +115,7 @@
           <div class="row"><span class="label">Final flow</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row shift"><span class="label">Visible shifts</span><span class="value"><b>&mdash;</b></span></div>
         </div>
-        <div id="measured" class="article"></div>
+        <div id="measured" class="pretext-article"></div>
       </section>
     </div>
   </main>

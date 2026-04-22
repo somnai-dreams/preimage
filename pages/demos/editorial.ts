@@ -13,14 +13,17 @@ import { newCacheBustToken, photoUrl, PHOTOS, type Photo } from './photo-source.
 import { observeShifts } from './demo-utils.js'
 
 const metaEl = document.getElementById('meta')!
+const naivePanel = document.getElementById('naive')!
 const nativePanel = document.getElementById('native')!
 const measuredPanel = document.getElementById('measured')!
+const naiveStats = document.getElementById('naiveStats')!
 const nativeStats = document.getElementById('nativeStats')!
 const measuredStats = document.getElementById('measuredStats')!
+const runNaiveBtn = document.getElementById('runNaive') as HTMLButtonElement
 const runNativeBtn = document.getElementById('runNative') as HTMLButtonElement
 const runMeasuredBtn = document.getElementById('runMeasured') as HTMLButtonElement
 
-const COLUMN_WIDTH = 460
+const COLUMN_WIDTH = 400
 const LINE_HEIGHT = 22
 const FONT = '14px/22px -apple-system, "SF Pro Text", Inter, system-ui, sans-serif'
 const FIGURE_MAX_W = Math.round(COLUMN_WIDTH * 0.44)
@@ -66,7 +69,7 @@ function resetStats(host: HTMLElement): void {
   host.querySelector<HTMLElement>('.row.shift')?.classList.remove('has-shifts')
 }
 
-// --- Shared pretext flow + render ---
+// --- Shared utilities ---
 
 function getCacheBust(): string | null {
   const checked = document.querySelector<HTMLInputElement>('input[name="cache"]:checked')
@@ -83,18 +86,126 @@ function setMeta(cacheBust: string | null): void {
     (cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — each run fetches fresh')
 }
 
+// Poll an <img>'s naturalWidth until it becomes nonzero. Same
+// mechanism preimage uses internally — the native panel opts into it
+// manually so the dim-detection timing is apples-to-apples with the
+// measured panel.
+function pollForDims(
+  img: HTMLImageElement,
+): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    let done = false
+    img.addEventListener(
+      'error',
+      () => {
+        if (done) return
+        done = true
+        reject(new Error('image load failed'))
+      },
+      { once: true },
+    )
+    const tick = (): void => {
+      if (done) return
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        done = true
+        resolve({ width: img.naturalWidth, height: img.naturalHeight })
+        return
+      }
+      if (img.complete) {
+        done = true
+        reject(new Error('loaded with no dims'))
+        return
+      }
+      setTimeout(tick, 0)
+    }
+    tick()
+  })
+}
+
+// --- Naive HTML panel: browser-managed <figure> floats ---
+
+function buildNaiveHtml(panel: HTMLElement): HTMLImageElement[] {
+  panel.innerHTML = ''
+  panel.style.width = `${COLUMN_WIDTH}px`
+  const paragraphs = ARTICLE.split('\n\n')
+  const imgs: HTMLImageElement[] = []
+  for (let pi = 0; pi < paragraphs.length; pi++) {
+    const p = document.createElement('p')
+    if (pi < FIGURES.length) {
+      const fig = document.createElement('figure')
+      const img = document.createElement('img')
+      img.alt = ''
+      fig.appendChild(img)
+      imgs.push(img)
+      const cap = document.createElement('figcaption')
+      cap.textContent = `Figure ${pi + 1}`
+      fig.appendChild(cap)
+      p.appendChild(fig)
+    }
+    p.appendChild(document.createTextNode(paragraphs[pi]!))
+    panel.appendChild(p)
+  }
+  return imgs
+}
+
+async function runNaive(): Promise<void> {
+  runNaiveBtn.disabled = true
+  runNaiveBtn.textContent = 'Running…'
+  naivePanel.innerHTML = ''
+  resetStats(naiveStats)
+
+  const cacheBust = getCacheBust()
+  setMeta(cacheBust)
+  const urls = buildUrls(cacheBust)
+
+  const t0 = performance.now()
+  const imgs = buildNaiveHtml(naivePanel)
+  const monitor = observeShifts(naivePanel)
+
+  let firstLoadedMs: number | null = null
+  let lastLoadedMs: number | null = null
+
+  for (let i = 0; i < imgs.length; i++) imgs[i]!.src = urls[i]!
+  await Promise.all(
+    imgs.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          const done = (): void => {
+            const t = performance.now() - t0
+            if (firstLoadedMs === null) {
+              firstLoadedMs = t
+              setRowValue(naiveStats, 1, `<b>${fmtMs(firstLoadedMs)}</b>`)
+            }
+            lastLoadedMs = t
+            setRowValue(naiveStats, 2, `<b>${fmtMs(lastLoadedMs)}</b>`)
+            resolve()
+          }
+          if (img.complete && img.naturalWidth > 0) done()
+          else {
+            img.addEventListener('load', done, { once: true })
+            img.addEventListener('error', done, { once: true })
+          }
+        }),
+    ),
+  )
+  monitor.stop()
+  setShifts(naiveStats, monitor.shifts())
+
+  runNaiveBtn.disabled = false
+  runNaiveBtn.textContent = 'Run again'
+}
+
+// --- Pretext common infrastructure ---
+
 // Pretext needs a PreparedImage per figure. When we only have raw
-// width/height (e.g. from native onload), mint a synthetic one via
-// recordKnownMeasurement so pretext's API shape is honoured without
-// forcing a network fetch from this code path.
+// width/height (e.g. from polling a native <img>), mint a synthetic
+// one via recordKnownMeasurement so pretext's API shape is honoured
+// without forcing a separate network fetch.
 function syntheticPrepared(
-  url: string,
+  key: string,
   width: number,
   height: number,
 ): PreparedImage {
-  // Use a unique cache key per url+size so multiple reflows with
-  // different dims don't collide.
-  const key = `editorial-native:${url}:${width}x${height}`
   const measurement = recordKnownMeasurement(key, width, height)
   return preparedFromMeasurement(measurement)
 }
@@ -104,16 +215,16 @@ type FigureDims = { width: number; height: number }
 function flowArticle(
   dims: ReadonlyArray<FigureDims | null>,
   urls: readonly string[],
-): { items: ReturnType<typeof flowColumnWithFloats>['items']; totalHeight: number; lineCount: number } {
+  keyPrefix: string,
+): { items: ReturnType<typeof flowColumnWithFloats>['items']; totalHeight: number } {
   const text = prepareWithSegments(ARTICLE, FONT)
-  // For figures whose dims aren't known yet, give pretext a 1×1
-  // placeholder rect so it still knows where to put the float box.
-  // When real dims land we reflow with them.
   const floats = dims.map((d, i) => {
     const w = d?.width ?? 1
     const h = d?.height ?? 1
+    // Cache key varies with dims so re-flows don't collide on the
+    // measurement cache.
     return {
-      image: syntheticPrepared(urls[i]!, w, h),
+      image: syntheticPrepared(`${keyPrefix}:${urls[i]!}:${w}x${h}`, w, h),
       side: 'right' as const,
       top: FIGURE_TOPS[i]!,
       maxWidth: FIGURE_MAX_W,
@@ -128,21 +239,19 @@ function flowArticle(
     lineHeight: LINE_HEIGHT,
     floats,
   })
-  return { items: result.items, totalHeight: result.totalHeight, lineCount: result.lineCount }
+  return { items: result.items, totalHeight: result.totalHeight }
 }
 
 function renderFlow(
   panel: HTMLElement,
-  urls: readonly string[],
   result: { items: ReturnType<typeof flowColumnWithFloats>['items']; totalHeight: number },
-): { figs: HTMLElement[]; imgs: HTMLImageElement[] } {
+): { figs: HTMLElement[] } {
   panel.innerHTML = ''
   panel.style.width = `${COLUMN_WIDTH}px`
   panel.style.height = `${result.totalHeight}px`
 
   const text = prepareWithSegments(ARTICLE, FONT)
   const figs: HTMLElement[] = []
-  const imgs: HTMLImageElement[] = []
   for (const item of result.items) {
     if (item.kind === 'line') {
       const line = materializeLineRange(text, item.range)
@@ -164,14 +273,12 @@ function renderFlow(
       fig.appendChild(img)
       panel.appendChild(fig)
       figs.push(fig)
-      imgs.push(img)
     }
   }
-  void urls
-  return { figs, imgs }
+  return { figs }
 }
 
-// --- Native run: dims come from img.naturalWidth after onload ---
+// --- Native + polling ---
 
 async function runNative(): Promise<void> {
   runNativeBtn.disabled = true
@@ -185,10 +292,8 @@ async function runNative(): Promise<void> {
 
   const t0 = performance.now()
 
-  // Start loading every image up front. At click-time we have no dims
-  // yet, so pretext flows the article with 1x1 placeholders — the
-  // float boxes are essentially absent. As each image's onload fires
-  // we update its dims and re-flow.
+  // No dims yet — start with 1×1 placeholders. Each time a figure's
+  // polled dims arrive we update `dims[i]` and re-run pretext.
   const dims: Array<FigureDims | null> = FIGURES.map(() => null)
   let flowRuns = 0
   let firstFlowMs: number | null = null
@@ -196,8 +301,8 @@ async function runNative(): Promise<void> {
 
   const doFlow = (): void => {
     flowRuns++
-    const result = flowArticle(dims, urls)
-    renderFlow(nativePanel, urls, result)
+    const result = flowArticle(dims, urls, 'editorial-native')
+    renderFlow(nativePanel, result)
     const now = performance.now() - t0
     if (firstFlowMs === null) firstFlowMs = now
     finalFlowMs = now
@@ -206,73 +311,54 @@ async function runNative(): Promise<void> {
     setRowValue(nativeStats, 3, `<b>${fmtMs(finalFlowMs)}</b>`)
   }
 
-  // Initial pass: all dims unknown.
   doFlow()
   const monitor = observeShifts(nativePanel)
 
-  // Start fetches outside pretext. When each one's dims are known,
-  // re-flow.
   await Promise.all(
-    urls.map(
-      (url, i) =>
-        new Promise<void>((resolve) => {
-          const probe = new Image()
-          probe.onload = () => {
-            dims[i] = { width: probe.naturalWidth, height: probe.naturalHeight }
-            doFlow()
-            resolve()
-          }
-          probe.onerror = () => resolve()
-          probe.src = url
-        }),
-    ),
+    urls.map((url, i) => {
+      const probe = new Image()
+      probe.src = url
+      return pollForDims(probe)
+        .then((d) => {
+          dims[i] = d
+          doFlow()
+        })
+        .catch(() => {
+          // load failed; leave this figure at 1×1 placeholder
+        })
+    }),
   )
 
-  // After all dims land and all flows are done, set the actual
-  // <img src> on the rendered figures so they paint.
-  const text = prepareWithSegments(ARTICLE, FONT)
-  void text
-  // Re-render one more time to be sure + attach images to the final
-  // figures rendered. Since doFlow already re-rendered after the last
-  // dim arrival, we just need to wire images into the current figs.
+  // All dims known; attach real rendered imgs with src = url. The
+  // browser's HTTP cache should serve from the probe fetch.
   const figNodes = nativePanel.querySelectorAll<HTMLElement>('.fig')
-  figNodes.forEach((fig, i) => {
-    const img = fig.querySelector('img')
-    if (img === null) return
-    img.onload = () => {
-      img.classList.add('loaded')
-      fig.classList.add('has-image')
-    }
-    img.onerror = () => fig.classList.add('has-image')
-    img.src = urls[i]!
-  })
-
   await Promise.all(
-    Array.from(figNodes).map(
-      (fig) =>
-        new Promise<void>((resolve) => {
-          const img = fig.querySelector('img')
-          if (img === null) {
-            resolve()
-            return
-          }
-          if (img.complete && img.naturalWidth > 0) {
-            resolve()
-            return
-          }
-          const onDone = (): void => resolve()
-          img.addEventListener('load', onDone, { once: true })
-          img.addEventListener('error', onDone, { once: true })
-        }),
-    ),
+    Array.from(figNodes).map((fig, i) => {
+      const img = fig.querySelector('img')
+      if (img === null) return Promise.resolve()
+      return new Promise<void>((resolve) => {
+        const done = (): void => {
+          img.classList.add('loaded')
+          fig.classList.add('has-image')
+          resolve()
+        }
+        if (img.complete && img.naturalWidth > 0) done()
+        else {
+          img.addEventListener('load', done, { once: true })
+          img.addEventListener('error', done, { once: true })
+        }
+        img.src = urls[i]!
+      })
+    }),
   )
+
   monitor.stop()
   setShifts(nativeStats, monitor.shifts())
   runNativeBtn.disabled = false
   runNativeBtn.textContent = 'Run again'
 }
 
-// --- Measured run: dims from preimage.prepare() ---
+// --- Measured (pretext + preimage) ---
 
 async function runMeasured(): Promise<void> {
   runMeasuredBtn.disabled = true
@@ -294,17 +380,14 @@ async function runMeasured(): Promise<void> {
     const m = getMeasurement(p)
     return { width: m.displayWidth, height: m.displayHeight }
   })
-  const result = flowArticle(dims, urls)
-  const { figs } = renderFlow(measuredPanel, urls, result)
+  const result = flowArticle(dims, urls, 'editorial-measured')
+  const { figs } = renderFlow(measuredPanel, result)
   const flowMs = performance.now() - t0
   setRowValue(measuredStats, 1, `<b>1</b>`)
   setRowValue(measuredStats, 2, `<b>${fmtMs(flowMs)}</b>`)
   setRowValue(measuredStats, 3, `<b>${fmtMs(flowMs)}</b>`)
 
   const monitor = observeShifts(measuredPanel)
-  // Replace each figure's fresh <img> with the warmed one prepare()
-  // already had in flight. That's the only way to get "one fetch per
-  // figure" — reusing the same element the library used to measure.
   await Promise.all(
     figs.map((fig, i) => {
       const placeholder = fig.querySelector('img') as HTMLImageElement | null
@@ -335,5 +418,6 @@ async function runMeasured(): Promise<void> {
   runMeasuredBtn.textContent = 'Run again'
 }
 
+runNaiveBtn.addEventListener('click', () => void runNaive())
 runNativeBtn.addEventListener('click', () => void runNative())
 runMeasuredBtn.addEventListener('click', () => void runMeasured())
