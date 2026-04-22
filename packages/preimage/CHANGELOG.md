@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.2
+
+- **Fix: `createVirtualTilePool` visibility check now translates `contentContainer`'s offset within `scrollContainer`.** Previously the intersection math assumed `placement.y` and `scrollContainer.scrollTop` were in the same coordinate space, which only holds when `contentContainer` is a direct child flush with the scroll area's top. If callers put a header, padding, or sibling above `contentContainer`, tiles silently mis-mounted (treated as visible at `scrollTop = 0` when they were actually below the fold). Offset is measured once at setup via bounding rects and refreshed on scrollContainer resize.
+
 ## 0.6.1
 
 - **Fix: `createVirtualTilePool` no longer forces layout on every `setPlacements()` call.** Previously `refresh()` read `scrollContainer.scrollTop` and `clientHeight` inline, so a caller's typical pattern — `contentContainer.style.height = ...; pool.setPlacements(next)` — triggered a forced reflow per call. For a probe-driven flow (one `setPlacements` per prepare() resolve), that's N reflows over the run. Now scroll position is cached and refreshed only on `scroll` events; `clientHeight` is refreshed via `ResizeObserver`. `refresh()` reads from the cache and doesn't touch layout.

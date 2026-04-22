@@ -127,6 +127,19 @@ export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualT
   // touches layout.
   let cachedScrollTop = scrollContainer.scrollTop
   let cachedClientHeight = scrollContainer.clientHeight
+  // Offset of contentContainer within scrollContainer's content. Matters
+  // when contentContainer isn't flush with the top of the scroll area —
+  // e.g. a header/sibling above it or padding on scrollContainer. Without
+  // this translation, tiles placed at p.y = 0 in contentContainer's frame
+  // would be treated as visible at scrollTop = 0 even when there's a
+  // 100px header pushing them below the fold.
+  let cachedContentOffsetTop = measureContentOffsetTop()
+
+  function measureContentOffsetTop(): number {
+    const scrollRect = scrollContainer.getBoundingClientRect()
+    const contentRect = contentContainer.getBoundingClientRect()
+    return contentRect.top - scrollRect.top + scrollContainer.scrollTop
+  }
 
   function acquire(): HTMLElement {
     const reused = pool.pop()
@@ -157,10 +170,14 @@ export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualT
     // ahead of travel is larger (so incoming tiles mount in time to
     // paint), the trailing band is smaller (so departing tiles release
     // quickly and their in-flight fetches get cancelled).
+    //
+    // `cachedContentOffsetTop` translates scrollContainer-frame scroll
+    // position into contentContainer-frame so placements (which are in
+    // contentContainer-frame) can be compared directly.
     const topOver = scrollDir === 1 ? behind : ahead
     const bottomOver = scrollDir === 1 ? ahead : behind
-    const top = scrollTop - topOver
-    const bottom = scrollTop + cachedClientHeight + bottomOver
+    const top = scrollTop - topOver - cachedContentOffsetTop
+    const bottom = scrollTop + cachedClientHeight + bottomOver - cachedContentOffsetTop
 
     const wanted = new Set<number>()
     for (let i = 0; i < placements.length; i++) {
@@ -194,13 +211,20 @@ export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualT
   })
   scrollContainer.addEventListener('scroll', onScroll, { passive: true })
 
-  // Container resize: refresh cached clientHeight, then recompute.
-  // Only path that changes clientHeight — browser resize, container
-  // parent layout change, explicit style tweaks all come through here.
+  // Container resize: refresh cached clientHeight AND the content
+  // offset, then recompute. Observing scrollContainer catches browser
+  // resize and parent layout changes. We intentionally don't observe
+  // contentContainer: the caller typically sets contentContainer.style
+  // .height to the total layout height on every placement update, so
+  // observing it would fire on every probe resolve and undo the
+  // scroll-metric caching we just did. Callers whose layouts have
+  // siblings above contentContainer that change size independently
+  // should call pool.refresh() themselves after the mutation.
   const hasResizeObserver = typeof ResizeObserver !== 'undefined'
   const resizeObserver = hasResizeObserver
     ? new ResizeObserver(() => {
         cachedClientHeight = scrollContainer.clientHeight
+        cachedContentOffsetTop = measureContentOffsetTop()
         refresh()
       })
     : null
