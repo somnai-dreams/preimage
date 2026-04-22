@@ -26,6 +26,7 @@
     <a href="./ttfs.html">TTFS</a>
     <a href="./decode-pool.html">Decode pool</a>
     <a href="./scale.html">Scale</a>
+    <a href="./virtual.html">Virtual</a>
     <a href="./dropzone.html">Drop zone</a>
     <a href="./chat.html">Chat</a>
     <span class="spacer"></span>
@@ -61,6 +62,10 @@
         <a class="demo-card" href="./scale.html">
           <h3>Scale — hundreds of tiles</h3>
           <p>Up to 500 cache-busted tiles, naive vs <code>PrepareQueue</code> + <code>dimsOnly</code> + <code>IntersectionObserver</code>. Measured panel takes header bytes for all tiles, lays out the whole grid, then full-fetches only what scrolls into view. Bytes-transferred readout shows what the library saves.</p>
+        </a>
+        <a class="demo-card" href="./virtual.html">
+          <h3>Virtual — ten thousand tiles, DOM-recycled</h3>
+          <p>The chicken-and-egg of windowing: you need heights to position items, but heights come from loading them. Crank to 10k tiles — naive side opens 10k parallel fetches and the CSS column layout thrashes on every arriving image. Measured side probes dims-only, packs the full layout synchronously, and recycles ~40 DOM nodes as you scroll. Scrollbar is honest from frame one.</p>
         </a>
         <a class="demo-card" href="./dropzone.html">
           <h3>Drop zone — Blob inputs</h3>

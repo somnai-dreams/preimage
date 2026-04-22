@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Preimage · scale</title>
+  <title>Preimage · virtual</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="./demo-styles.css" />
   <style>
@@ -10,8 +10,8 @@
 
     .controls-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
     .count-control { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-muted); }
-    .count-control input[type=range] { width: 200px; }
-    .count-control .count-val { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; min-width: 3ch; text-align: right; }
+    .count-control input[type=range] { width: 220px; }
+    .count-control .count-val { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; min-width: 5ch; text-align: right; }
 
     .panel-run { margin: 4px 0 12px; }
     .panel-run button { font: inherit; font-weight: 500; padding: 7px 14px; background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm); cursor: pointer; transition: background 120ms; }
@@ -20,38 +20,45 @@
     .panel-stats { border-top: 1px solid var(--border); padding-top: 10px; margin-bottom: 14px; }
 
     .scroll-box {
-      height: 600px;
+      height: 620px;
       overflow-y: auto;
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       background: var(--surface-muted);
       position: relative;
+      contain: strict;
     }
 
     /* Naive: stock <img> tags in a CSS column layout. */
-    .naive-grid { column-count: 4; column-gap: 4px; padding: 4px; }
-    .naive-grid img { width: 100%; display: block; margin-bottom: 4px; break-inside: avoid; }
+    .naive-grid { column-count: 5; column-gap: 3px; padding: 3px; }
+    .naive-grid img { width: 100%; display: block; margin-bottom: 3px; break-inside: avoid; }
 
-    /* Measured: absolutely-positioned tiles, shimmer while waiting
-       for IntersectionObserver to commit a full load. */
-    .packed { position: relative; padding: 4px; }
-    .packed .item {
+    /* Measured: a fixed-height spacer reserves total scroll length,
+       and tiles (absolutely positioned) are mounted/unmounted from a
+       small DOM-recycled pool based on scroll position. */
+    .virtual-spacer { position: relative; width: 100%; }
+    .vtile {
       position: absolute;
       overflow: hidden;
       border-radius: var(--radius-sm);
       background: #e4e7eb;
+      will-change: transform;
     }
-    .packed .item.pending { animation: tile-shimmer 1.3s ease-in-out infinite; }
-    .packed .item.has-image { animation: none; }
-    .packed .item img {
+    .vtile.pending { animation: tile-shimmer 1.3s ease-in-out infinite; }
+    .vtile.has-image { animation: none; }
+    .vtile img {
       position: absolute; inset: 0; width: 100%; height: 100%;
       object-fit: cover; display: block;
       opacity: 0; transition: opacity 180ms ease-out;
     }
-    .packed .item img.loaded { opacity: 1; }
+    .vtile img.loaded { opacity: 1; }
     @keyframes tile-shimmer {
       0%, 100% { background-color: #e4e7eb; }
       50%      { background-color: #d4d8de; }
+    }
+
+    .warn {
+      font-size: 12px; color: var(--text-muted); margin-top: 6px;
     }
   </style>
 </head>
@@ -62,8 +69,8 @@
     <a href="./editorial.html">Editorial</a>
     <a href="./ttfs.html">TTFS</a>
     <a href="./decode-pool.html">Decode pool</a>
-    <a href="./scale.html" aria-current="page">Scale</a>
-    <a href="./virtual.html">Virtual</a>
+    <a href="./scale.html">Scale</a>
+    <a href="./virtual.html" aria-current="page">Virtual</a>
     <a href="./dropzone.html">Drop zone</a>
     <a href="./chat.html">Chat</a>
     <span class="spacer"></span>
@@ -72,19 +79,20 @@
 
   <main class="page wide">
     <header class="page-header">
-      <h1>Scale — hundreds of tiles, cache-busted</h1>
-      <p>The library's story at scale. Each panel scrolls independently. The left panel is the stock web: <code>&lt;img&gt;</code> tags in a CSS column layout, all fired at once. The right panel uses <code>PrepareQueue</code> to measure every tile with <code>dimsOnly: true</code> up front (saves the image body bytes), lays out the full grid from known dims, and <code>IntersectionObserver</code> triggers a full fetch for tiles as they scroll into view. Crank the slider to 500 and watch what happens.</p>
+      <h1>Virtual — ten thousand tiles, DOM-recycled</h1>
+      <p>Windowing a grid of non-uniform-height tiles is the chicken-and-egg: you need heights to position items, but heights come from loading them. The left panel is the naive attempt — drop N <code>&lt;img&gt;</code> tags into a CSS column layout and let the browser fetch, decode, and reflow all at once. The right panel uses <code>prepare()</code> with <code>dimsOnly</code> to measure every URL for just the header bytes (~4KB each), packs the full layout from the returned aspect ratios, then recycles a pool of ~40 DOM nodes as you scroll. Crank the slider; the scrollbar length is honest from the first frame, no matter the count.</p>
     </header>
 
     <div class="controls">
       <div class="controls-row">
         <div class="count-control">
           <span>Tiles</span>
-          <input id="countSlider" type="range" min="50" max="500" value="200" step="10" />
-          <span id="countVal" class="count-val">200</span>
+          <input id="countSlider" type="range" min="500" max="10000" value="2000" step="100" />
+          <span id="countVal" class="count-val">2000</span>
         </div>
       </div>
       <span id="meta" class="meta"></span>
+      <p class="warn">Heads up: the naive side at 5k+ tiles can make your tab unresponsive for a few seconds while the browser builds the CSS column layout and opens 10k parallel fetches. That's the point.</p>
     </div>
 
     <div class="panels two">
@@ -96,9 +104,9 @@
           <button id="runNaive" class="primary">Run</button>
         </div>
         <div class="panel-stats stat-list" id="naiveStats">
+          <div class="row"><span class="label">DOM nodes</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row"><span class="label">First tile loaded</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row"><span class="label">All tiles loaded</span><span class="value"><b>&mdash;</b></span></div>
-          <div class="row shift"><span class="label">Visible shifts</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row"><span class="label">Bytes transferred</span><span class="value"><b>&mdash;</b></span></div>
         </div>
         <div class="scroll-box" id="naiveScroll">
@@ -108,24 +116,25 @@
 
       <section class="panel">
         <div class="panel-header">
-          <h2 class="panel-title">Preimage <code>PrepareQueue</code> + <code>dimsOnly</code></h2>
+          <h2 class="panel-title">Preimage <code>dimsOnly</code> + DOM recycling</h2>
         </div>
         <div class="panel-run">
           <button id="runMeasured" class="primary">Run</button>
         </div>
         <div class="panel-stats stat-list" id="measuredStats">
+          <div class="row"><span class="label">DOM nodes (live)</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Dims probed</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row"><span class="label">First tile placed</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row"><span class="label">All tiles placed</span><span class="value"><b>&mdash;</b></span></div>
-          <div class="row"><span class="label">Visible loaded</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row"><span class="label">Bytes transferred</span><span class="value"><b>&mdash;</b></span></div>
         </div>
         <div class="scroll-box" id="measuredScroll">
-          <div id="measured" class="packed"></div>
+          <div id="measured" class="virtual-spacer"></div>
         </div>
       </section>
     </div>
   </main>
 
-  <script type="module" src="./scale.ts"></script>
+  <script type="module" src="./virtual.ts"></script>
 </body>
 </html>
