@@ -2,13 +2,7 @@ import { prepareWithSegments, materializeLineRange } from '@chenglou/pretext'
 
 import { prepare, getMeasurement } from '../../src/index.js'
 import { flowColumnWithFloats } from '../../src/pretext.js'
-import {
-  generateFallbackBlob,
-  newCacheBustToken,
-  picsumReachable,
-  picsumUrl,
-  type PhotoDescriptor,
-} from './photo-source.js'
+import { newCacheBustToken, photoUrl, PHOTOS, type Photo } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
 
 const metaEl = document.getElementById('meta')!
@@ -29,10 +23,12 @@ The right panel measures each figure before layout runs. Preimage's prepare() st
 
 No author-declared attributes. No intermediate skeleton swap. The column's final height, every line's y-coordinate, and every figure's rect are all known before the first paint. When the bytes finish streaming the figures just fill into their already-reserved positions.`
 
-const FIGURES: readonly PhotoDescriptor[] = [
-  { seed: 'preimage-editorial-1', width: 2400, height: 1600, caption: 'landscape' },
-  { seed: 'preimage-editorial-2', width: 2400, height: 1350, caption: 'cityscape' },
-  { seed: 'preimage-editorial-3', width: 1800, height: 2400, caption: 'portrait' },
+// Pick three visually varied figures: one landscape, one landscape,
+// one portrait. Indices hand-picked from photos.json.
+const FIGURES: readonly Photo[] = [
+  PHOTOS[12]!, // 13.png — 1344×896 landscape (battle field)
+  PHOTOS[22]!, // 23.png — 1344×896 landscape
+  PHOTOS[3]!,  //  4.png —  816×1456 portrait (samurai)
 ]
 
 const FIGURE_TOPS = [0, 210, 420]
@@ -42,32 +38,14 @@ function getCacheBust(): string | null {
   return checked?.value === 'off' ? null : newCacheBustToken()
 }
 
-async function resolvePhotos(
-  useLive: boolean,
-  cacheBust: string | null,
-  panelTag: string,
-): Promise<string[]> {
-  if (useLive) {
-    return FIGURES.map((p) => {
-      const base = picsumUrl(p, cacheBust)
-      const sep = base.includes('?') ? '&' : '?'
-      return `${base}${sep}panel=${panelTag}`
-    })
-  }
-  const out: string[] = []
-  for (let i = 0; i < FIGURES.length; i++) {
-    const blob = await generateFallbackBlob(FIGURES[i]!, (i * 43 + panelTag.length) % 360)
-    out.push(URL.createObjectURL(blob))
-  }
-  return out
+function buildUrls(cacheBust: string | null): string[] {
+  return FIGURES.map((p) => photoUrl(p, cacheBust))
 }
 
-function setMeta(useLive: boolean, cacheBust: string | null): void {
+function setMeta(cacheBust: string | null): void {
   metaEl.textContent =
     `${FIGURES.length} figures · ` +
-    (useLive
-      ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
-      : 'picsum offline — canvas fallbacks')
+    (cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — each run fetches fresh')
 }
 
 function buildNaiveArticle(panel: HTMLElement): HTMLImageElement[] {
@@ -100,10 +78,9 @@ async function runNaive(): Promise<void> {
   runNaiveBtn.textContent = 'Running…'
   naivePanel.innerHTML = ''
   naiveResult.innerHTML = ''
-  const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
-  setMeta(useLive, cacheBust)
-  const urls = await resolvePhotos(useLive, cacheBust, 'naive')
+  setMeta(cacheBust)
+  const urls = buildUrls(cacheBust)
 
   const t0 = performance.now()
   const imgs = buildNaiveArticle(naivePanel)
@@ -137,10 +114,9 @@ async function runMeasured(): Promise<void> {
   measuredPanel.innerHTML = ''
   measuredPanel.style.height = '0px'
   measuredResult.innerHTML = ''
-  const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
-  setMeta(useLive, cacheBust)
-  const urls = await resolvePhotos(useLive, cacheBust, 'measured')
+  setMeta(cacheBust)
+  const urls = buildUrls(cacheBust)
 
   const t0 = performance.now()
   const [prepared] = await Promise.all([

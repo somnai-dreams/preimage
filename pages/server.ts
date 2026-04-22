@@ -1,0 +1,42 @@
+// Dev server for the demo pages. Each demo HTML is a Bun HTML entry
+// (bundling its TS + CSS dependencies on request); anything under
+// /assets/ is served as static bytes. Bun's built-in HTML-only mode
+// (`bun pages/*.html`) doesn't serve arbitrary static files, so we
+// wrap it in a tiny server here.
+import { serve } from 'bun'
+import { join } from 'node:path'
+
+import indexHtml from './demos/index.html'
+import masonryHtml from './demos/masonry.html'
+import editorialHtml from './demos/editorial.html'
+import ttfsHtml from './demos/ttfs.html'
+import decodePoolHtml from './demos/decode-pool.html'
+
+const port = Number(Bun.env.PORT ?? 3000)
+const hostname = Bun.env.HOST ?? '0.0.0.0'
+const pagesRoot = import.meta.dir
+
+const server = serve({
+  port,
+  hostname,
+  routes: {
+    '/': indexHtml,
+    '/masonry': masonryHtml,
+    '/editorial': editorialHtml,
+    '/ttfs': ttfsHtml,
+    '/decode-pool': decodePoolHtml,
+    '/assets/*': async (req) => {
+      // Strip leading "/" and map into pages/assets/.
+      const url = new URL(req.url)
+      const rel = url.pathname.replace(/^\/+/, '')
+      const file = Bun.file(join(pagesRoot, rel))
+      if (!(await file.exists())) {
+        return new Response('not found', { status: 404 })
+      }
+      return new Response(file)
+    },
+  },
+  development: true,
+})
+
+console.log(`preimage demos: http://${server.hostname}:${server.port}`)

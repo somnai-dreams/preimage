@@ -1,11 +1,5 @@
 import { DecodePool, prepare, getMeasurement } from '../../src/index.js'
-import {
-  generateFallbackBlob,
-  newCacheBustToken,
-  picsumReachable,
-  picsumUrl,
-  type PhotoDescriptor,
-} from './photo-source.js'
+import { newCacheBustToken, photoUrl, takePhotos, type Photo } from './photo-source.js'
 
 const metaEl = document.getElementById('meta')!
 const runNaiveBtn = document.getElementById('runNaive') as HTMLButtonElement
@@ -28,47 +22,24 @@ const poolEmpty = document.getElementById('poolEmpty')!
 
 const FRAME_COUNT = 16
 
-// 2000×1125 JPEGs are heavy enough (≈250-500KB each) that main-thread
-// decode is measurable on every scrub. Smaller frames make the naive
-// path look artificially fast.
-const PHOTOS: PhotoDescriptor[] = Array.from({ length: FRAME_COUNT }, (_, i) => ({
-  seed: `preimage-pool-${i}`,
-  width: 2000,
-  height: 1125,
-  caption: `frame ${i + 1}`,
-}))
+// Take the first 16 photos from the manifest — PNGs at ~1-3MB each
+// are heavy enough that main-thread decode is measurable on every
+// scrub. Smaller frames make the naive path look artificially fast.
+const FRAMES: Photo[] = takePhotos(FRAME_COUNT)
 
 function getCacheBust(): string | null {
   const checked = document.querySelector<HTMLInputElement>('input[name="cache"]:checked')
   return checked?.value === 'off' ? null : newCacheBustToken()
 }
 
-async function resolvePhotos(
-  useLive: boolean,
-  cacheBust: string | null,
-  panelTag: string,
-): Promise<string[]> {
-  if (useLive) {
-    return PHOTOS.map((p) => {
-      const base = picsumUrl(p, cacheBust)
-      const sep = base.includes('?') ? '&' : '?'
-      return `${base}${sep}panel=${panelTag}`
-    })
-  }
-  const out: string[] = []
-  for (let i = 0; i < PHOTOS.length; i++) {
-    const blob = await generateFallbackBlob(PHOTOS[i]!, (i * 29 + panelTag.length) % 360)
-    out.push(URL.createObjectURL(blob))
-  }
-  return out
+function resolvePhotos(cacheBust: string | null): string[] {
+  return FRAMES.map((p) => photoUrl(p, cacheBust))
 }
 
-function setMeta(useLive: boolean, cacheBust: string | null): void {
+function setMeta(cacheBust: string | null): void {
   metaEl.textContent =
-    `${FRAME_COUNT} frames @ ${PHOTOS[0]!.width}×${PHOTOS[0]!.height} · ` +
-    (useLive
-      ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
-      : 'picsum offline — canvas fallbacks')
+    `${FRAME_COUNT} local frames · ` +
+    (cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — each run fetches fresh')
 }
 
 function sizeCanvas(canvas: HTMLCanvasElement): { w: number; h: number } {
@@ -138,10 +109,9 @@ async function runNaive(): Promise<void> {
   naiveTimeTag.textContent = '—'
   naiveTimeTag.className = 'tag'
 
-  const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
-  setMeta(useLive, cacheBust)
-  const urls = await resolvePhotos(useLive, cacheBust, 'naive')
+  setMeta(cacheBust)
+  const urls = resolvePhotos(cacheBust)
 
   const t0 = performance.now()
   const images = urls.map((u) => {
@@ -220,10 +190,9 @@ async function runPool(): Promise<void> {
   poolFrameTag.textContent = '—'
   poolTimeTag.textContent = '—'
   poolTimeTag.className = 'tag'
-  const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
-  setMeta(useLive, cacheBust)
-  const urls = await resolvePhotos(useLive, cacheBust, 'pool')
+  setMeta(cacheBust)
+  const urls = resolvePhotos(cacheBust)
 
   const t0 = performance.now()
   const pool = new DecodePool({

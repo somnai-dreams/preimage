@@ -1,11 +1,5 @@
 import { prepare, getMeasurement } from '../../src/index.js'
-import {
-  generateFallbackBlob,
-  newCacheBustToken,
-  picsumReachable,
-  picsumUrl,
-  type PhotoDescriptor,
-} from './photo-source.js'
+import { newCacheBustToken, photoUrl, PHOTOS } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
 
 const metaEl = document.getElementById('meta')!
@@ -22,15 +16,11 @@ const run1 = document.getElementById('run1') as HTMLButtonElement
 const run2 = document.getElementById('run2') as HTMLButtonElement
 const run3 = document.getElementById('run3') as HTMLButtonElement
 
-// High-res photo: ~4800×3200 JPEGs weigh in at 2-5MB. That's the
-// window where "dims known from first 2KB" vs "dims known after
-// full transfer" becomes a visible delta, even on fast connections.
-const PHOTO: PhotoDescriptor = {
-  seed: 'preimage-ttfs-highres',
-  width: 4800,
-  height: 3200,
-  caption: 'high-res landscape',
-}
+// Pick the beefiest PNG in the manifest — 13.png (battle field) is
+// 1344×896 at ~2.9MB. PNGs at this scale take meaningful time to
+// transfer, which is the window where "dims from first 2KB" beats
+// "dims after full transfer".
+const PHOTO = PHOTOS[12]!
 
 const PANEL_WIDTH = 340
 const MAX_FRAME_HEIGHT = 260
@@ -56,26 +46,14 @@ function getCacheBust(): string | null {
   return checked?.value === 'off' ? null : newCacheBustToken()
 }
 
-async function resolveUrl(
-  useLive: boolean,
-  cacheBust: string | null,
-  panelTag: string,
-): Promise<string> {
-  if (useLive) {
-    const base = picsumUrl(PHOTO, cacheBust)
-    const sep = base.includes('?') ? '&' : '?'
-    return `${base}${sep}panel=${panelTag}`
-  }
-  const blob = await generateFallbackBlob(PHOTO, 200 + panelTag.length * 37)
-  return URL.createObjectURL(blob)
+function resolveUrl(cacheBust: string | null): string {
+  return photoUrl(PHOTO, cacheBust)
 }
 
-function setMeta(useLive: boolean, cacheBust: string | null): void {
+function setMeta(cacheBust: string | null): void {
   metaEl.textContent =
-    `${PHOTO.width}×${PHOTO.height} · ` +
-    (useLive
-      ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
-      : 'picsum offline — canvas fallback (no realistic network time)')
+    `${PHOTO.width}×${PHOTO.height} · local PNG · ` +
+    (cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — each run fetches fresh')
 }
 
 function sizedFrame(
@@ -110,10 +88,9 @@ async function runNaive(): Promise<void> {
   ], 0)
   e1.innerHTML = `<div class="row"><span>dims known (onload)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div>`
 
-  const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
-  setMeta(useLive, cacheBust)
-  const url = await resolveUrl(useLive, cacheBust, 'naive')
+  setMeta(cacheBust)
+  const url = resolveUrl(cacheBust)
 
   const t0 = performance.now()
   const img = document.createElement('img')
@@ -153,10 +130,9 @@ async function runNative(): Promise<void> {
   r2.innerHTML = ''
   e2.innerHTML = `<div class="row"><span>dims known (from attrs)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div>`
 
-  const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
-  setMeta(useLive, cacheBust)
-  const url = await resolveUrl(useLive, cacheBust, 'native')
+  setMeta(cacheBust)
+  const url = resolveUrl(cacheBust)
 
   const t0 = performance.now()
   const frame = sizedFrame(f2, PHOTO.width, PHOTO.height)
@@ -202,10 +178,9 @@ async function runPreimage(): Promise<void> {
   r3.innerHTML = ''
   e3.innerHTML = `<div class="row"><span>dims known (prepare)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div>`
 
-  const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
-  setMeta(useLive, cacheBust)
-  const url = await resolveUrl(useLive, cacheBust, 'preimage')
+  setMeta(cacheBust)
+  const url = resolveUrl(cacheBust)
 
   const t0 = performance.now()
   const prepared = await prepare(url)

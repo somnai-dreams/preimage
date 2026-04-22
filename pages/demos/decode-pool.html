@@ -38,7 +38,7 @@
   <main class="page">
     <header class="page-header">
       <h1>Decode pool — scrub a high-res photo timeline on a canvas</h1>
-      <p>Sixteen 2000×1125 frames rendered to a canvas as you drag the slider. Each panel has its own Run button so you feel the difference. Left: <code>img.src = url</code> per scrub, with a main-thread decode on every tick. Right: warm a <code>DecodePool</code> up front, then every scrub is a single blit of a cached <code>ImageBitmap</code>. Scrub quickly and watch the per-frame time.</p>
+      <p>Sixteen local PNG frames (~1-3MB each) rendered to a canvas as you drag the slider. Each panel has its own Run button so you feel the difference. Left: <code>img.src = url</code> per scrub, with a main-thread decode on every tick. Right: warm a <code>DecodePool</code> up front, then every scrub is a single blit of a cached <code>ImageBitmap</code>. Scrub quickly and watch the per-frame time.</p>
     </header>
 
     <div class="controls">

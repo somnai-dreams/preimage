@@ -37,7 +37,7 @@
 
     <section class="demo-section">
       <h2>Demos</h2>
-      <p class="intro">Each demo has per-panel Run buttons — click one side at a time to feel the click-to-layout delay. Real photos from picsum at meaningful sizes, so you can see the download-decode window that reflow happens in.</p>
+      <p class="intro">Each demo has per-panel Run buttons — click one side at a time to feel the click-to-layout delay. Photos are committed locally (~1-3MB PNGs) so cache-busting is honest and there's no CDN redirect chain skewing the numbers.</p>
       <div class="demo-list">
         <a class="demo-card" href="./masonry">
           <h3>Masonry grid</h3>
@@ -49,11 +49,11 @@
         </a>
         <a class="demo-card" href="./ttfs">
           <h3>Time to first sizing</h3>
-          <p>One 4800×3200 photo (~2-5MB) loaded three ways: naive <code>&lt;img src&gt;</code>, declared <code>width</code>/<code>height</code> attrs, and <code>prepare()</code>. The timestamp shows when each strategy knows the dimensions.</p>
+          <p>One ~3MB local PNG loaded three ways: naive <code>&lt;img src&gt;</code>, declared <code>width</code>/<code>height</code> attrs, and <code>prepare()</code>. The timestamp shows when each strategy knows the dimensions.</p>
         </a>
         <a class="demo-card" href="./decode-pool">
           <h3>Decode pool for canvas timelines</h3>
-          <p>Sixteen 2000×1125 frames scrubbable on a canvas. Left decodes on every scrub on the main thread; right warms a <code>DecodePool</code> up front and each scrub is a single cached-bitmap blit.</p>
+          <p>Sixteen ~1-3MB PNG frames scrubbable on a canvas. Left decodes on every scrub on the main thread; right warms a <code>DecodePool</code> up front and each scrub is a single cached-bitmap blit.</p>
         </a>
       </div>
     </section>

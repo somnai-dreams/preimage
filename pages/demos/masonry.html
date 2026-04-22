@@ -48,15 +48,15 @@
   <main class="page wide">
     <header class="page-header">
       <h1>Masonry — reflow during image loads</h1>
-      <p>Two grids, same photos, separate Run buttons so you feel each one. The left uses stock <code>&lt;img&gt;</code> tags with no reserved dimensions — the column stretches as each image decodes and every tile below it shifts. The right calls <code>prepare()</code> per image first, then commits a shortest-column layout in one synchronous pass; tiles are positioned before any pixel paints, and the dominant-color placeholder holds the spot.</p>
+      <p>Two grids, same photos, separate Run buttons so you feel each one. The left uses stock <code>&lt;img&gt;</code> tags with no reserved dimensions — the column stretches as each image decodes and every tile below it shifts. The right calls <code>prepare()</code> per image first, then commits a shortest-column layout in one synchronous pass; tiles are positioned before any pixel paints.</p>
     </header>
 
     <div class="controls">
       <div class="controls-row">
         <div class="count-control">
           <span>Images</span>
-          <input id="countSlider" type="range" min="9" max="90" value="30" step="3" />
-          <span id="countVal" class="count-val">30</span>
+          <input id="countSlider" type="range" min="6" max="34" value="24" step="1" />
+          <span id="countVal" class="count-val">24</span>
         </div>
         <span class="controls-label">Cache-bust</span>
         <div class="segmented" role="radiogroup" aria-label="Cache-bust">

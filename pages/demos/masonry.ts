@@ -1,11 +1,5 @@
 import { prepare, getMeasurement } from '../../src/index.js'
-import {
-  generateFallbackBlob,
-  newCacheBustToken,
-  picsumReachable,
-  picsumUrl,
-  type PhotoDescriptor,
-} from './photo-source.js'
+import { newCacheBustToken, photoUrl, takePhotos, PHOTO_COUNT } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
 
 const countSlider = document.getElementById('countSlider') as HTMLInputElement
@@ -21,37 +15,20 @@ const runMeasuredBtn = document.getElementById('runMeasured') as HTMLButtonEleme
 const COLUMNS = 3
 const GAP = 6
 
-// Larger source dimensions than previous iterations — picsum serves
-// real photos at whatever size you ask for, and meaningful reflow
-// windows need meaningful transfer times. At 2400×1600 each photo is
-// ~400KB-1MB; scaled down to column width the detail is still visible.
-const ASPECTS: Array<[number, number]> = [
-  [2400, 1600], // 3:2 landscape
-  [1800, 2400], // 3:4 portrait
-  [2700, 1800], // 3:2 landscape
-  [2400, 1350], // 16:9 landscape
-  [1500, 2100], // 5:7 portrait
-  [2250, 1500], // 3:2 landscape
-  [2000, 2000], // 1:1 square
-  [2560, 1440], // 16:9 landscape
-  [1350, 2400], // 9:16 portrait
-  [2400, 1600], // 3:2 landscape
-]
-
-function buildPhotos(count: number): PhotoDescriptor[] {
-  return Array.from({ length: count }, (_, i) => {
-    const [w, h] = ASPECTS[i % ASPECTS.length]!
-    return {
-      seed: `preimage-masonry-${i}`,
-      width: w,
-      height: h,
-      caption: `photo ${i + 1}`,
-    }
-  })
+function getCount(): number {
+  return Math.min(Number(countSlider.value), PHOTO_COUNT)
 }
 
-// Layout: shortest-column fill. Returns (x, y, w, h) per tile plus
-// the container's total height. Pure arithmetic over aspect ratios.
+function getCacheBust(): string | null {
+  const checked = document.querySelector<HTMLInputElement>('input[name="cache"]:checked')
+  return checked?.value === 'off' ? null : newCacheBustToken()
+}
+
+function buildUrls(count: number, cacheBust: string | null): string[] {
+  return takePhotos(count).map((p) => photoUrl(p, cacheBust))
+}
+
+// Shortest-column fill. Pure arithmetic over aspect ratios.
 type Placement = { x: number; y: number; width: number; height: number }
 
 function layoutShortestColumn(
@@ -75,44 +52,12 @@ function layoutShortestColumn(
   return { placements, totalHeight: Math.max(...heights) - GAP }
 }
 
-function getCount(): number {
-  return Number(countSlider.value)
-}
-
-function getCacheBust(): string | null {
-  const checked = document.querySelector<HTMLInputElement>('input[name="cache"]:checked')
-  return checked?.value === 'off' ? null : newCacheBustToken()
-}
-
-type ResolvedPhoto = { url: string; origin: 'picsum' | 'fallback' }
-
-async function resolvePhotos(
-  photos: readonly PhotoDescriptor[],
-  useLive: boolean,
-  cacheBust: string | null,
-  panelTag: string,
-): Promise<ResolvedPhoto[]> {
-  if (useLive) {
-    return photos.map((p) => {
-      const base = picsumUrl(p, cacheBust)
-      const sep = base.includes('?') ? '&' : '?'
-      return { url: `${base}${sep}panel=${panelTag}`, origin: 'picsum' as const }
-    })
-  }
-  const results: ResolvedPhoto[] = []
-  for (let i = 0; i < photos.length; i++) {
-    const blob = await generateFallbackBlob(photos[i]!, (i * 43 + panelTag.length) % 360)
-    results.push({ url: URL.createObjectURL(blob), origin: 'fallback' })
-  }
-  return results
-}
-
-function setMeta(useLive: boolean, cacheBust: string | null, count: number): void {
+function setMeta(count: number, cacheBust: string | null): void {
   metaEl.textContent =
-    `${count} photos · ` +
-    (useLive
-      ? `picsum.photos (${cacheBust === null ? 'HTTP cache allowed' : 'cache-busted — real network'})`
-      : 'picsum offline — canvas fallbacks')
+    `${count} local photos · ` +
+    (cacheBust === null
+      ? 'HTTP cache allowed'
+      : 'cache-busted — each run fetches fresh')
 }
 
 // --- Naive run ---
@@ -124,16 +69,12 @@ async function runNaive(): Promise<void> {
   naiveResult.innerHTML = ''
 
   const count = getCount()
-  const photos = buildPhotos(count)
-  const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
-  setMeta(useLive, cacheBust, count)
-  const resolved = await resolvePhotos(photos, useLive, cacheBust, 'naive')
-  const urls = resolved.map((r) => r.url)
+  setMeta(count, cacheBust)
+  const urls = buildUrls(count, cacheBust)
 
-  // Click-to-layout timer starts the moment we actually begin the
-  // render. Everything before this (photo prep, network probe) is
-  // setup — not what the user cares about.
+  // Click-to-layout timer. Everything after this is what the user
+  // actually waits on.
   const t0 = performance.now()
   const imgs = urls.map(() => {
     const img = document.createElement('img')
@@ -173,17 +114,12 @@ async function runMeasured(): Promise<void> {
   measuredResult.innerHTML = ''
 
   const count = getCount()
-  const photos = buildPhotos(count)
-  const useLive = await picsumReachable()
   const cacheBust = getCacheBust()
-  setMeta(useLive, cacheBust, count)
-  const resolved = await resolvePhotos(photos, useLive, cacheBust, 'measured')
-  const urls = resolved.map((r) => r.url)
+  setMeta(count, cacheBust)
+  const urls = buildUrls(count, cacheBust)
 
-  // Timer starts at the moment of the click (after resolving — the
-  // user's click is the last thing before this function runs). The
-  // library's work is everything after t0: measure dims, solve
-  // layout, commit DOM.
+  // Timer starts at the click. The library's work: measure dims, solve
+  // layout, commit DOM — then images load into the reserved tiles.
   const t0 = performance.now()
   const prepared = await Promise.all(urls.map((u) => prepare(u)))
   const measuredMs = performance.now() - t0
@@ -241,6 +177,7 @@ async function runMeasured(): Promise<void> {
 
 // --- Controls ---
 
+countSlider.max = String(PHOTO_COUNT)
 countSlider.addEventListener('input', () => {
   countVal.textContent = countSlider.value
 })

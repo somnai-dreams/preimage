@@ -51,8 +51,8 @@
     "build:package": "rm -rf dist && tsc -p tsconfig.build.json",
     "check": "tsc",
     "prepack": "rm -rf dist && tsc -p tsconfig.build.json",
-    "start": "HOST=${HOST:-0.0.0.0}; PORT=3000; bun pages/*.html pages/demos/*.html --host=$HOST:$PORT",
-    "start:windows": "bun pages/*.html pages/demos/*.html --host=0.0.0.0:3000"
+    "start": "HOST=${HOST:-0.0.0.0} PORT=${PORT:-3000} bun --hot pages/server.ts",
+    "start:windows": "bun --hot pages/server.ts"
   },
   "devDependencies": {
     "@chenglou/pretext": "^0.0.5",

@@ -39,8 +39,8 @@
 
   <main class="page">
     <header class="page-header">
-      <h1>Time to first sizing — one high-res photo, three strategies</h1>
-      <p>One 4800×3200 photo (≈2-5MB over the wire), loaded three ways. Each panel has its own Run button — click to feel the click-to-dimensions delay for each strategy. Naive <code>&lt;img src&gt;</code> can only tell you dimensions once the full transfer is decoded. Declared <code>width</code>/<code>height</code> attributes are instant but require the author to already know them. <code>prepare()</code> streams the response and parses the format header out of the first ~2KB — dimensions arrive long before the image finishes downloading.</p>
+      <h1>Time to first sizing — one photo, three strategies</h1>
+      <p>One ~3MB PNG, loaded three ways. Each panel has its own Run button — click to feel the click-to-dimensions delay for each strategy. Naive <code>&lt;img src&gt;</code> can only tell you dimensions once the full transfer is decoded. Declared <code>width</code>/<code>height</code> attributes are instant but require the author to already know them. <code>prepare()</code> streams the response and parses the format header out of the first ~2KB — dimensions arrive long before the image finishes downloading.</p>
     </header>
 
     <div class="controls">
