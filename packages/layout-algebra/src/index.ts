@@ -225,3 +225,40 @@ function placeJustifiedRow(
   }
   return y + rowH + gap
 }
+
+// --- Visibility query ---
+//
+// Given a set of placements and a vertical window [viewTop, viewBottom],
+// return the indices of placements that overlap. Optional `overscan`
+// widens the window above and below — useful for pre-mounting tiles
+// that are about to scroll into view so the user doesn't see blank
+// space during a fast scroll.
+//
+// Linear scan in placement order. For ~10k placements at 60Hz that's
+// under a millisecond per frame. Callers with larger sets or tighter
+// budgets can index by y-bucket externally; the math here doesn't
+// assume sortedness because shortest-column placements are emitted in
+// item-add order, not y-order.
+
+export type VisibilityWindow = {
+  viewTop: number
+  viewBottom: number
+  overscan?: number
+}
+
+export function visibleIndices(
+  placements: readonly Placement[],
+  window: VisibilityWindow,
+): number[] {
+  const overscan = window.overscan ?? 0
+  const top = window.viewTop - overscan
+  const bottom = window.viewBottom + overscan
+  const out: number[] = []
+  for (let i = 0; i < placements.length; i++) {
+    const p = placements[i]!
+    if (p.y + p.height < top) continue
+    if (p.y > bottom) continue
+    out.push(i)
+  }
+  return out
+}

@@ -1,4 +1,5 @@
 import { PrepareQueue, getMeasurement } from '@somnai-dreams/preimage'
+import { createVirtualTilePool } from '@somnai-dreams/preimage/virtual'
 import { shortestColumnCursor, type Placement } from '@somnai-dreams/layout-algebra'
 import { cycledUrls } from './photo-source.js'
 
@@ -159,27 +160,6 @@ async function runNaive(): Promise<void> {
 
 // --- Measured run with true DOM recycling ---
 
-type VirtualTile = {
-  idx: number
-  url: string
-  place: Placement
-}
-
-// Scroll handler is rAF-throttled so a fast scroll coalesces to one
-// recompute per frame. `pending` is a sticky bit that collapses bursts
-// of scroll events.
-function rafThrottle(fn: () => void): () => void {
-  let pending = false
-  return () => {
-    if (pending) return
-    pending = true
-    requestAnimationFrame(() => {
-      pending = false
-      fn()
-    })
-  }
-}
-
 async function runMeasured(): Promise<void> {
   runMeasuredBtn.disabled = true
   runMeasuredBtn.textContent = 'Running…'
@@ -207,72 +187,24 @@ async function runMeasured(): Promise<void> {
     gap: GAP,
     panelWidth: measuredPanel.getBoundingClientRect().width,
   })
-  const tiles: VirtualTile[] = []
 
-  // DOM recycling pool. Up to ~(viewport-height / min-tile-height) *
-  // COLUMNS tiles visible at once; pool holds everything mounted,
-  // `active` maps index to the element currently rendering that tile.
-  const pool: HTMLDivElement[] = []
-  const active = new Map<number, HTMLDivElement>()
+  // `placements[i]` is the i-th resolved tile in resolution order.
+  // `indexUrl[i]` is the URL that `mount` should render for that
+  // tile. Both arrays grow monotonically as prepare() resolves fire.
+  const placements: Placement[] = []
+  const indexUrl: string[] = []
 
-  function getEl(): HTMLDivElement {
-    const existing = pool.pop()
-    if (existing !== undefined) {
-      existing.style.display = 'block'
-      return existing
-    }
-    const el = document.createElement('div')
-    el.className = 'vtile pending'
-    measuredPanel.appendChild(el)
-    return el
-  }
-
-  function releaseEl(el: HTMLDivElement): void {
-    el.style.display = 'none'
-    // Clear the old <img>. Leaving it in place would show stale pixels
-    // the next time this pooled element is mounted for a *different*
-    // tile. The browser HTTP cache dedupes refetches of the same URL,
-    // so scrolling back to a previously-seen tile is effectively free.
-    el.innerHTML = ''
-    el.classList.remove('has-image')
-    el.classList.add('pending')
-    pool.push(el)
-  }
-
-  function renderVisible(): void {
-    const scrollY = measuredScroll.scrollTop
-    const vh = measuredScroll.clientHeight
-    const top = scrollY - OVERSCAN
-    const bot = scrollY + vh + OVERSCAN
-
-    // Collect wanted indices. Linear scan over tiles is fine here —
-    // at 10k tiles × 60Hz that's 600k comparisons/sec, nothing.
-    // A sorted-by-y structure would be faster but adds insertion cost
-    // as dim-probes resolve out of order.
-    const wanted = new Set<number>()
-    for (const t of tiles) {
-      if (t.place.y + t.place.height < top) continue
-      if (t.place.y > bot) continue
-      wanted.add(t.idx)
-    }
-
-    // Unmount tiles that scrolled away.
-    for (const [idx, el] of active) {
-      if (!wanted.has(idx)) {
-        active.delete(idx)
-        releaseEl(el)
-      }
-    }
-
-    // Mount tiles that scrolled in.
-    for (const t of tiles) {
-      if (!wanted.has(t.idx) || active.has(t.idx)) continue
-      const el = getEl()
-      el.style.left = `${t.place.x}px`
-      el.style.top = `${t.place.y}px`
-      el.style.width = `${t.place.width}px`
-      el.style.height = `${t.place.height}px`
-      el.dataset['idx'] = String(t.idx)
+  const pool = createVirtualTilePool({
+    scrollContainer: measuredScroll,
+    contentContainer: measuredPanel,
+    overscan: OVERSCAN,
+    mount: (idx, el, place) => {
+      el.className = 'vtile pending'
+      el.style.left = `${place.x}px`
+      el.style.top = `${place.y}px`
+      el.style.width = `${place.width}px`
+      el.style.height = `${place.height}px`
+      el.dataset['idx'] = String(idx)
 
       const img = new Image()
       img.alt = ''
@@ -285,17 +217,23 @@ async function runMeasured(): Promise<void> {
         },
         { once: true },
       )
-      img.src = t.url
+      img.src = indexUrl[idx]!
       el.appendChild(img)
 
-      active.set(t.idx, el)
-    }
-
-    setRowValue(measuredStats, 1, `<b>${fmtCount(active.size)}</b>`)
-  }
-
-  const onScroll = rafThrottle(renderVisible)
-  measuredScroll.addEventListener('scroll', onScroll, { passive: true })
+      setRowValue(measuredStats, 1, `<b>${fmtCount(pool.activeCount)}</b>`)
+    },
+    unmount: (_idx, el) => {
+      // Cancel any in-flight image fetch before discarding the <img>.
+      // Removing the element from the DOM alone doesn't stop the
+      // browser from finishing the request in the background.
+      const img = el.querySelector('img')
+      if (img !== null) img.src = ''
+      el.innerHTML = ''
+      el.classList.remove('has-image')
+      el.classList.add('pending')
+      setRowValue(measuredStats, 1, `<b>${fmtCount(pool.activeCount)}</b>`)
+    },
+  })
 
   // Fire every prepare(dimsOnly) through the queue. concurrency: 20
   // is the H2 sweet spot; on H1 the browser's 6-slot cap gatekeeps
@@ -307,16 +245,18 @@ async function runMeasured(): Promise<void> {
   let firstPlacedMs: number | null = null
   let dimsProbed = 0
 
-  const placePromises = urls.map((url, idx) =>
+  const placePromises = urls.map((url) =>
     queue.enqueue(url, { dimsOnly: true }).then((prepared) => {
       const aspect = getMeasurement(prepared).aspectRatio
       const place = packer.add(aspect)
-      tiles.push({ idx, url, place })
+      placements.push(place)
+      indexUrl.push(url)
 
       // Grow the spacer monotonically so the scrollbar length tracks
       // "how much layout exists so far." After the last probe resolves,
       // the height is final and stays put.
       measuredPanel.style.height = `${packer.totalHeight()}px`
+      pool.setPlacements(placements)
 
       dimsProbed++
       setRowValue(measuredStats, 2, `<b>${fmtCount(dimsProbed)} / ${fmtCount(urls.length)}</b>`)
@@ -324,15 +264,6 @@ async function runMeasured(): Promise<void> {
       if (firstPlacedMs === null) {
         firstPlacedMs = performance.now() - t0
         setRowValue(measuredStats, 3, `<b>${fmtMs(firstPlacedMs)}</b>`)
-      }
-
-      // Render only when the newly-placed tile would actually be
-      // visible — cheap guard avoids a full recompute for off-screen
-      // placements, which is most of them when scrolled to top.
-      const scrollY = measuredScroll.scrollTop
-      const vh = measuredScroll.clientHeight
-      if (place.y + place.height >= scrollY - OVERSCAN && place.y <= scrollY + vh + OVERSCAN) {
-        renderVisible()
       }
     }),
   )

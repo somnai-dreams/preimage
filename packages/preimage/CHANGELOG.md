@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- **New subpath `@somnai-dreams/preimage/virtual`.** `createVirtualTilePool({ scrollContainer, contentContainer, overscan, mount, unmount })` returns a DOM-recycled tile pool for scrollable grids of `Placement[]`. Pairs naturally with `shortestColumnCursor` from layout-algebra: feed placements in via `pool.setPlacements(next)` as prepare() resolves fire, and the pool mounts/unmounts tiles as the user scrolls. Handles the scroll listener (rAF-throttled), the pool of reusable `<div>`s, the active-index map, and cleanup. `unmount` is the place to cancel in-flight image fetches (`img.src = ''`) so a fast scroll through 10k tiles doesn't leave dozens of abandoned requests in the pipeline.
+- Virtual demo refactored to use `createVirtualTilePool`; ~70 lines of hand-rolled pool/scroll bookkeeping removed.
+
 ## 0.3.0
 
 - **New bin `preimage-manifest` + subpath `@somnai-dreams/preimage/manifest`.** A build-time CLI that walks a directory, header-probes every image via the DOM-free core (no decode, reads only the first 4KB of each file), and emits a JSON manifest keyed by URL path with `{ width, height }`. Clients hydrate at startup with `recordKnownMeasurement` from `/core` — `prepare(url)` then resolves synchronously from cache on first paint, skipping the network-for-dims step entirely. Usage: `preimage-manifest ./public/photos --base /photos/ --out ./src/photos.json`. Programmatic access via `buildManifest({ root, base })`. Covers PNG/JPEG/GIF/BMP/WebP/SVG (the formats `probeImageBytes` handles); skips AVIF/HEIC with a stderr warning.
