@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · stream</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./demo-styles.css" />
+  <style>
+    .page.wide { max-width: 1400px; }
+
+    .controls-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+    .speed-control { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-muted); }
+    .speed-control input[type=range] { width: 240px; }
+    .speed-control .speed-val { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; min-width: 7ch; text-align: right; }
+
+    .panel-run { margin: 4px 0 12px; }
+    .panel-run button { font: inherit; font-weight: 500; padding: 7px 14px; background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm); cursor: pointer; transition: background 120ms; }
+    .panel-run button:hover:not(:disabled) { background: var(--accent-hover); }
+    .panel-run button:disabled { background: var(--border-strong); cursor: not-allowed; }
+    .panel-stats { border-top: 1px solid var(--border); padding-top: 10px; margin-bottom: 14px; }
+
+    .stage {
+      position: relative;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-muted);
+      min-height: 420px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 16px;
+    }
+    .stage .figure {
+      position: relative;
+      background: #e4e7eb;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      transition: opacity 150ms ease-out;
+    }
+    .stage .figure.pending {
+      animation: tile-shimmer 1.3s ease-in-out infinite;
+    }
+    .stage .figure img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      opacity: 0; transition: opacity 180ms ease-out;
+    }
+    .stage .figure img.loaded { opacity: 1; }
+    @keyframes tile-shimmer {
+      0%, 100% { background-color: #e4e7eb; }
+      50%      { background-color: #d4d8de; }
+    }
+
+    .progress {
+      position: absolute; left: 16px; bottom: 16px; right: 16px;
+      height: 4px; background: var(--border);
+      border-radius: 2px; overflow: hidden;
+    }
+    .progress > div {
+      height: 100%; background: var(--accent);
+      width: 0%; transition: width 80ms linear;
+    }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="./">preimage demos</a>
+    <a href="./masonry.html">Masonry</a>
+    <a href="./editorial.html">Editorial</a>
+    <a href="./ttfs.html">TTFS</a>
+    <a href="./decode-pool.html">Decode pool</a>
+    <a href="./scale.html">Scale</a>
+    <a href="./virtual.html">Virtual</a>
+    <a href="./manifest.html">Manifest</a>
+    <a href="./stream.html" aria-current="page">Stream</a>
+    <a href="./dropzone.html">Drop zone</a>
+    <a href="./chat.html">Chat</a>
+    <span class="spacer"></span>
+    <button type="button" id="warmCdn" class="warm-btn">Warm CDN</button>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page wide">
+    <header class="page-header">
+      <h1>Stream — reserve space mid-stream with <code>probeImageStream</code></h1>
+      <p>Both panels receive the same byte stream (a photo fetched and throttled to simulate a WebSocket or AI generation feed). The left panel waits for every byte, builds a Blob, sets <code>img.src</code>, and only then has dimensions — space pops in at the end. The right panel pipes the same stream through <code>probeImageStream</code> from <code>@somnai-dreams/preimage/core</code>; the first chunk's worth of header bytes fires <code>onDims</code>, space is reserved immediately, and the final Blob renders into it when the stream drains.</p>
+    </header>
+
+    <div class="controls">
+      <div class="controls-row">
+        <div class="speed-control">
+          <span>Throttle</span>
+          <input id="speedSlider" type="range" min="50" max="5000" value="400" step="50" />
+          <span id="speedVal" class="speed-val">400 KB/s</span>
+        </div>
+      </div>
+      <span id="meta" class="meta"></span>
+    </div>
+
+    <div class="panels two">
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Naive — <code>fetch</code> → Blob → <code>img.src</code></h2>
+        </div>
+        <div class="panel-run">
+          <button id="runNaive" class="primary">Stream</button>
+        </div>
+        <div class="panel-stats stat-list" id="naiveStats">
+          <div class="row"><span class="label">Bytes received</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Dims known</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Space reserved</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Full image rendered</span><span class="value"><b>&mdash;</b></span></div>
+        </div>
+        <div class="stage" id="naiveStage">
+          <div class="progress"><div id="naiveProgress"></div></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Preimage — <code>probeImageStream</code></h2>
+        </div>
+        <div class="panel-run">
+          <button id="runMeasured" class="primary">Stream</button>
+        </div>
+        <div class="panel-stats stat-list" id="measuredStats">
+          <div class="row"><span class="label">Bytes received</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Dims known</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Space reserved</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Full image rendered</span><span class="value"><b>&mdash;</b></span></div>
+        </div>
+        <div class="stage" id="measuredStage">
+          <div class="progress"><div id="measuredProgress"></div></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="./stream.ts"></script>
+  <script type="module" src="./warm-cdn.ts"></script>
+</body>
+</html>

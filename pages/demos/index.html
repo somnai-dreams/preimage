@@ -28,6 +28,7 @@
     <a href="./scale.html">Scale</a>
     <a href="./virtual.html">Virtual</a>
     <a href="./manifest.html">Manifest</a>
+    <a href="./stream.html">Stream</a>
     <a href="./dropzone.html">Drop zone</a>
     <a href="./chat.html">Chat</a>
     <span class="spacer"></span>
@@ -72,6 +73,10 @@
         <a class="demo-card" href="./manifest.html">
           <h3>Manifest — build-time dimensions, instant layout</h3>
           <p>Cold <code>prepare(url)</code> versus <code>recordKnownMeasurement</code> hydrated from a <code>preimage-manifest</code> JSON. Same 34 photos, same cache-bust, same layout. Cold pays a network probe per URL. Hydrated resolves every <code>prepare()</code> synchronously from cache — layout commits in microseconds.</p>
+        </a>
+        <a class="demo-card" href="./stream.html">
+          <h3>Stream — reserve space mid-stream</h3>
+          <p>Same photo streamed to both panels under a throttle (simulates a WebSocket, AI-gen feed, or slow CDN). Left buffers every byte, builds a Blob, sets <code>img.src</code>, and only then knows the size — space pops in at the end. Right pipes the same stream through <code>probeImageStream</code>: the first chunk's header fires <code>onDims</code>, space reserves mid-stream, the final Blob renders into it when the stream drains.</p>
         </a>
         <a class="demo-card" href="./dropzone.html">
           <h3>Drop zone — Blob inputs</h3>
