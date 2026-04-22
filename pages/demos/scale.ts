@@ -1,4 +1,5 @@
 import { PrepareQueue, getMeasurement } from '@somnai-dreams/preimage'
+import { shortestColumnCursor } from '@somnai-dreams/layout-algebra'
 import { cycledUrls } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
 
@@ -61,31 +62,6 @@ function resetStats(host: HTMLElement): void {
     if (b !== null) b.innerHTML = '—'
   }
   host.querySelector<HTMLElement>('.row.shift')?.classList.remove('has-shifts')
-}
-
-// --- Layout math (shortest column) ---
-
-type Placement = { x: number; y: number; width: number; height: number }
-
-function layoutShortestColumn(
-  aspects: readonly number[],
-  panelWidth: number,
-): { placements: Placement[]; totalHeight: number } {
-  const colWidth = (panelWidth - GAP * (COLUMNS - 1)) / COLUMNS
-  const heights = new Array<number>(COLUMNS).fill(0)
-  const placements: Placement[] = []
-  for (const aspect of aspects) {
-    let shortest = 0
-    for (let c = 1; c < COLUMNS; c++) {
-      if (heights[c]! < heights[shortest]!) shortest = c
-    }
-    const h = colWidth / aspect
-    const x = shortest * (colWidth + GAP)
-    const y = heights[shortest]!
-    placements.push({ x, y, width: colWidth, height: h })
-    heights[shortest] = y + h + GAP
-  }
-  return { placements, totalHeight: Math.max(...heights) - GAP }
 }
 
 // --- Bytes accounting via PerformanceObserver ---
@@ -209,13 +185,15 @@ async function runMeasured(): Promise<void> {
 
   const t0 = performance.now()
 
-  // Shortest-column state, updated per-tile as each prepare resolves.
-  // We lay out progressively: every time a dim arrives we drop a new
-  // tile into whichever column is currently shortest. Existing tiles
-  // never move, so there's no reflow — just growth at the bottom.
-  const panelWidth = measuredPanel.getBoundingClientRect().width
-  const colWidth = (panelWidth - GAP * (COLUMNS - 1)) / COLUMNS
-  const heights = new Array<number>(COLUMNS).fill(0)
+  // Shortest-column cursor. Each time prepare() resolves we hand the
+  // aspect to the cursor, get back a { x, y, width, height }, drop a
+  // tile there. Existing tiles never move, so there's no reflow —
+  // just growth at the bottom.
+  const packer = shortestColumnCursor({
+    columns: COLUMNS,
+    gap: GAP,
+    panelWidth: measuredPanel.getBoundingClientRect().width,
+  })
 
   type Tile = { container: HTMLElement; img: HTMLImageElement | null; url: string }
   const tiles: Tile[] = []
@@ -260,23 +238,15 @@ async function runMeasured(): Promise<void> {
   await Promise.all(
     urls.map((url) =>
       queue.enqueue(url, { dimsOnly: true }).then((prepared) => {
-        const aspect = getMeasurement(prepared).aspectRatio
-        const h = colWidth / aspect
-        let shortest = 0
-        for (let c = 1; c < COLUMNS; c++) {
-          if (heights[c]! < heights[shortest]!) shortest = c
-        }
-        const x = shortest * (colWidth + GAP)
-        const y = heights[shortest]!
-        heights[shortest] = y + h + GAP
-        measuredPanel.style.height = `${Math.max(...heights) - GAP}px`
+        const place = packer.add(getMeasurement(prepared).aspectRatio)
+        measuredPanel.style.height = `${packer.totalHeight()}px`
 
         const container = document.createElement('div')
         container.className = 'item pending'
-        container.style.left = `${x}px`
-        container.style.top = `${y}px`
-        container.style.width = `${colWidth}px`
-        container.style.height = `${h}px`
+        container.style.left = `${place.x}px`
+        container.style.top = `${place.y}px`
+        container.style.width = `${place.width}px`
+        container.style.height = `${place.height}px`
         measuredPanel.appendChild(container)
 
         const tile: Tile = { container, img: null, url }

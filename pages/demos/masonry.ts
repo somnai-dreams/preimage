@@ -1,4 +1,9 @@
 import { prepare, getMeasurement, getElement } from '@somnai-dreams/preimage'
+import {
+  packShortestColumn,
+  shortestColumnCursor,
+  type Placement,
+} from '@somnai-dreams/layout-algebra'
 import { newCacheBustToken, photoUrl, takePhotos, PHOTO_COUNT } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
 
@@ -71,31 +76,6 @@ function resetStats(host: HTMLElement): void {
     const b = row.querySelector('.value b')
     if (b !== null) b.innerHTML = '—'
   }
-}
-
-// --- Layout: shortest-column fill ---
-
-type Placement = { x: number; y: number; width: number; height: number }
-
-function layoutShortestColumn(
-  aspects: readonly number[],
-  panelWidth: number,
-): { placements: Placement[]; totalHeight: number } {
-  const colWidth = (panelWidth - GAP * (COLUMNS - 1)) / COLUMNS
-  const heights = new Array<number>(COLUMNS).fill(0)
-  const placements: Placement[] = []
-  for (const aspect of aspects) {
-    let shortest = 0
-    for (let c = 1; c < COLUMNS; c++) {
-      if (heights[c]! < heights[shortest]!) shortest = c
-    }
-    const h = colWidth / aspect
-    const x = shortest * (colWidth + GAP)
-    const y = heights[shortest]!
-    placements.push({ x, y, width: colWidth, height: h })
-    heights[shortest] = y + h + GAP
-  }
-  return { placements, totalHeight: Math.max(...heights) - GAP }
 }
 
 type Tile = { container: HTMLElement; img: HTMLImageElement }
@@ -284,7 +264,11 @@ async function runMeasuredBatch(urls: readonly string[]): Promise<void> {
 
   const panelWidth = measuredPanel.getBoundingClientRect().width
   const aspects = prepared.map((p) => getMeasurement(p).aspectRatio)
-  const { placements, totalHeight } = layoutShortestColumn(aspects, panelWidth)
+  const { placements, totalHeight } = packShortestColumn(aspects, {
+    columns: COLUMNS,
+    gap: GAP,
+    panelWidth,
+  })
   measuredPanel.style.height = `${totalHeight}px`
 
   const tiles: Tile[] = []
@@ -307,9 +291,11 @@ async function runMeasuredBatch(urls: readonly string[]): Promise<void> {
 
 async function runMeasuredProgressive(urls: readonly string[]): Promise<void> {
   const t0 = performance.now()
-  const panelWidth = measuredPanel.getBoundingClientRect().width
-  const colWidth = (panelWidth - GAP * (COLUMNS - 1)) / COLUMNS
-  const heights = new Array<number>(COLUMNS).fill(0)
+  const packer = shortestColumnCursor({
+    columns: COLUMNS,
+    gap: GAP,
+    panelWidth: measuredPanel.getBoundingClientRect().width,
+  })
 
   let firstReservedMs: number | null = null
   let lastReservedMs: number | null = null
@@ -321,19 +307,11 @@ async function runMeasuredProgressive(urls: readonly string[]): Promise<void> {
         const dimMs = performance.now() - t0
         dimTimes.push(dimMs)
 
-        const aspect = getMeasurement(p).aspectRatio
-        const h = colWidth / aspect
-        let shortest = 0
-        for (let c = 1; c < COLUMNS; c++) {
-          if (heights[c]! < heights[shortest]!) shortest = c
-        }
-        const x = shortest * (colWidth + GAP)
-        const y = heights[shortest]!
-        heights[shortest] = y + h + GAP
-        measuredPanel.style.height = `${Math.max(...heights) - GAP}px`
+        const place = packer.add(getMeasurement(p).aspectRatio)
+        measuredPanel.style.height = `${packer.totalHeight()}px`
 
         const img = imgForPrepared(url, getElement(p))
-        const tile = createTile({ x, y, width: colWidth, height: h }, img)
+        const tile = createTile(place, img)
         measuredPanel.appendChild(tile.container)
 
         const now = performance.now() - t0
