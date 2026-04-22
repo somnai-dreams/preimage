@@ -22,12 +22,13 @@ export const PHOTOS: Photo[] = manifest.map((m, i) => ({
 
 export const PHOTO_COUNT = PHOTOS.length
 
-// Relative URL for a photo. Bun's dev server serves `pages/` at the
-// root. In production the demos are served from the same origin as
-// the package under `./demos/`, and `./assets/` is also exported, so
-// `/assets/demos/photos/<file>` resolves correctly in both.
+// Relative path so the demos work both under our dev server
+// (http://host:port/masonry.html → ./assets/... → /assets/...)
+// and under a GitHub Pages project path
+// (https://user.github.io/preimage/masonry.html → ./assets/... →
+// https://user.github.io/preimage/assets/...).
 export function photoUrl(p: Photo, cacheBust: string | null): string {
-  const base = `/assets/demos/photos/${p.file}`
+  const base = `./assets/demos/photos/${p.file}`
   return cacheBust === null ? base : `${base}?v=${cacheBust}`
 }
 

@@ -21,10 +21,11 @@ const server = serve({
   hostname,
   routes: {
     '/': indexHtml,
-    '/masonry': masonryHtml,
-    '/editorial': editorialHtml,
-    '/ttfs': ttfsHtml,
-    '/decode-pool': decodePoolHtml,
+    '/index.html': indexHtml,
+    '/masonry.html': masonryHtml,
+    '/editorial.html': editorialHtml,
+    '/ttfs.html': ttfsHtml,
+    '/decode-pool.html': decodePoolHtml,
     '/assets/*': async (req) => {
       // Strip leading "/" and map into pages/assets/.
       const url = new URL(req.url)

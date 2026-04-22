@@ -21,10 +21,10 @@
 <body>
   <nav class="demo-nav">
     <a class="brand" href="./">preimage demos</a>
-    <a href="./masonry">Masonry</a>
-    <a href="./editorial">Editorial</a>
-    <a href="./ttfs">TTFS</a>
-    <a href="./decode-pool">Decode pool</a>
+    <a href="./masonry.html">Masonry</a>
+    <a href="./editorial.html">Editorial</a>
+    <a href="./ttfs.html">TTFS</a>
+    <a href="./decode-pool.html">Decode pool</a>
     <span class="spacer"></span>
     <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
   </nav>
@@ -39,19 +39,19 @@
       <h2>Demos</h2>
       <p class="intro">Each demo has per-panel Run buttons — click one side at a time to feel the click-to-layout delay. Photos are committed locally (~1-3MB PNGs) so cache-busting is honest and there's no CDN redirect chain skewing the numbers.</p>
       <div class="demo-list">
-        <a class="demo-card" href="./masonry">
+        <a class="demo-card" href="./masonry.html">
           <h3>Masonry grid</h3>
           <p>Up to 90 photos, two grids. Left: stock <code>&lt;img&gt;</code> tags — column grows as each image decodes, every tile below shifts. Right: <code>prepare()</code> measures every image, a shortest-column layout commits in one pass, dominant-color placeholders hold the spot.</p>
         </a>
-        <a class="demo-card" href="./editorial">
+        <a class="demo-card" href="./editorial.html">
           <h3>Editorial article with floats</h3>
           <p>Three floated figures inside flowing paragraph text. Naive HTML reflows as each figure decodes. Pretext + preimage measures up front and flows the text around the measured rects via <code>flowColumnWithFloats</code>.</p>
         </a>
-        <a class="demo-card" href="./ttfs">
+        <a class="demo-card" href="./ttfs.html">
           <h3>Time to first sizing</h3>
           <p>One ~3MB local PNG loaded three ways: naive <code>&lt;img src&gt;</code>, declared <code>width</code>/<code>height</code> attrs, and <code>prepare()</code>. The timestamp shows when each strategy knows the dimensions.</p>
         </a>
-        <a class="demo-card" href="./decode-pool">
+        <a class="demo-card" href="./decode-pool.html">
           <h3>Decode pool for canvas timelines</h3>
           <p>Sixteen ~1-3MB PNG frames scrubbable on a canvas. Left decodes on every scrub on the main thread; right warms a <code>DecodePool</code> up front and each scrub is a single cached-bitmap blit.</p>
         </a>
