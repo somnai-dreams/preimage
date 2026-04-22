@@ -209,57 +209,40 @@ async function runMeasured(): Promise<void> {
 
   const t0 = performance.now()
 
-  // Phase 1: measure every tile with dimsOnly — abort the body fetch
-  // after the header bytes arrive. Application-level queue holds the
-  // requests so the browser's 6-connection cap isn't fought over
-  // with render-side fetches later.
-  const queue = new PrepareQueue({ concurrency: 6 })
-  const prepared = await Promise.all(urls.map((u) => queue.enqueue(u, { dimsOnly: true })))
-  const dimsMs = performance.now() - t0
-  setRowValue(measuredStats, 1, `<b>${fmtMs(dimsMs)}</b>`)
-
-  // Phase 2: lay out every tile from the measured aspect ratios.
+  // Shortest-column state, updated per-tile as each prepare resolves.
+  // We lay out progressively: every time a dim arrives we drop a new
+  // tile into whichever column is currently shortest. Existing tiles
+  // never move, so there's no reflow — just growth at the bottom.
   const panelWidth = measuredPanel.getBoundingClientRect().width
-  const aspects = prepared.map((p) => getMeasurement(p).aspectRatio)
-  const { placements, totalHeight } = layoutShortestColumn(aspects, panelWidth)
-  measuredPanel.style.height = `${totalHeight}px`
+  const colWidth = (panelWidth - GAP * (COLUMNS - 1)) / COLUMNS
+  const heights = new Array<number>(COLUMNS).fill(0)
 
-  const tiles: Array<{ container: HTMLElement; img: HTMLImageElement | null; url: string }> = []
-  const frag = document.createDocumentFragment()
-  for (let i = 0; i < placements.length; i++) {
-    const p = placements[i]!
-    const container = document.createElement('div')
-    container.className = 'item pending'
-    container.style.left = `${p.x}px`
-    container.style.top = `${p.y}px`
-    container.style.width = `${p.width}px`
-    container.style.height = `${p.height}px`
-    frag.appendChild(container)
-    tiles.push({ container, img: null, url: urls[i]! })
-  }
-  measuredPanel.appendChild(frag)
-  const laidOutMs = performance.now() - t0
-  setRowValue(measuredStats, 2, `<b>${fmtMs(laidOutMs)}</b>`)
+  type Tile = { container: HTMLElement; img: HTMLImageElement | null; url: string }
+  const tiles: Tile[] = []
+  let firstTileMs: number | null = null
+  let lastTileMs: number | null = null
 
-  // Phase 3: as tiles scroll into view, commit to a full fetch.
-  // The IntersectionObserver fires once per tile — we load it, drop
-  // the observer, move on. Tiles never observed keep their dimsOnly
-  // savings forever.
+  // IntersectionObserver watches each tile as it gets placed. When a
+  // tile intersects the scroll viewport (with 200px rootMargin) we
+  // spin up a fresh <img> for the full fetch. Tiles that never
+  // scroll into view keep their dimsOnly savings.
   const io = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue
-        const idx = tiles.findIndex((t) => t.container === entry.target)
-        if (idx === -1) continue
-        const tile = tiles[idx]!
-        if (tile.img !== null) continue
+        const tile = tiles.find((t) => t.container === entry.target)
+        if (tile === undefined || tile.img !== null) continue
         const img = new Image()
         img.alt = ''
-        img.addEventListener('load', () => {
-          img.classList.add('loaded')
-          tile.container.classList.add('has-image')
-          tile.container.classList.remove('pending')
-        }, { once: true })
+        img.addEventListener(
+          'load',
+          () => {
+            img.classList.add('loaded')
+            tile.container.classList.add('has-image')
+            tile.container.classList.remove('pending')
+          },
+          { once: true },
+        )
         img.src = tile.url
         tile.container.appendChild(img)
         tile.img = img
@@ -268,7 +251,48 @@ async function runMeasured(): Promise<void> {
     },
     { root: measuredScroll, rootMargin: '200px' },
   )
-  for (const tile of tiles) io.observe(tile.container)
+
+  // Application-level queue. Holds the dimsOnly prepare() calls so
+  // the browser's 6-connection cap isn't fought over with the
+  // render-side fetches from the IntersectionObserver callback.
+  const queue = new PrepareQueue({ concurrency: 6 })
+
+  await Promise.all(
+    urls.map((url) =>
+      queue.enqueue(url, { dimsOnly: true }).then((prepared) => {
+        const aspect = getMeasurement(prepared).aspectRatio
+        const h = colWidth / aspect
+        let shortest = 0
+        for (let c = 1; c < COLUMNS; c++) {
+          if (heights[c]! < heights[shortest]!) shortest = c
+        }
+        const x = shortest * (colWidth + GAP)
+        const y = heights[shortest]!
+        heights[shortest] = y + h + GAP
+        measuredPanel.style.height = `${Math.max(...heights) - GAP}px`
+
+        const container = document.createElement('div')
+        container.className = 'item pending'
+        container.style.left = `${x}px`
+        container.style.top = `${y}px`
+        container.style.width = `${colWidth}px`
+        container.style.height = `${h}px`
+        measuredPanel.appendChild(container)
+
+        const tile: Tile = { container, img: null, url }
+        tiles.push(tile)
+        io.observe(container)
+
+        const now = performance.now() - t0
+        if (firstTileMs === null) {
+          firstTileMs = now
+          setRowValue(measuredStats, 1, `<b>${fmtMs(firstTileMs)}</b>`)
+        }
+        lastTileMs = now
+        setRowValue(measuredStats, 2, `<b>${fmtMs(lastTileMs)}</b>`)
+      }),
+    ),
+  )
 
   // Wait for every visible tile to finish loading. "Visible" means
   // intersecting at the time we check — a conservative bound for

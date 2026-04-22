@@ -13,11 +13,10 @@ const IMAGE_HEIGHT = 100
 const SAMPLE_TEXT =
   "Here's what came up in today's lineup: we ran through a long list of candidates, drafted headlines for each, and then drop the selects in so everyone can see which made the cut. Placeholder text trailing around each image so you can see how surrounding content reacts."
 
-// Running totals for stats.
 let naiveCount = 0
 let measuredCount = 0
-let naiveTimingTotal = 0 // per-image width-known time (from drop to onload)
-let measuredTimingTotal = 0 // per-image prepare(blob) time
+let naiveResized = 0 // imgs whose measured width changed post-insert
+let measuredResized = 0
 
 function initFlows(): void {
   for (const panel of [naivePanel, measuredPanel]) {
@@ -29,13 +28,9 @@ function initFlows(): void {
   }
   naiveCount = 0
   measuredCount = 0
-  naiveTimingTotal = 0
-  measuredTimingTotal = 0
+  naiveResized = 0
+  measuredResized = 0
   renderStats()
-}
-
-function fmtMs(ms: number | null): string {
-  return ms === null ? '—' : `${ms.toFixed(1)}ms`
 }
 
 function setRowValue(host: HTMLElement, nth: number, html: string): void {
@@ -43,28 +38,61 @@ function setRowValue(host: HTMLElement, nth: number, html: string): void {
   if (b !== null) b.innerHTML = html
 }
 
-function renderStats(): void {
-  setRowValue(naiveStats, 1, `<b>${naiveCount}</b>`)
-  setRowValue(
-    naiveStats,
-    2,
-    naiveCount === 0 ? '<b>—</b>' : `<b>${fmtMs(naiveTimingTotal / naiveCount)}</b>`,
-  )
-
-  setRowValue(measuredStats, 1, `<b>${measuredCount}</b>`)
-  setRowValue(
-    measuredStats,
-    2,
-    measuredCount === 0
-      ? '<b>—</b>'
-      : `<b>${fmtMs(measuredTimingTotal / measuredCount)}</b>`,
-  )
+function setShiftRow(host: HTMLElement, count: number, total: number): void {
+  const row = host.querySelector<HTMLElement>('.row.shift')
+  if (row === null) return
+  row.classList.toggle('has-shifts', count > 0)
+  row.querySelector('.value b')!.innerHTML = `${count} / ${total}`
 }
 
-async function addNaive(file: File): Promise<void> {
-  // Stock browser behaviour: set src on an <img> with only a height.
-  // Width becomes known at onload (full decode). Measure how long
-  // that takes — it's what the browser inherently costs you.
+function renderStats(): void {
+  setRowValue(naiveStats, 1, `<b>${naiveCount}</b>`)
+  setShiftRow(naiveStats, naiveResized, naiveCount)
+  setRowValue(measuredStats, 1, `<b>${measuredCount}</b>`)
+  setShiftRow(measuredStats, measuredResized, measuredCount)
+}
+
+// Watch an <img>'s width from the moment of insert. If the rendered
+// width changes later (because naturalWidth arrived and the browser
+// resolved the missing dimension), count it as a "resized after
+// insert" event — the concrete signal the user sees as text shifting
+// horizontally next to the image.
+function watchForResize(img: HTMLImageElement, onResize: () => void): void {
+  // Double-rAF so we read layout after the browser has committed the
+  // initial render. Then record the starting width and poll.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const initial = img.getBoundingClientRect().width
+      if (img.complete && img.naturalWidth > 0 && initial > 0) {
+        // Already fully sized — no resize will happen.
+        return
+      }
+      let done = false
+      const check = (): void => {
+        if (done) return
+        const current = img.getBoundingClientRect().width
+        if (Math.abs(current - initial) > 0.5) {
+          done = true
+          onResize()
+          return
+        }
+        if (img.complete && img.naturalWidth > 0) {
+          done = true
+          const final = img.getBoundingClientRect().width
+          if (Math.abs(final - initial) > 0.5) onResize()
+          return
+        }
+        setTimeout(check, 16)
+      }
+      check()
+    })
+  })
+}
+
+function addNaive(file: File): void {
+  // Stock browser behaviour: <img height=100> with no width. The
+  // browser renders the box at 0 × 100 until the bytes decode; then
+  // it resolves width from naturalWidth. That's the visible shift.
   const url = URL.createObjectURL(file)
   const img = document.createElement('img')
   img.alt = ''
@@ -72,29 +100,20 @@ async function addNaive(file: File): Promise<void> {
   img.src = url
   naivePanel.appendChild(img)
   naivePanel.appendChild(document.createTextNode(' '))
-  const t0 = performance.now()
-  await new Promise<void>((resolve) => {
-    const done = (): void => resolve()
-    if (img.complete && img.naturalWidth > 0) done()
-    else {
-      img.addEventListener('load', done, { once: true })
-      img.addEventListener('error', done, { once: true })
-    }
-  })
-  const widthKnownMs = performance.now() - t0
   naiveCount++
-  naiveTimingTotal += widthKnownMs
+  watchForResize(img, () => {
+    naiveResized++
+    renderStats()
+  })
   renderStats()
 }
 
 async function addMeasured(file: File): Promise<void> {
   // Byte-probe path. prepare(Blob) slices the first 4KB and parses
-  // the format header — takes ~5ms regardless of file size. We now
-  // know width + height; write both into the <img> before inserting
-  // so the browser reserves the correct box from the first frame.
-  const t0 = performance.now()
+  // the format header. width + aspectRatio are written into the
+  // <img> element's attrs before insert, so the browser reserves
+  // the correct box from the first frame.
   const prepared = await prepare(file)
-  const prepareMs = performance.now() - t0
   const m = getMeasurement(prepared)
   const displayWidth = m.aspectRatio * IMAGE_HEIGHT
   const img = document.createElement('img')
@@ -105,7 +124,10 @@ async function addMeasured(file: File): Promise<void> {
   measuredPanel.appendChild(img)
   measuredPanel.appendChild(document.createTextNode(' '))
   measuredCount++
-  measuredTimingTotal += prepareMs
+  watchForResize(img, () => {
+    measuredResized++
+    renderStats()
+  })
   renderStats()
 }
 
@@ -113,19 +135,15 @@ async function handleFiles(files: FileList): Promise<void> {
   const incoming = Array.from(files).filter((f) => f.type.startsWith('image/'))
   if (incoming.length === 0) return
   metaEl.textContent = `processing ${incoming.length} file${incoming.length === 1 ? '' : 's'}…`
-  // Fire both panels in parallel so each measures its own latency
-  // against roughly the same page state.
-  await Promise.all([
-    ...incoming.map((f) => addNaive(f)),
-    ...incoming.map((f) => addMeasured(f)),
-  ])
+  // Fire both panels in parallel.
+  for (const f of incoming) addNaive(f)
+  await Promise.all(incoming.map((f) => addMeasured(f)))
   metaEl.textContent = `${measuredCount} image${measuredCount === 1 ? '' : 's'} dropped · drop more to keep comparing`
 }
 
 // --- Event wiring ---
 
 dropArea.addEventListener('click', (e) => {
-  // Avoid double-picking when the button inside is clicked.
   if ((e.target as HTMLElement).tagName !== 'BUTTON') picker.click()
 })
 pickBtn.addEventListener('click', () => picker.click())
@@ -146,6 +164,4 @@ dropArea.addEventListener('drop', (e) => {
   if (e.dataTransfer?.files !== undefined) void handleFiles(e.dataTransfer.files)
 })
 
-// Reset the panels & stats if the user clicks the drop area with no
-// files (acts as a nudge and keeps things predictable between demos).
 initFlows()

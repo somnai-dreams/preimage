@@ -18,41 +18,35 @@ const widthVal = document.getElementById('widthVal')!
 const metaEl = document.getElementById('meta')!
 const bubble = document.getElementById('bubble')!
 
-const FONT = '15px/22px -apple-system, "SF Pro Text", Inter, system-ui, sans-serif'
-const IMAGE_HEIGHT = 20
-const AVATAR_HEIGHT = 40
-const PHOTO_HEIGHT = 140
-
-// Script for the bubble. Text runs are plain RichInlineItems; image
-// spec entries get turned into inlineImage items later via
-// resolveMixedInlineItems. Mixing small icons (emoji-ish), avatars,
-// and photo attachments at different heights exercises the full
-// wrap/shrink behaviour when the bubble narrows.
-type ImageSpec = { src: string; height: number; extraWidth?: number }
-type Script = Array<{ kind: 'text'; text: string } | { kind: 'image'; spec: ImageSpec }>
+const FONT = '15px/28px -apple-system, "SF Pro Text", Inter, system-ui, sans-serif'
+const INLINE_HEIGHT = 24 // every inline image fits inside a 28px line
 
 function photo(i: number): string {
   return photoUrl(PHOTOS[i]!, null)
 }
 
+// All inline items share one line-height. Mixing icon-size and photo-
+// size items in pretext rich-inline doesn't work — pretext gives
+// every fragment a single line-height, so tall items would overflow
+// into adjacent lines. Chat messages with inline media are the right
+// fit: small reaction icons and avatars intermixed with text.
+type Script = Array<{ kind: 'text'; text: string } | { kind: 'image'; src: string; extraWidth?: number }>
+
 const SCRIPT: Script = [
-  { kind: 'text', text: 'hey! had an absolute madlad of a weekend ' },
-  { kind: 'image', spec: { src: photo(12), height: PHOTO_HEIGHT, extraWidth: 4 } },
-  { kind: 'text', text: ' took the dogs ' },
-  { kind: 'image', spec: { src: photo(14), height: AVATAR_HEIGHT, extraWidth: 4 } },
-  { kind: 'image', spec: { src: photo(15), height: AVATAR_HEIGHT, extraWidth: 4 } },
-  { kind: 'text', text: ' up to the ridge ' },
-  { kind: 'image', spec: { src: photo(20), height: PHOTO_HEIGHT, extraWidth: 4 } },
-  { kind: 'text', text: ' and the light was absurd. bumped into the crew ' },
-  { kind: 'image', spec: { src: photo(4), height: AVATAR_HEIGHT, extraWidth: 4 } },
-  { kind: 'image', spec: { src: photo(5), height: AVATAR_HEIGHT, extraWidth: 4 } },
-  { kind: 'image', spec: { src: photo(17), height: AVATAR_HEIGHT, extraWidth: 4 } },
-  { kind: 'text', text: ' who dragged me into one of their moebius-looking lookout spots ' },
-  { kind: 'image', spec: { src: photo(18), height: PHOTO_HEIGHT, extraWidth: 4 } },
-  { kind: 'text', text: '. anyway wanted to show you the set, drop a ' },
-  { kind: 'image', spec: { src: photo(21), height: IMAGE_HEIGHT, extraWidth: 2 } },
-  { kind: 'text', text: ' if any of these hit. more tmr once i’ve cleaned the rest up ' },
-  { kind: 'image', spec: { src: photo(26), height: IMAGE_HEIGHT, extraWidth: 2 } },
+  { kind: 'text', text: 'morning ' },
+  { kind: 'image', src: photo(4), extraWidth: 3 },
+  { kind: 'text', text: ' crew! pushing the weekend recap to the channel ' },
+  { kind: 'image', src: photo(17), extraWidth: 3 },
+  { kind: 'image', src: photo(27), extraWidth: 3 },
+  { kind: 'text', text: ' — mostly camera roll dumps from the ridge ' },
+  { kind: 'image', src: photo(20), extraWidth: 3 },
+  { kind: 'text', text: ' plus a couple of keepers from that late-afternoon session ' },
+  { kind: 'image', src: photo(0), extraWidth: 3 },
+  { kind: 'image', src: photo(25), extraWidth: 3 },
+  { kind: 'text', text: '. drop a ' },
+  { kind: 'image', src: photo(21), extraWidth: 3 },
+  { kind: 'text', text: ' on the ones worth blowing up. i’ll send the raws once i’ve cleaned the sequence ' },
+  { kind: 'image', src: photo(14), extraWidth: 3 },
   { kind: 'text', text: ' ✌️' },
 ]
 
@@ -63,10 +57,10 @@ async function buildItems(): Promise<RichInlineItem[]> {
       items.push({ text: entry.text, font: FONT })
       continue
     }
-    const item = await inlineImage(entry.spec.src, {
+    const item = await inlineImage(entry.src, {
       font: FONT,
-      height: entry.spec.height,
-      extraWidth: entry.spec.extraWidth ?? 0,
+      height: INLINE_HEIGHT,
+      extraWidth: entry.extraWidth ?? 0,
     })
     items.push(item)
   }

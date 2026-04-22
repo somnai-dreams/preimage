@@ -103,8 +103,8 @@
         </div>
         <div class="panel-stats stat-list" id="naiveStats">
           <div class="row"><span class="label">Images dropped</span><span class="value"><b>&mdash;</b></span></div>
-          <div class="row"><span class="label">Avg time to width-known</span><span class="value"><b>&mdash;</b></span></div>
-          <div class="row"><span class="label">Strategy</span><span class="value"><b>onload (full decode)</b></span></div>
+          <div class="row shift"><span class="label">Images that resized after insert</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Strategy</span><span class="value"><b>onload — width unknown until full decode</b></span></div>
         </div>
         <div id="naive" class="message-flow"></div>
       </section>
@@ -115,8 +115,8 @@
         </div>
         <div class="panel-stats stat-list" id="measuredStats">
           <div class="row"><span class="label">Images dropped</span><span class="value"><b>&mdash;</b></span></div>
-          <div class="row"><span class="label">Avg time to width-known</span><span class="value"><b>&mdash;</b></span></div>
-          <div class="row"><span class="label">Strategy</span><span class="value"><b>byte-probe, first 4KB</b></span></div>
+          <div class="row shift"><span class="label">Images that resized after insert</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Strategy</span><span class="value"><b>byte-probe — width set before insert</b></span></div>
         </div>
         <div id="measured" class="message-flow"></div>
       </section>

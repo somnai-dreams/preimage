@@ -18,17 +18,19 @@
       padding: 40px 24px;
       background: linear-gradient(180deg, #f5f6f8 0%, #eef0f3 100%);
       border-radius: var(--radius-lg);
-      min-height: 400px;
+      min-height: 240px;
       overflow: hidden;
     }
 
+    /* Each line is a fixed 28px band. Inline items are 24px tall so
+       they fit within that band with small vertical slack. */
     .bubble {
       background: var(--accent);
       color: #fff;
       border-radius: 18px;
-      padding: 10px 14px;
+      padding: 12px 16px;
       font-size: 15px;
-      line-height: 22px;
+      line-height: 28px;
       box-shadow: 0 2px 10px rgba(37, 99, 235, 0.25);
       position: relative;
     }
@@ -45,22 +47,17 @@
 
     .bubble .line {
       white-space: pre;
-      height: 22px;
+      height: 28px;
       display: flex;
       align-items: center;
     }
-    .bubble .frag {
-      display: inline-block;
-      vertical-align: middle;
-    }
+    .bubble .frag { display: inline-block; }
     .bubble .frag-img {
       position: relative;
       display: inline-block;
-      vertical-align: middle;
-      border-radius: 6px;
+      border-radius: 4px;
       overflow: hidden;
       background: rgba(255, 255, 255, 0.18);
-      margin: 0 4px;
       flex-shrink: 0;
     }
     .bubble .frag-img img {
@@ -71,7 +68,7 @@
       object-fit: cover;
       display: block;
       opacity: 0;
-      transition: opacity 240ms ease-out;
+      transition: opacity 200ms ease-out;
     }
     .bubble .frag-img img.loaded { opacity: 1; }
 
@@ -104,15 +101,15 @@
 
   <main class="page wide">
     <header class="page-header">
-      <h1>Chat — inline images in a resizable bubble</h1>
-      <p>A chat message with icons, stickers, and photo attachments mixed into the text. <code>inlineImage</code> turns each image into a pretext <code>RichInlineItem</code> whose <code>extraWidth</code> equals the measured image's rendered width — pretext treats it as an atomic pill that wraps with neighboring text and never breaks. Drag the slider to resize the bubble; the text re-breaks and images shuffle to their new slots in a single synchronous flow pass, no DOM measurements, no reflow.</p>
+      <h1>Chat — inline icons in a resizable bubble</h1>
+      <p>A chat message with small inline images — avatars, reaction icons, a thumbnail — mixed into the text. <code>inlineImage(src, { font, height: 24 })</code> turns each image into a pretext <code>RichInlineItem</code> whose <code>extraWidth</code> equals its measured rendered width. Pretext treats them as atomic pills that wrap with neighboring text and never break mid-image. Drag the slider — <code>walkRichInlineLineRanges</code> re-breaks the lines in <strong>a couple of milliseconds</strong>, pure arithmetic over cached text widths, no DOM reads.</p>
     </header>
 
     <div class="controls">
       <div class="width-control">
         <span>Bubble width</span>
-        <input id="widthSlider" type="range" min="200" max="720" value="420" step="10" />
-        <span id="widthVal" class="width-val">420px</span>
+        <input id="widthSlider" type="range" min="180" max="680" value="380" step="10" />
+        <span id="widthVal" class="width-val">380px</span>
       </div>
       <span id="meta" class="meta"></span>
     </div>
@@ -122,7 +119,7 @@
     </div>
 
     <div class="aside">
-      <div>Source items: a sequence of text fragments and <code>inlineImage(src, { font, height })</code> items, fed to <code>prepareRichInline</code>. On every resize we call <code>walkRichInlineLineRanges</code> — pure arithmetic over the cached text widths, no DOM reads. Image fragments carry the <code>PreparedImage</code> handle, so rendering them is a single <code>&lt;img src=…&gt;</code> with exact width/height pre-known.</div>
+      Source items: a sequence of text fragments and <code>inlineImage(src, { font, height: 24 })</code> items, fed to <code>prepareRichInline</code>. On every resize we call <code>walkRichInlineLineRanges</code> — pure arithmetic over cached text widths, no DOM reads. Each image fragment carries the <code>PreparedImage</code> handle, so rendering is a single <code>&lt;img src=…&gt;</code> with exact width/height pre-known.
     </div>
   </main>
 
