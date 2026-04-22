@@ -45,3 +45,18 @@ export function newCacheBustToken(): string {
 export function takePhotos(count: number): Photo[] {
   return PHOTOS.slice(0, Math.min(count, PHOTOS.length))
 }
+
+// Scale beyond the 34-photo manifest by cycling and appending a
+// per-slot cache-bust token. Each returned URL is unique from the
+// browser's perspective (and from our server's) so HTTP cache can't
+// collapse them, even though the underlying bytes repeat. Used by
+// the scale demo.
+export function cycledUrls(count: number, baseToken: string): string[] {
+  const out: string[] = []
+  for (let i = 0; i < count; i++) {
+    const photo = PHOTOS[i % PHOTOS.length]!
+    const base = `/assets/demos/photos/${photo.file}`
+    out.push(`${base}?v=${baseToken}-${i}`)
+  }
+  return out
+}
