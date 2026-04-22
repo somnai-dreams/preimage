@@ -17,12 +17,15 @@ const runMeasuredBtn = document.getElementById('runMeasured') as HTMLButtonEleme
 
 const COLUMNS = 5
 const GAP = 3
-// How far above/below the viewport to mount tiles — wider overscan
-// means fewer mount/unmount churns when scrolling fast, narrower
-// means fewer DOM nodes at any one time. 600px is a comfortable
-// compromise: a fast scroll scrolls ~1500px/sec and we want ~400ms
-// of buffer.
-const OVERSCAN = 600
+// Asymmetric overscan, biased toward scroll direction. `ahead` (the
+// direction the user is scrolling) is a scroll-budget head start so
+// images load before they enter the viewport; `behind` is tight so
+// off-screen tiles release quickly and their in-flight fetches get
+// cancelled. On a ~620px viewport, 400px ahead ≈ two-thirds of a
+// screen worth of incoming tiles, 150px behind ≈ a row or two of
+// safety for a momentary scroll reversal.
+const OVERSCAN_AHEAD = 400
+const OVERSCAN_BEHIND = 150
 
 function getCount(): number {
   return Number(countSlider.value)
@@ -197,7 +200,7 @@ async function runMeasured(): Promise<void> {
   const pool = createVirtualTilePool({
     scrollContainer: measuredScroll,
     contentContainer: measuredPanel,
-    overscan: OVERSCAN,
+    overscan: { ahead: OVERSCAN_AHEAD, behind: OVERSCAN_BEHIND },
     mount: (idx, el, place) => {
       el.className = 'vtile pending'
       el.style.left = `${place.x}px`

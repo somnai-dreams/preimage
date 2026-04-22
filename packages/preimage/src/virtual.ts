@@ -53,10 +53,14 @@ export type VirtualTilePoolOptions = {
   // set by the caller (usually to the total layout height) so the
   // scroll container has something to scroll.
   contentContainer: HTMLElement
-  // Extra pixels above and below the viewport that still count as
-  // visible — tiles within this band are mounted in advance so a
-  // fast scroll doesn't reveal blank space.
-  overscan?: number
+  // Extra pixels around the viewport that still count as visible.
+  // Number form = symmetric band above and below.
+  // Object form = asymmetric by scroll direction: `ahead` applies in
+  // the direction the user just scrolled, `behind` on the other side.
+  // Asymmetric is usually what you want — images coming into view
+  // need a head start; images leaving can be released aggressively.
+  // Default: 200 symmetric.
+  overscan?: number | { ahead: number; behind: number }
   // Called when a tile becomes visible. The element is positioned
   // absolutely inside `contentContainer`; the caller is responsible
   // for setting left/top/width/height from `placement`.
@@ -98,12 +102,20 @@ function rafThrottle(fn: () => void): () => void {
 
 export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualTilePool {
   const { scrollContainer, contentContainer, mount, unmount } = options
-  const overscan = options.overscan ?? 200
+  const ahead =
+    typeof options.overscan === 'object' ? options.overscan.ahead : (options.overscan ?? 200)
+  const behind =
+    typeof options.overscan === 'object' ? options.overscan.behind : (options.overscan ?? 200)
 
   let placements: readonly Placement[] = []
   const pool: HTMLElement[] = []
   const active = new Map<number, HTMLElement>()
   let destroyed = false
+  // Scroll direction: +1 = down, -1 = up. Starts down so the initial
+  // first-paint favors the below-viewport band (the only band that
+  // matters when scrolled to the top).
+  let scrollDir: 1 | -1 = 1
+  let lastScrollTop = scrollContainer.scrollTop
 
   function acquire(): HTMLElement {
     const reused = pool.pop()
@@ -125,8 +137,19 @@ export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualT
 
   function refresh(): void {
     if (destroyed) return
-    const top = scrollContainer.scrollTop - overscan
-    const bottom = scrollContainer.scrollTop + scrollContainer.clientHeight + overscan
+    const scrollTop = scrollContainer.scrollTop
+    if (scrollTop > lastScrollTop) scrollDir = 1
+    else if (scrollTop < lastScrollTop) scrollDir = -1
+    lastScrollTop = scrollTop
+
+    // Apply overscan biased toward the scroll direction: the band
+    // ahead of travel is larger (so incoming tiles mount in time to
+    // paint), the trailing band is smaller (so departing tiles release
+    // quickly and their in-flight fetches get cancelled).
+    const topOver = scrollDir === 1 ? behind : ahead
+    const bottomOver = scrollDir === 1 ? ahead : behind
+    const top = scrollTop - topOver
+    const bottom = scrollTop + scrollContainer.clientHeight + bottomOver
 
     const wanted = new Set<number>()
     for (let i = 0; i < placements.length; i++) {

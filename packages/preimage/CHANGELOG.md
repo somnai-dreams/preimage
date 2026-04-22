@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.0
+
+- **`createVirtualTilePool`'s `overscan` option now accepts an asymmetric `{ ahead, behind }`** in addition to a single number. `ahead` is applied on the side the user just scrolled toward; `behind` on the opposite side. Asymmetric is almost always what you want — tiles coming into view need a head start so their images load before the user sees them, tiles leaving should release quickly so their in-flight fetches get cancelled. Scroll direction flips transparently from the internal scroll handler; callers don't need to tell the pool anything. Number form still works for the symmetric case (default 200).
+- Virtual demo tuned to `{ ahead: 400, behind: 150 }` to match.
+
 ## 0.5.0
 
 - **New: `probeImageStream(readable, { onDims, maxProbeBytes? })`** in `@somnai-dreams/preimage/core`. Consume a `ReadableStream<Uint8Array>` — WebSocket bytes, `fetch().body`, AI-gen output, whatever — and fire dimensions the moment the header is in hand (PNG: 24 bytes; JPEG: usually under 2KB). The returned promise resolves with the dims and a complete `Blob` after the stream drains; `URL.createObjectURL(blob)` gives a renderable `<img src>` without a second network fetch. DOM-free surface: runs in Node, Deno, Bun, workers, edge runtimes. Replaces the concat-and-retry loop every streaming caller would otherwise have to write.
