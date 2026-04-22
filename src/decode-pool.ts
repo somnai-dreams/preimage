@@ -24,7 +24,7 @@
 //   const bitmap = await pool.get('https://.../photo.jpg')
 //   ctx.drawImage(bitmap, x, y) // main-thread blit, no decode cost
 
-import { prepare, getMeasurement } from './prepare.js'
+import { prepare, getElement } from './prepare.js'
 import { normalizeSrc } from './analysis.js'
 
 export type DecodePoolOptions = {
@@ -156,22 +156,38 @@ export class DecodePool {
       throw new Error('preimage: DecodePool requires createImageBitmap support.')
     }
     // Route through prepare() so the measurement cache gets populated
-    // and we can reuse prepare()'s blobUrl (= same bytes, no second
-    // fetch).
+    // and we can reuse its warmed <img> element — createImageBitmap
+    // accepts HTMLImageElement, so once the img's own load completes
+    // we can decode directly from it. One fetch total.
     const prepared = await prepare(src)
-    const measurement = getMeasurement(prepared)
-    const source = measurement.blobUrl ?? src
-    const response = await fetch(source)
+    const img = getElement(prepared)
+    if (img !== null) {
+      if (!img.complete) {
+        await new Promise<void>((resolve, reject) => {
+          img.addEventListener('load', () => resolve(), { once: true })
+          img.addEventListener(
+            'error',
+            () => reject(new Error(`preimage: DecodePool load failed for ${src}.`)),
+            { once: true },
+          )
+        })
+      }
+      return this.bitmapOptions !== undefined
+        ? await createImageBitmap(img, this.bitmapOptions)
+        : await createImageBitmap(img)
+    }
+    // Fallback for the cases where prepare() doesn't hand back an
+    // element (URL-pattern shortcut, dimsOnly, synthetic measurements):
+    // fetch the bytes ourselves.
+    const response = await fetch(src)
     if (!response.ok) {
       throw new Error(`preimage: DecodePool fetch failed for ${src} (${response.status}).`)
     }
     const blob = await response.blob()
-    const bitmap =
-      this.bitmapOptions !== undefined
-        ? await createImageBitmap(blob, this.bitmapOptions)
-        : await createImageBitmap(blob)
     void key
-    return bitmap
+    return this.bitmapOptions !== undefined
+      ? await createImageBitmap(blob, this.bitmapOptions)
+      : await createImageBitmap(blob)
   }
 
   private async runBounded<T>(fn: () => Promise<T>): Promise<T> {

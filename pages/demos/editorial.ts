@@ -1,6 +1,13 @@
 import { prepareWithSegments, materializeLineRange } from '@chenglou/pretext'
 
-import { prepare, getMeasurement, preparedFromMeasurement, recordKnownMeasurement, type PreparedImage } from '../../src/index.js'
+import {
+  prepare,
+  getMeasurement,
+  getElement,
+  preparedFromMeasurement,
+  recordKnownMeasurement,
+  type PreparedImage,
+} from '../../src/index.js'
 import { flowColumnWithFloats } from '../../src/pretext.js'
 import { newCacheBustToken, photoUrl, PHOTOS, type Photo } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
@@ -295,22 +302,30 @@ async function runMeasured(): Promise<void> {
   setRowValue(measuredStats, 3, `<b>${fmtMs(flowMs)}</b>`)
 
   const monitor = observeShifts(measuredPanel)
+  // Replace each figure's fresh <img> with the warmed one prepare()
+  // already had in flight. That's the only way to get "one fetch per
+  // figure" — reusing the same element the library used to measure.
   await Promise.all(
     figs.map((fig, i) => {
-      const img = fig.querySelector('img') as HTMLImageElement | null
-      if (img === null) return Promise.resolve()
-      const url = getMeasurement(prepared[i]!).blobUrl ?? urls[i]!
+      const placeholder = fig.querySelector('img') as HTMLImageElement | null
+      if (placeholder === null) return Promise.resolve()
+      const warmed = getElement(prepared[i]!)
+      const img = warmed ?? placeholder
+      if (warmed !== null && warmed !== placeholder) {
+        fig.replaceChild(warmed, placeholder)
+      }
+      if (warmed === null) img.src = urls[i]!
       return new Promise<void>((resolve) => {
-        img.onload = () => {
+        const done = (): void => {
           img.classList.add('loaded')
           fig.classList.add('has-image')
           resolve()
         }
-        img.onerror = () => {
-          fig.classList.add('has-image')
-          resolve()
+        if (img.complete && img.naturalWidth > 0) done()
+        else {
+          img.addEventListener('load', done, { once: true })
+          img.addEventListener('error', done, { once: true })
         }
-        img.src = url
       })
     }),
   )

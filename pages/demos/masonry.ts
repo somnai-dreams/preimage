@@ -1,4 +1,4 @@
-import { prepare, getMeasurement } from '../../src/index.js'
+import { prepare, getMeasurement, getElement } from '../../src/index.js'
 import { newCacheBustToken, photoUrl, takePhotos, PHOTO_COUNT } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
 
@@ -98,22 +98,34 @@ function layoutShortestColumn(
   return { placements, totalHeight: Math.max(...heights) - GAP }
 }
 
-function createTile(place: Placement): { container: HTMLElement; img: HTMLImageElement } {
+type Tile = { container: HTMLElement; img: HTMLImageElement }
+
+// Create a tile container around an already-existing <img>. When the
+// caller passes the <img> that prepare() was warming, no new network
+// request happens — the same element the library fetched to measure is
+// the one the user sees. Fall back to a fresh <img> with src=url for
+// cases where prepare() returned no element (cache hits, URL-pattern
+// shortcut, dimsOnly).
+function createTile(place: Placement, img: HTMLImageElement): Tile {
   const container = document.createElement('div')
   container.className = 'item'
   container.style.left = `${place.x}px`
   container.style.top = `${place.y}px`
   container.style.width = `${place.width}px`
   container.style.height = `${place.height}px`
-  const img = document.createElement('img')
+  img.alt = ''
   container.appendChild(img)
   return { container, img }
 }
 
-function loadTileImage(
-  tile: { container: HTMLElement; img: HTMLImageElement },
-  url: string,
-): Promise<void> {
+function imgForPrepared(url: string, warmed: HTMLImageElement | null): HTMLImageElement {
+  if (warmed !== null) return warmed
+  const img = new Image()
+  img.src = url
+  return img
+}
+
+function waitForImage(tile: Tile): Promise<void> {
   return new Promise<void>((resolve) => {
     const done = (): void => {
       tile.img.classList.add('loaded')
@@ -122,10 +134,9 @@ function loadTileImage(
     }
     if (tile.img.complete && tile.img.naturalWidth > 0) done()
     else {
-      tile.img.onload = done
-      tile.img.onerror = done
+      tile.img.addEventListener('load', done, { once: true })
+      tile.img.addEventListener('error', done, { once: true })
     }
-    tile.img.src = url
   })
 }
 
@@ -276,10 +287,11 @@ async function runMeasuredBatch(urls: readonly string[]): Promise<void> {
   const { placements, totalHeight } = layoutShortestColumn(aspects, panelWidth)
   measuredPanel.style.height = `${totalHeight}px`
 
-  const tiles: Array<{ container: HTMLElement; img: HTMLImageElement }> = []
+  const tiles: Tile[] = []
   const frag = document.createDocumentFragment()
   for (let i = 0; i < placements.length; i++) {
-    const tile = createTile(placements[i]!)
+    const img = imgForPrepared(urls[i]!, getElement(prepared[i]!))
+    const tile = createTile(placements[i]!, img)
     frag.appendChild(tile.container)
     tiles.push(tile)
   }
@@ -290,12 +302,7 @@ async function runMeasuredBatch(urls: readonly string[]): Promise<void> {
   // the same moment so first/all reserved are identical.
   fillStats(measuredStats, reservedAt, avgDimMs, reservedAt)
 
-  await Promise.all(
-    tiles.map((tile, i) => {
-      const url = getMeasurement(prepared[i]!).blobUrl ?? urls[i]!
-      return loadTileImage(tile, url)
-    }),
-  )
+  await Promise.all(tiles.map((tile) => waitForImage(tile)))
 }
 
 async function runMeasuredProgressive(urls: readonly string[]): Promise<void> {
@@ -325,7 +332,8 @@ async function runMeasuredProgressive(urls: readonly string[]): Promise<void> {
         heights[shortest] = y + h + GAP
         measuredPanel.style.height = `${Math.max(...heights) - GAP}px`
 
-        const tile = createTile({ x, y, width: colWidth, height: h })
+        const img = imgForPrepared(url, getElement(p))
+        const tile = createTile({ x, y, width: colWidth, height: h }, img)
         measuredPanel.appendChild(tile.container)
 
         const now = performance.now() - t0
@@ -338,8 +346,7 @@ async function runMeasuredProgressive(urls: readonly string[]): Promise<void> {
         setRowValue(measuredStats, 2, `<b>${fmtMs(avgSoFar)}</b>`)
         setRowValue(measuredStats, 3, `<b>${fmtMs(lastReservedMs)}</b>`)
 
-        const src = getMeasurement(p).blobUrl ?? url
-        return loadTileImage(tile, src)
+        return waitForImage(tile)
       }),
     ),
   )

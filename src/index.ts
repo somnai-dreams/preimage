@@ -1,6 +1,5 @@
 // Main entry. Core image-measurement primitives + single-image layout.
-// Pretext-integration lives in the `./pretext` subpath; gallery packing in
-// `./gallery`.
+// Pretext-integration lives in the `./pretext` subpath.
 
 export {
   prepare,
@@ -11,10 +10,10 @@ export {
   measureAspect,
   measureNaturalSize,
   getMeasurement,
+  getElement,
   preparedFromMeasurement,
   type PreparedImage,
   type PrepareOptions,
-  type PrepareStrategy,
 } from './prepare.js'
 
 export {
@@ -44,18 +43,13 @@ export { PrepareQueue, type PrepareQueueOptions } from './prepare-queue.js'
 export { DecodePool, type DecodePoolOptions } from './decode-pool.js'
 
 export {
-  measureImage,
-  measureImages,
   peekImageMeasurement,
   recordKnownMeasurement,
-  decodeImageBitmap,
   measureFromSvgText,
-  getEngineProfile,
   clearMeasurementCaches,
   listCachedMeasurements,
   type ImageMeasurement,
   type MeasureOptions,
-  type EngineProfile,
 } from './measurement.js'
 
 export {

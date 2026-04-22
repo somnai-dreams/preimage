@@ -1,4 +1,4 @@
-import { prepare, getMeasurement } from '../../src/index.js'
+import { prepare, getMeasurement, getElement } from '../../src/index.js'
 import { newCacheBustToken, photoUrl, PHOTOS } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
 
@@ -214,7 +214,13 @@ async function runPreimage(): Promise<void> {
   const dimsAt = performance.now() - t0
   const frame = sizedFrame(f3, m.naturalWidth, m.naturalHeight)
   const reservedAt = performance.now() - t0
-  const img = document.createElement('img')
+  // Reuse the warmed <img> prepare() already has in flight so there's
+  // exactly one network fetch. Only fall back to a fresh element when
+  // the prepared measurement came from a non-<img> path (cache hit,
+  // URL-pattern shortcut).
+  const warmed = getElement(prepared)
+  const img = warmed ?? new Image()
+  if (warmed === null) img.src = url
   frame.appendChild(img)
   const stage = f3.parentElement!
   const monitor = observeShifts(stage)
@@ -225,10 +231,9 @@ async function runPreimage(): Promise<void> {
     }
     if (img.complete && img.naturalWidth > 0) done()
     else {
-      img.onload = done
-      img.onerror = done
+      img.addEventListener('load', done, { once: true })
+      img.addEventListener('error', done, { once: true })
     }
-    img.src = m.blobUrl ?? url
   })
   const paintedAt = performance.now() - t0
   monitor.stop()

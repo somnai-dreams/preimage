@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.0
+
+Breaking: `prepare(url)` now uses a native `<img>` element with `setTimeout(0)` polling of `naturalWidth` instead of a custom `fetch()` + stream-and-header-parse pipeline. The refactor pays off three things at once — it's smaller (~30% fewer lines in `src/`), format-agnostic (free AVIF/HEIC/anything-the-browser-supports), and **actually one fetch** for the common render case.
+
+### What changed
+
+- **`prepare(url)` internals**: no more `fetch()`, no more `streamAndProbe`, no more PNG/JPEG/WebP/GIF/BMP-specific parsers in the URL path. An `<img>` is created, `src` is set, and the library polls `naturalWidth` on a `setTimeout(0)` tick (empirically 4-8ms to dims-known, ~5× faster than `requestAnimationFrame`). Blob/File inputs keep the existing byte-probe path via `probeImageBytes` — that code still ships standalone for direct use.
+- **New: `getElement(prepared)`** returns the warmed `<img>` element the library used to measure. Callers render by inserting that same element (or `replaceChild`-ing it) — the `<img>` is still loading its bytes when `prepare()` resolves, but it's the same network request, not a second one. Render and measure share one fetch.
+- **New: `{ dimsOnly: true }`** option. After dims are known, `img.src = ''` aborts the rest of the transfer. Use this when you need dims for many URLs but will only render a subset (catalog planning, SSR precompute, bandwidth-constrained UIs). Bandwidth savings are smaller than the stream-cancel approach we had before — browsers cancel lazily once bytes are in flight — but it's a real knob when you need it.
+- **Demos updated**: masonry, editorial, and TTFS now pass `getElement(prepared)` into their rendered DOM instead of setting a fresh `img.src`. On the wire this means exactly one request per image; previously the "HTTP cache dedupes" story was usually but not always true.
+
+### Removed from the public surface
+
+These were all building blocks of the old stream-probe pipeline; none of them have consumers after the refactor. Shape of the `PreparedImage` handle, `layout()`, `fitRect()`, `recordKnownMeasurement`, `probeImageBytes`, URL parsers, `PrepareQueue`, `DecodePool`, and pretext integration are all unchanged.
+
+- `strategy: 'auto' | 'stream' | 'image-element'` on `PrepareOptions` — the new path has only one strategy.
+- `completeStream` on `PrepareOptions` — replaced by `dimsOnly` (inverse intent).
+- `measureImage`, `measureImages` — the old classic path. `prepare()` covers their use cases.
+- `decodeImageBitmap` — use `DecodePool.get(src)` instead; it also handles caching and off-main-thread decode.
+- `getEngineProfile`, `EngineProfile` — the polling path doesn't branch on engine capabilities.
+- `PrepareStrategy` type — no longer exposed.
+
+### Snapshot of the old stream-probe implementation
+
+Preserved on branch `archive/stream-probe-prepare` with a `STREAM-PROBE.md` explaining what's there, why it was dropped, and the one thing it does that the new approach can't (deterministic bandwidth-savings cancellation after the header bytes). If you want to build on that primitive for a catalog/SSR tool, start there.
+
 ## 0.0.7
 
 - **Removed dominant-color extraction.** `prepare({extractDominantColor: true})`, `measurement.dominantColor`, and the `extractDominantColorFromBlob` / `extractDominantRgbaFromBlob` / `rgbaToCss` exports are gone. The extraction ran on the fully-assembled blob *after* the stream drain, so the color arrived at roughly the same moment the real image paints — it couldn't function as a loading placeholder, which was the only story the feature was advertised for. Color extraction is a real problem worth solving but doesn't belong in an image-measurement library. The code is preserved on the `feat/dominant-color` branch for anyone who wants to build a proper standalone color library (the compelling version extracts color from the partial bytes already streamed for dimension probing — progressive-JPEG DC coefficients, AVIF preview layers — which nobody ships).

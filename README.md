@@ -1,56 +1,65 @@
 # Preimage
 
-Measured images for [pretext](https://github.com/chenglou/pretext): float figures and inline images in pretext-flowed text, without triggering DOM reflow.
+Image utilities for [pretext](https://github.com/chenglou/pretext)-flowed layouts and canvas/WebGL renderers. Measure images once, lay them out many times — no DOM reflow, no `await img.onload` before layout runs. Plus opt-in utilities for common "I have a lot of images" problems: concurrency capping, off-main-thread decode caching, `object-fit` math for canvas, URL-pattern dimension shortcuts.
 
-Pretext's variable-width cursor loop — its `layoutNextLineRange(prepared, cursor, maxWidth)` API — is built for exactly the scenarios where a figure sits beside a column of text and each line has to know how wide it's allowed to be. Pretext deliberately stops short of computing the figure: it takes `{ width, height, bottom }` as input and leaves the question of *how you got those numbers* to the caller.
+## What it does
 
-Preimage answers that question. It loads and decodes images once (via `HTMLImageElement.decode()`), caches their intrinsic size and aspect ratio, and provides two adapters that plug straight into pretext:
+Pretext's variable-width cursor loop — `layoutNextLineRange(prepared, cursor, maxWidth)` — is built for the case where a figure sits beside a column of text and each line has to know how wide it's allowed to be. Pretext takes `{ width, height, bottom }` as input and leaves the question of *how you got those numbers* to the caller. Preimage answers that question.
 
-- **`flowColumnWithFloats`** — drives pretext's cursor loop, reserves horizontal space for a floated image, yields a stream of placed lines + placed images with absolute `(x, y, w, h)`.
-- **`inlineImage` / `resolveMixedInlineItems`** — return pretext `RichInlineItem` values whose `extraWidth` reserves the measured image's rendered width, so pretext's rich-inline walker treats it as an atomic pill that wraps naturally with surrounding text.
+Two pretext adapters and a small set of adjacent utilities:
 
-Plus the primitives those adapters are built on — `prepare`, `layout`, `fitRect`, EXIF orientation handling, SVG viewBox extraction, and byte-level `probeImageBytes` for File/Blob sources.
+- **`flowColumnWithFloats`** — drives pretext's cursor loop, reserves horizontal space for floated images, yields placed lines and placed figures with absolute `(x, y, w, h)`.
+- **`inlineImage` / `resolveMixedInlineItems`** — return pretext `RichInlineItem` values whose `extraWidth` reserves the measured image's rendered width. Pretext treats them as atomic pills that wrap with surrounding text.
+- **`prepare`, `layout`, `fitRect`, `getElement`** — the primitives those adapters are built on, usable standalone.
+- **`PrepareQueue`** — application-level concurrency cap with `boost(url)` priority for "this just scrolled into view, jump the queue."
+- **`DecodePool`** — off-main-thread decode cache for canvas timelines and WebGL scenarios where you want `ctx.drawImage(bitmap, …)` to be a single blit, not a decode.
 
-## Demos at a glance
-
-| | |
-|---|---|
-| **[Masonry](./pages/demos/masonry.html)** — ~60 fresh photos into a grid. Left: naive `<img>`, layout shifts on every image decode. Right: `prepare()` each image then place by measured aspect ratio — the grid is stable from the first frame. | ![masonry](./pages/assets/screenshots/masonry.png) |
-| **[Editorial](./pages/demos/editorial.html)** — article with 3 floated figures. Left: naive HTML, text reflows as each figure loads. Right: pretext + preimage via `flowColumnWithFloats`, layout stable from first frame. | ![editorial](./pages/assets/screenshots/editorial.png) |
-| **[Pretext float](./pages/demos/pretext-float.html)** — paragraph wrapping around a measured figure. Column width, float side, and float top are live-editable; every change re-flows on pure arithmetic. | ![pretext float](./pages/assets/screenshots/pretext-float.png) |
-| **[Pretext rich-inline](./pages/demos/pretext-inline.html)** — chat bubble with three inline icon images. Resizing the bubble re-breaks the lines and shuffles the icons to their new slots. | ![pretext inline](./pages/assets/screenshots/pretext-inline.png) |
-| **[Canvas fit](./pages/demos/canvas-fit.html)** — `drawImage` stretch vs `layout()` fit math. The standalone (no-pretext) case where canvas can't fall back on CSS `object-fit`. | ![canvas fit](./pages/assets/screenshots/canvas-fit.png) |
-| **[Time-to-first-sizing](./pages/demos/ttfs.html)** — `prepare` in default (byte-probe) vs `image-element` strategy on an 11MB PNG Blob. Byte-probe returns in ~700µs; full decode takes ~374ms. | ![ttfs](./pages/assets/screenshots/ttfs.png) |
-
-Run them live with `bun install && bun start` and open [`/demos`](http://localhost:3000/).
-
-## `prepare`: time-to-first-sizing
-
-`prepare(src)` returns dimensions as fast as the platform allows. By default it streams the fetch for URLs and byte-probes the first chunk (~150ms for remote photos); for `Blob`/`File` sources it slices the first 4KB and probes (~5ms). The classic `HTMLImageElement.decode()` path is available as a fallback and via an opt-out strategy.
+## What `prepare()` actually does
 
 ```ts
-import { prepare, getMeasurement } from '@somnai-dreams/preimage'
+import { prepare, getMeasurement, getElement, layout } from '@somnai-dreams/preimage'
 
-// URL — streams + probes
-const hero = await prepare('/hero.jpg')
-const m = getMeasurement(hero)
-// m.naturalWidth / m.naturalHeight ready in ~150ms, not ~4000ms
-// m.blobUrl — the streamed blob exposed as an object URL; <img src> reuses it
+const img = await prepare('/hero.jpg')
+// Resolves once the browser has parsed the header bytes and set
+// naturalWidth on the underlying <img>. ~5-10ms typical for URLs.
+// The same <img> is still fetching the rest of the bytes.
 
-// Blob — slices + probes
-const file = inputEl.files[0]
-const prepared = await prepare(file)
-// dimensions in ~5ms, no decode
+const { naturalWidth, naturalHeight, aspectRatio } = getMeasurement(img)
+const rect = layout(img, 640, 480, 'contain')
 
-// Opt out of streaming for specific calls (e.g. to guarantee no fetch is issued)
-await prepare('/hero.jpg', { strategy: 'image-element' })
+// Render by reusing the <img> the library already has in flight. One
+// fetch total — no second request to the same URL.
+const el = getElement(img)
+if (el !== null) container.appendChild(el)
 ```
 
-Covers **PNG, JPEG, WebP, GIF, BMP, SVG** via pure byte parsers. **AVIF / HEIC / anything unknown** falls back transparently to `createImageBitmap(blob)` — still faster than a round trip because the bytes are already buffered, just without the first-2KB shortcut. `strategy` accepts `'auto'` (default), `'stream'` (require streaming, error on failure), or `'image-element'` (force classic path).
+Under the hood: create an `<img>`, set `src`, poll `naturalWidth` on a `setTimeout(0)` tick until the browser exposes it, resolve. No custom byte parsing, no `fetch()`, no blob-URL shuffling. The browser does all the work; we just observe the handoff.
+
+For **File/Blob** inputs (upload previews), we do parse bytes ourselves — the standalone `probeImageBytes(bytes)` reads PNG, JPEG, WebP, GIF, BMP, and SVG headers without going through an `<img>`. Useful when you already have the bytes in JS and don't want the round trip.
+
+### `dimsOnly` — measure without committing to load
+
+```ts
+const prepared = await prepare(url, { dimsOnly: true })
+// Dims known. The rest of the transfer is aborted.
+// getElement(prepared) returns null — the caller re-fetches if they
+// later decide to render.
+```
+
+For "I need to plan a layout from 200 URLs but only render the visible 30" scenarios: catalogs, above-the-fold precompute, bandwidth-metered contexts. Abort isn't free — browsers cancel lazily once bytes are in flight, so some header-adjacent bytes land before the cancel takes effect — but it's meaningfully cheaper than a full load.
+
+### `prepareSync(src, w, h)` — no-network-path
+
+Already know the dimensions (HTML attrs, server manifest, SSR)? Skip the DOM entirely:
+
+```ts
+const prepared = prepareSync('/hero.jpg', 1920, 1080)
+// Sync, no fetch. Goes straight into the measurement cache.
+```
 
 ## URL-pattern dimension extraction
 
-Many CDNs encode intrinsic dimensions directly in the URL — Cloudinary's `w_400,h_300/` transform segments, Shopify's `_400x300.jpg` suffix, picsum's `/800/600` path, Unsplash's `?w=400&h=300` query. If `prepare(url)` can read the dimensions straight out of the URL, it skips the network entirely and resolves them in microseconds. Parsers are opt-in via a pluggable registry:
+Many CDNs encode dimensions in the URL — Cloudinary's `w_400,h_300/`, Shopify's `_400x300.jpg`, picsum's `/800/600`, Unsplash's `?w=400&h=300`. When `prepare(url)` sees a registered parser match, it resolves dims from the string alone — no network.
 
 ```ts
 import {
@@ -60,22 +69,21 @@ import {
   queryParamDimensionParser,
 } from '@somnai-dreams/preimage'
 
-// Register every vendor parser the library ships with.
-registerCommonUrlDimensionParsers()
+registerCommonUrlDimensionParsers()  // Cloudinary, Shopify, picsum, Unsplash
 
-// Or register individually.
+// Or define your own:
 registerUrlDimensionParser(
   queryParamDimensionParser((u) => u.includes('my-cdn.example.com/'), 'width', 'height'),
 )
 
-const prepared = await prepare(cloudinaryUrl)  // no network — URL parsed
+const prepared = await prepare(cloudinaryUrl)   // zero network
 ```
 
-Built-ins: `cloudinaryParser`, `shopifyParser`, `picsumParser`, `unsplashParser`. The `queryParamDimensionParser` helper builds a parser for any CDN that uses query-string keys. Custom parsers are just `(url: string) => { width, height } | null` functions — register as many as you need.
+Parsers are `(url: string) => { width, height } | null` functions — register as many as you need.
 
-## Managed concurrency with `PrepareQueue`
+## `PrepareQueue`
 
-Browsers cap parallel requests per origin (6 for HTTP/1.1). Firing `prepare()` for 200 tiles means the later tiles queue inside the browser's network stack, where you can't reorder them. `PrepareQueue` is an application-level queue that holds requests before they hit the network and lets you `boost(url)` to move a URL to the front when it scrolls into view.
+Browsers cap parallel requests per origin (6 for HTTP/1.1). Firing `prepare()` for 200 tiles means the later tiles queue inside the browser's network stack where you can't reorder them.
 
 ```ts
 import { PrepareQueue } from '@somnai-dreams/preimage'
@@ -83,18 +91,18 @@ import { PrepareQueue } from '@somnai-dreams/preimage'
 const queue = new PrepareQueue({ concurrency: 6 })
 
 for (const tile of tiles) {
-  tile.prepared = queue.enqueue(tile.src)
+  tile.prepared = queue.enqueue(tile.src, { dimsOnly: true })
 }
 
-// User scrolls to tile 50 before tile 10 has even started:
-queue.boost(tiles[50].src)   // jumps the application queue immediately
+// User scrolls to tile 50 before tile 10 has started:
+queue.boost(tiles[50].src)
 ```
 
-Duplicate `enqueue()` calls for the same URL share one in-flight prepare (normalized by URL). `clear()` drops the pending backlog; in-flight work continues.
+Dedupes by normalized URL. `clear()` drops the pending backlog; in-flight work continues.
 
-## Off-main-thread decode with `DecodePool`
+## `DecodePool`
 
-`createImageBitmap(blob)` decodes off the main thread. For canvas/WebGL apps (scrubbable timelines, map tiles, photo editors), drawing from a cached `ImageBitmap` is a single main-thread blit — no decode cost on the hot path. `DecodePool` wraps `createImageBitmap` with a concurrency cap, an LRU cache of decoded bitmaps, and in-flight dedupe.
+`createImageBitmap(element-or-blob)` decodes off the main thread. For canvas/WebGL scenarios — scrubbable timelines, map tiles, photo editors — drawing from a cached `ImageBitmap` is a single blit with no decode cost on the hot path.
 
 ```ts
 import { DecodePool } from '@somnai-dreams/preimage'
@@ -103,14 +111,25 @@ const pool = new DecodePool({ concurrency: 4, maxCacheEntries: 64 })
 
 function paint() {
   for (const frame of visibleFrames) {
-    const bitmap = pool.peek(frame.src)     // non-blocking; null if not yet decoded
+    const bitmap = pool.peek(frame.src)        // non-blocking
     if (bitmap !== null) ctx.drawImage(bitmap, frame.x, frame.y)
-    else void pool.get(frame.src)           // kick off the decode for next paint
+    else void pool.get(frame.src)              // kick off decode for next paint
   }
 }
 ```
 
-Bitmaps evicted by LRU have `.close()` called to release GPU memory immediately. `release(src)` forces release before eviction; `clear()` closes everything.
+Internally uses `prepare()` to get dims and the warmed `<img>` element, then `createImageBitmap(img)` directly — one fetch shared between measurement, cache, and the bitmap decode. Bitmaps evicted by LRU have `.close()` called to release GPU memory.
+
+## Demos
+
+Four side-by-side demos at [the demos page](./pages/demos/). Each panel has its own Run button so you feel the click-to-layout delay for each strategy:
+
+- **Masonry** — ~30 local PNGs, naive `<img>` grid vs measured shortest-column layout. Naive shifts on every image decode; measured commits the grid in one pass.
+- **Editorial** — pretext + native `<img>` (re-flows on every figure's `onload`) vs pretext + preimage (flows once with measured dims).
+- **TTFS** — one ~3MB PNG, three strategies: naive, declared `<img width height>`, `prepare()`.
+- **Decode pool** — canvas scrub timeline, decode-per-scrub vs warmed pool.
+
+Run them: `bun install && bun start`, then open <http://localhost:3000/>.
 
 ## Installation
 
@@ -118,19 +137,19 @@ Bitmaps evicted by LRU have `.close()` called to release GPU memory immediately.
 npm install @somnai-dreams/preimage @chenglou/pretext
 ```
 
-Pretext is a `peerDependency` — the main entry (`@somnai-dreams/preimage`) does not import it, but the `@somnai-dreams/preimage/pretext` subpath does.
+Pretext is a `peerDependency` — the main entry (`@somnai-dreams/preimage`) does not import it, but `@somnai-dreams/preimage/pretext` does.
 
-## The pretext integration
+## Pretext integration
 
-### 1. Float a figure beside a pretext text column
+### Float a figure beside a text column
 
 ```ts
 import { prepareWithSegments, materializeLineRange } from '@chenglou/pretext'
 import { prepare } from '@somnai-dreams/preimage'
 import { flowColumnWithFloats } from '@somnai-dreams/preimage/pretext'
 
-const image = await prepare('/figure.jpg')        // one decode, aspect cached
-const text = prepareWithSegments(article, FONT)   // pretext's one-time pass
+const image = await prepare('/figure.jpg')
+const text = prepareWithSegments(article, FONT)
 
 const { items, totalHeight } = flowColumnWithFloats({
   text,
@@ -151,11 +170,9 @@ for (const item of items) {
 }
 ```
 
-The driver solves each float's rect against the column width, tracks which floats are active at each `y`, narrows pretext's `maxWidth` when one is, and emits placed lines that skip past the float's horizontal footprint. `totalHeight` is the greater of the last line's baseline and the lowest float's bottom. No DOM reads, no reflow, same data on every resize.
+`solveFloat(spec, columnWidth)` is the low-level version — just the `{ width, height }` for one floated image, for callers driving pretext's loop themselves.
 
-`solveFloat(spec, columnWidth)` is the low-level version — just the `{ width, height }` for one floated image, for callers that want to drive pretext's loop themselves.
-
-### 2. Inline a measured image inside pretext's rich-inline flow
+### Inline images in rich-inline text flow
 
 ```ts
 import {
@@ -185,42 +202,48 @@ walkRichInlineLineRanges(prepared, maxWidth, (range) => {
 })
 ```
 
-`inlineImage(src, options)` returns a `RichInlineItem` whose `text` is a single word joiner (U+2060 — invisible, zero-width, survives both pretext's `[ \t\n\f\r]+` trim and its soft-break-only drop) and whose `extraWidth` is the measured image's rendered width plus any caller-supplied chrome. Pretext packs it as an atomic pill with `break: 'never'` by default.
+`inlineImage(src, options)` returns a `RichInlineItem` whose `text` is a single word joiner (U+2060) and whose `extraWidth` is the measured image's rendered width plus any caller-supplied chrome. Pretext packs it as an atomic pill with `break: 'never'` by default. The returned item also carries `imageDisplayWidth`, `imageDisplayHeight`, and a reference to the `PreparedImage`, so the caller has everything needed to render at the fragment's computed position.
 
-The returned item also carries `imageDisplayWidth`, `imageDisplayHeight`, and a reference to the `PreparedImage`, so the caller has everything it needs to render the image at the fragment's computed position.
-
-`inlineImageItem(preparedImage, options)` is the sync version for callers that already have the image measured (useful when the whole rich-inline flow is being rebuilt on every keystroke, but the images were prepared once).
+`inlineImageItem(preparedImage, options)` is the sync version for callers that already have the image measured.
 
 ## API glossary
 
-### Core primitives (`@somnai-dreams/preimage`)
+### Core (`@somnai-dreams/preimage`)
 
 ```ts
-prepare(src: string, options?: PrepareOptions): Promise<PreparedImage>
-  // one-time load + decode + measurement pass, returns an opaque handle.
-
+// Prepare
+prepare(src: string | Blob, options?): Promise<PreparedImage>
 prepareSync(src, width, height, { orientation? }?): PreparedImage
-  // skip the network when your server already reports intrinsic dimensions.
 
-layout(prepared, maxWidth, maxHeight?, fit?): FittedRect
-  // CSS object-fit math over the cached aspect ratio. No DOM reads.
-  // `fit` is 'contain' | 'cover' | 'fill' | 'scale-down' | 'none'.
-
+// Handle readers
+getMeasurement(prepared): ImageMeasurement
+getElement(prepared): HTMLImageElement | null   // warmed <img> for render reuse
 measureAspect(prepared): number
-measureNaturalSize(prepared): { width: number, height: number }
-getMeasurement(prepared): ImageMeasurement  // full record (EXIF, format, …)
+measureNaturalSize(prepared): { width, height }
 
-fitRect(natW, natH, boxW, boxH, fit?): FittedRect
-  // the object-fit math as a standalone pure function. Used internally by
-  // `layout()` and `solveFloat()`; exposed because it's handy.
+// Layout math (pure, DOM-free)
+layout(prepared, maxWidth, maxHeight?, fit?): FittedRect
+layoutForWidth(prepared, maxWidth): FittedRect
+layoutForHeight(prepared, maxHeight): FittedRect
+fitRect(naturalW, naturalH, boxW, boxH, fit?): FittedRect
+   // fit is 'contain' | 'cover' | 'fill' | 'scale-down' | 'none'
 
-measureImage(src, options?): Promise<ImageMeasurement>
+// Caching + cache-awareness
 recordKnownMeasurement(src, w, h, { orientation?, decoded? }?): ImageMeasurement
-measureFromSvgText(svgText): { width, height } | null
-readExifOrientation(buffer): OrientationCode | null
+peekImageMeasurement(src): ImageMeasurement | null
+listCachedMeasurements(): ImageMeasurement[]
 clearCache(): void
 
-// Managed concurrency + decode pool
+// Byte-level primitives (for File/Blob consumers)
+probeImageBytes(bytes: Uint8Array): { width, height } | null
+MAX_HEADER_BYTES: number
+measureFromSvgText(svgText): { width, height } | null
+
+// EXIF
+readExifOrientation(buffer): OrientationCode | null
+applyOrientationToSize(w, h, orientation): { width, height }
+
+// Concurrency + decode pool
 new PrepareQueue({ concurrency? })
   queue.enqueue(src, options?): Promise<PreparedImage>
   queue.boost(src): boolean
@@ -253,43 +276,39 @@ Shapes:
 type FloatSpec = {
   image: PreparedImage
   side: 'left' | 'right'
-  top: number          // measured from column y=0
+  top: number
   maxWidth: number
   maxHeight?: number
-  gapX?: number        // horizontal gap between float and flowing text (default 12)
-  gapY?: number        // vertical gap above/below the float for line overlap (default 0)
+  gapX?: number   // default 12
+  gapY?: number   // default 0
 }
 
 type ColumnFlowItem =
-  | { kind: 'line'; y, x, width; range: LayoutLineRange }   // pretext's LayoutLineRange
+  | { kind: 'line'; y, x, width; range: LayoutLineRange }
   | { kind: 'float'; y, x, width, height; image; itemIndex; side }
 
 type InlineImageItem = RichInlineItem & {
   __preimageInline: true
   image: PreparedImage
-  imageDisplayWidth: number   // aspectRatio * options.height
-  imageDisplayHeight: number  // options.height
-  chromeWidth: number         // non-image extraWidth
+  imageDisplayWidth: number
+  imageDisplayHeight: number
+  chromeWidth: number
 }
 ```
 
-## Why these two integrations, and nothing else
+## Why this exists
 
-Pretext solves a sharp problem: "measure text without triggering reflow, then do line breaking with pure arithmetic." Preimage's job is to deliver the *one other input* pretext needs to cover the scenarios its own README describes:
+Pretext solves a sharp problem: "measure text without triggering reflow, then do line breaking with pure arithmetic." Preimage's job is to deliver the *one other input* pretext needs to cover the scenarios its own README describes: editorial article layout with floated figures, rich-note with inline icon images, chat bubbles with inline attachments, masonry layouts mixing text and image cards.
 
-- editorial article layout with floated figures
-- markdown / rich-note with inline icon images
-- chat bubbles with inline image attachments
-- masonry / column layouts that mix text and image cards
-
-For anything else images can do in a browser, CSS and the platform already have better answers: `aspect-ratio` handles CLS, `object-fit` handles single-image fitting inside a CSS box, `<picture>` handles responsive sources. Preimage does not try to reinvent any of those. It fills the specific gap where a JS layout engine — pretext — needs numeric dimensions *before* paint to decide how text wraps around an image.
+For anything else images do in a browser, the platform has better answers: `aspect-ratio` handles CLS, `object-fit` handles single-image fitting inside a CSS box, `<picture>` handles responsive sources. Preimage doesn't reinvent those. It fills the specific gap where a JS layout engine — pretext, a canvas renderer, a WebGL scene — needs numeric dimensions *before* paint.
 
 ## Caveats
 
-- The inline adapter's word-joiner (U+2060) sentinel measures 0px in every font we've tested. If you hit a font that gives `⁠` a non-zero glyph width, the reserved width will be off by that amount. Report it.
-- `flowColumnWithFloats` currently handles any number of floats, but a line's available width is always calculated as `columnWidth - (widest active left float) - (widest active right float) - gaps`. Side-by-side floats on the same side stack to the full width of the larger one, not sum to both — matching how CSS floats behave.
+- The inline adapter's word-joiner (U+2060) sentinel measures 0px in every font we've tested. If you hit a font that gives `⁠` a non-zero glyph width, the reserved width will be off by that amount.
+- `flowColumnWithFloats` handles any number of floats, but a line's available width is `columnWidth - (widest active left float) - (widest active right float) - gaps`. Side-by-side floats on the same side stack to the width of the larger one, not sum — matching CSS float behavior.
 - EXIF orientations 1–8 are respected for measurement axes; canvas rendering still needs to apply the transform manually. Browser `<img>` rendering applies it automatically.
-- SVG without an intrinsic size falls back to `300 × 150` (CSS default). Use `measureFromSvgText` for the viewBox if that matters.
+- SVG without an intrinsic size returns `(0, 0)` on most browsers; use `measureFromSvgText(svgText)` to extract the viewBox.
+- `dimsOnly: true` cancel isn't instantaneous — browsers let the in-flight request settle a bit before aborting. Bandwidth savings are real but not surgical.
 
 ## Develop
 
@@ -297,4 +316,4 @@ See [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Credits
 
-Built on top of Chenglou's [pretext](https://github.com/chenglou/pretext). The two-phase prepare/layout split, the opaque prepared handle, and the cursor-driven streaming API are all pretext's design; preimage just follows its shape for the image side of the same problems.
+Built on top of Chenglou's [pretext](https://github.com/chenglou/pretext). The two-phase prepare/layout split, the opaque prepared handle, and the cursor-driven streaming API are all pretext's design — preimage just follows its shape for the image side of the same problems.
