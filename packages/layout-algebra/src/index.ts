@@ -95,3 +95,133 @@ export function shortestColumnCursor(config: ShortestColumnConfig): PackingCurso
     },
   }
 }
+
+// --- Justified-rows packer ---
+//
+// Flickr / Google Photos / Unsplash-style: images flow left-to-right
+// at a target row height. Each row closes when the next image would
+// overflow `panelWidth`; the closed row's items are scaled uniformly
+// so their widths fit exactly. Rows have different heights between
+// rows but uniform height within a row — the opposite trade-off from
+// shortest-column masonry.
+//
+// Trailing row: if `lastRowJustified` is false (default), the last
+// row keeps `targetRowHeight` and whatever trailing whitespace is
+// left. If true, the last row is scaled up to fill the panel like
+// every other row — visually tidier but distorts the final tiles if
+// they're meant to be consumed as a "what's newest" stripe.
+
+export type JustifiedRowsConfig = {
+  panelWidth: number
+  targetRowHeight: number
+  gap: number
+  lastRowJustified?: boolean
+}
+
+export function packJustifiedRows(
+  aspects: readonly number[],
+  config: JustifiedRowsConfig,
+): { placements: Placement[]; totalHeight: number } {
+  const { panelWidth, targetRowHeight, gap } = config
+  const lastRowJustified = config.lastRowJustified ?? false
+
+  if (!Number.isFinite(panelWidth) || panelWidth <= 0) {
+    throw new RangeError(`packJustifiedRows: panelWidth must be positive, got ${panelWidth}.`)
+  }
+  if (!Number.isFinite(targetRowHeight) || targetRowHeight <= 0) {
+    throw new RangeError(
+      `packJustifiedRows: targetRowHeight must be positive, got ${targetRowHeight}.`,
+    )
+  }
+  if (!Number.isFinite(gap) || gap < 0) {
+    throw new RangeError(`packJustifiedRows: gap must be non-negative, got ${gap}.`)
+  }
+
+  const placements: Placement[] = new Array(aspects.length)
+  let y = 0
+  let rowStart = 0
+
+  // Walk items, tentatively adding to the current row. When adding
+  // item i would overflow panelWidth at targetRowHeight, close the
+  // row with [rowStart, i) and start a new row with i.
+  for (let i = 0; i < aspects.length; i++) {
+    const aspect = aspects[i]!
+    if (!Number.isFinite(aspect) || aspect <= 0) {
+      throw new RangeError(
+        `packJustifiedRows: aspect at index ${i} must be a positive finite number, got ${aspect}.`,
+      )
+    }
+
+    if (rowStart < i) {
+      // Would adding this item push the row past panelWidth?
+      const countWithNew = i - rowStart + 1
+      const widthAtTarget = sumWidthsAtTarget(aspects, rowStart, i + 1, targetRowHeight)
+      const totalGap = gap * (countWithNew - 1)
+      if (widthAtTarget + totalGap > panelWidth) {
+        // Close [rowStart, i) justified; item i begins a new row.
+        y = placeJustifiedRow(aspects, rowStart, i, targetRowHeight, gap, panelWidth, y, placements, true)
+        rowStart = i
+      }
+    }
+  }
+  // Flush the final row.
+  if (rowStart < aspects.length) {
+    y = placeJustifiedRow(
+      aspects,
+      rowStart,
+      aspects.length,
+      targetRowHeight,
+      gap,
+      panelWidth,
+      y,
+      placements,
+      lastRowJustified,
+    )
+  }
+
+  // y currently includes a trailing gap after the last row; undo it
+  // so the container sizes to the actual bottom of the last row.
+  return { placements, totalHeight: Math.max(0, y - gap) }
+}
+
+function sumWidthsAtTarget(
+  aspects: readonly number[],
+  start: number,
+  end: number,
+  targetH: number,
+): number {
+  let sum = 0
+  for (let i = start; i < end; i++) sum += aspects[i]! * targetH
+  return sum
+}
+
+// Place items [start, end) as one row, advancing y. If `justify` is
+// true, scale the row so widths + gaps == panelWidth exactly. If
+// false (last row, default behavior), keep items at targetRowHeight
+// and leave whatever whitespace is natural.
+function placeJustifiedRow(
+  aspects: readonly number[],
+  start: number,
+  end: number,
+  targetH: number,
+  gap: number,
+  panelWidth: number,
+  y: number,
+  out: Placement[],
+  justify: boolean,
+): number {
+  const count = end - start
+  const totalGap = gap * Math.max(0, count - 1)
+  const widthAtTarget = sumWidthsAtTarget(aspects, start, end, targetH)
+  const availWidth = panelWidth - totalGap
+
+  const rowH = justify ? targetH * (availWidth / widthAtTarget) : targetH
+
+  let x = 0
+  for (let i = start; i < end; i++) {
+    const w = aspects[i]! * rowH
+    out[i] = { x, y, width: w, height: rowH }
+    x += w + gap
+  }
+  return y + rowH + gap
+}
