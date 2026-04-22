@@ -1,5 +1,6 @@
 import { prepare, getMeasurement, getElement } from '@somnai-dreams/preimage'
 import {
+  packJustifiedRows,
   packShortestColumn,
   shortestColumnCursor,
   type Placement,
@@ -19,8 +20,12 @@ const runMeasuredBtn = document.getElementById('runMeasured') as HTMLButtonEleme
 
 const COLUMNS = 3
 const GAP = 6
+// Target row height for justified-rows layout. Sized so a typical row
+// of 3-4 photos reads similar in scale to the 3-column masonry view.
+const TARGET_ROW_HEIGHT = 220
 
 type Mode = 'batch' | 'progressive'
+type Layout = 'column' | 'rows'
 
 function getCount(): number {
   return Math.min(Number(countSlider.value), PHOTO_COUNT)
@@ -29,6 +34,11 @@ function getCount(): number {
 function getMode(): Mode {
   const checked = document.querySelector<HTMLInputElement>('input[name="mode"]:checked')
   return checked?.value === 'progressive' ? 'progressive' : 'batch'
+}
+
+function getLayout(): Layout {
+  const checked = document.querySelector<HTMLInputElement>('input[name="layout"]:checked')
+  return checked?.value === 'rows' ? 'rows' : 'column'
 }
 
 function getCacheBust(): string | null {
@@ -235,11 +245,16 @@ async function runMeasured(): Promise<void> {
   const count = getCount()
   const cacheBust = getCacheBust()
   const mode = getMode()
+  const layout = getLayout()
   setMeta(count, cacheBust)
   const urls = buildUrls(count, cacheBust)
 
-  if (mode === 'batch') {
-    await runMeasuredBatch(urls)
+  // Justified rows can't be laid out progressively — closing a row
+  // scales every tile in it, so an incremental version would reflow
+  // already-placed tiles. Fall back to batch when the user picks
+  // rows.
+  if (layout === 'rows' || mode === 'batch') {
+    await runMeasuredBatch(urls, layout)
   } else {
     await runMeasuredProgressive(urls)
   }
@@ -248,7 +263,7 @@ async function runMeasured(): Promise<void> {
   runMeasuredBtn.textContent = 'Run again'
 }
 
-async function runMeasuredBatch(urls: readonly string[]): Promise<void> {
+async function runMeasuredBatch(urls: readonly string[], layout: Layout): Promise<void> {
   const t0 = performance.now()
   // Track each prepare()'s individual resolve time for the "average
   // dim fetch" stat. Promise.all only gives us the all-done time.
@@ -264,11 +279,18 @@ async function runMeasuredBatch(urls: readonly string[]): Promise<void> {
 
   const panelWidth = measuredPanel.getBoundingClientRect().width
   const aspects = prepared.map((p) => getMeasurement(p).aspectRatio)
-  const { placements, totalHeight } = packShortestColumn(aspects, {
-    columns: COLUMNS,
-    gap: GAP,
-    panelWidth,
-  })
+  const { placements, totalHeight } =
+    layout === 'rows'
+      ? packJustifiedRows(aspects, {
+          panelWidth,
+          targetRowHeight: TARGET_ROW_HEIGHT,
+          gap: GAP,
+        })
+      : packShortestColumn(aspects, {
+          columns: COLUMNS,
+          gap: GAP,
+          panelWidth,
+        })
   measuredPanel.style.height = `${totalHeight}px`
 
   const tiles: Tile[] = []

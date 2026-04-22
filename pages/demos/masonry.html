@@ -70,7 +70,7 @@
   <main class="page wide">
     <header class="page-header">
       <h1>Masonry — reflow during image loads</h1>
-      <p>Two grids, same photos, separate Run buttons so you feel each one. The left uses stock <code>&lt;img&gt;</code> tags with no reserved dimensions — the column stretches as each image decodes and every tile below it shifts. The right calls <code>prepare()</code> per image first, then commits a shortest-column layout in one synchronous pass; tiles are positioned before any pixel paints.</p>
+      <p>Two grids, same photos, separate Run buttons so you feel each one. The left uses stock <code>&lt;img&gt;</code> tags with no reserved dimensions — the column stretches as each image decodes and every tile below it shifts. The right calls <code>prepare()</code> per image first, then commits the layout from <code>@somnai-dreams/layout-algebra</code> in one synchronous pass; tiles are positioned before any pixel paints. Toggle between shortest-column masonry (<code>packShortestColumn</code>) and Flickr-style justified rows (<code>packJustifiedRows</code>).</p>
     </header>
 
     <div class="controls">
@@ -79,6 +79,11 @@
           <span>Images</span>
           <input id="countSlider" type="range" min="6" max="34" value="24" step="1" />
           <span id="countVal" class="count-val">24</span>
+        </div>
+        <span class="controls-label">Layout</span>
+        <div class="segmented" role="radiogroup" aria-label="Layout algorithm">
+          <label><input type="radio" name="layout" value="column" checked> Shortest column</label>
+          <label><input type="radio" name="layout" value="rows"> Justified rows</label>
         </div>
         <span class="controls-label">Placement</span>
         <div class="segmented" role="radiogroup" aria-label="Placement mode">
