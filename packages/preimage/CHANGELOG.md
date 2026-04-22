@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0
+
+- **New subpath `@somnai-dreams/preimage/core`** — DOM-free exports. `probeImageBytes`, `fitRect`, the URL-dimension parsers, `measureFromSvgText`, EXIF orientation helpers, `recordKnownMeasurement`/`peekImageMeasurement`, analysis helpers. No `Image`, no `HTMLImageElement`, no `createImageBitmap` — runs in Node, Deno, Bun, Web Workers, and edge runtimes. Use for SSR precompute, build-time manifest generation, and worker-side byte probing. The main entry still ships `prepare`, `PrepareQueue`, `DecodePool`, and pretext integration; those require the DOM.
+- No changes to the main entry's public surface.
+
 ## 0.1.1
 
 - **`PrepareQueue` default concurrency bumped from 6 → 20.** Sized for HTTP/2 origins, which is most modern deployment targets (GitHub Pages, Cloudflare, Vercel, Netlify, any CDN built in the last decade). On HTTP/1.1 origins the browser's 6-slot connection cap gatekeeps automatically — firing 20 means the browser accepts all into its own queue, runs 6 in parallel, serves the rest in FIFO order. Same throughput as the old default, no penalty. Callers who know they're on H1 and want to leave slots free for render-side fetches can pass `concurrency: 6` explicitly.

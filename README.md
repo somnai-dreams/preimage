@@ -259,6 +259,35 @@ new DecodePool({ concurrency?, maxCacheEntries?, imageBitmapOptions? })
   pool.clear(): void
 ```
 
+### DOM-free core (`@somnai-dreams/preimage/core`)
+
+The subset of the main entry that doesn't touch `Image`, `HTMLImageElement`, or `createImageBitmap`. Runs in Node, Deno, Bun, Web Workers, and edge runtimes.
+
+```ts
+// Byte-level probing
+probeImageBytes(bytes): { width, height } | null
+MAX_HEADER_BYTES: number
+measureFromSvgText(svgText): { width, height } | null
+
+// URL analysis + declared-dimension parsers
+analyzeImage(src): ImageAnalysis
+normalizeSrc, detectImageFormat, detectSourceKind
+parseUrlDimensions, registerCommonUrlDimensionParsers
+cloudinaryParser, shopifyParser, picsumParser, unsplashParser
+
+// Measurement cache seeding
+recordKnownMeasurement(src, w, h, options?): ImageMeasurement
+peekImageMeasurement(src): ImageMeasurement | null
+listCachedMeasurements(): ImageMeasurement[]
+
+// EXIF + layout math
+readExifOrientation(buffer): OrientationCode | null
+applyOrientationToSize(w, h, orientation): { width, height }
+fitRect(naturalW, naturalH, boxW, boxH, fit?): FittedRect
+```
+
+Use for SSR precompute, build-time manifest generation, and worker-side byte probing. For rendering-path APIs (`prepare`, `PrepareQueue`, `DecodePool`, pretext integration), import from the main entry or `./pretext`.
+
 ### Pretext integration (`@somnai-dreams/preimage/pretext`)
 
 ```ts
