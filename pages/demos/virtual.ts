@@ -245,6 +245,16 @@ async function runMeasured(): Promise<void> {
   let firstPlacedMs: number | null = null
   let dimsProbed = 0
 
+  // Don't start mounting tiles (and kicking off their full-image
+  // fetches) until we've packed enough placements to cover the first
+  // screen. Until that threshold, dim probes run unopposed for
+  // connection slots — so the first screen of real images starts
+  // loading from a state where 20+ parallel GETs are available
+  // instead of sharing with in-flight probes.
+  const firstScreenThreshold =
+    measuredScroll.clientHeight + OVERSCAN
+  let mountingStarted = false
+
   const placePromises = urls.map((url) =>
     queue.enqueue(url, { dimsOnly: true }).then((prepared) => {
       const aspect = getMeasurement(prepared).aspectRatio
@@ -256,18 +266,31 @@ async function runMeasured(): Promise<void> {
       // "how much layout exists so far." After the last probe resolves,
       // the height is final and stays put.
       measuredPanel.style.height = `${packer.totalHeight()}px`
-      pool.setPlacements(placements)
+
+      // Gate the tile-pool: feed placements only once the first
+      // screen is covered (or this is the final tile, whichever
+      // comes first). After the gate opens, every subsequent resolve
+      // feeds normally so new tiles mount as they scroll into view.
+      if (!mountingStarted && packer.totalHeight() >= firstScreenThreshold) {
+        mountingStarted = true
+      }
+      if (mountingStarted) pool.setPlacements(placements)
 
       dimsProbed++
       setRowValue(measuredStats, 2, `<b>${fmtCount(dimsProbed)} / ${fmtCount(urls.length)}</b>`)
 
-      if (firstPlacedMs === null) {
+      if (mountingStarted && firstPlacedMs === null) {
         firstPlacedMs = performance.now() - t0
         setRowValue(measuredStats, 3, `<b>${fmtMs(firstPlacedMs)}</b>`)
       }
     }),
   )
   await Promise.all(placePromises)
+
+  // Final safety net: if the whole layout is shorter than the first
+  // screen (count small enough that the gate never triggered), mount
+  // everything now.
+  if (!mountingStarted) pool.setPlacements(placements)
 
   const allPlacedMs = performance.now() - t0
   setRowValue(measuredStats, 4, `<b>${fmtMs(allPlacedMs)}</b>`)
