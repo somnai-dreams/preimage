@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · drop zone</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./demo-styles.css" />
+  <style>
+    .page.wide { max-width: 1500px; }
+
+    .drop-area {
+      border: 2px dashed var(--border-strong);
+      border-radius: var(--radius-md);
+      padding: 28px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 14px;
+      background: var(--surface-muted);
+      cursor: pointer;
+      transition: border-color 120ms, background 120ms;
+      margin-bottom: 20px;
+    }
+    .drop-area.dragover {
+      border-color: var(--accent);
+      background: rgba(37, 99, 235, 0.05);
+      color: var(--accent);
+    }
+    .drop-area .hint {
+      font-size: 12px;
+      color: var(--text-soft);
+      margin-top: 6px;
+    }
+    .drop-area button {
+      font: inherit;
+      font-weight: 500;
+      padding: 6px 12px;
+      margin-left: 10px;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+    }
+    .drop-area button:hover { border-color: var(--accent); color: var(--accent); }
+
+    .panel-stats { border-top: 1px solid var(--border); padding-top: 10px; margin-bottom: 14px; }
+
+    /* Both flows use the same inline layout. The only difference is
+       whether each inline <img> has its width declared before the
+       bytes finish decoding. */
+    .message-flow {
+      font-size: 15px;
+      line-height: 1.85;
+      color: var(--text);
+      min-height: 220px;
+      padding: 12px;
+      background: var(--surface-muted);
+      border-radius: var(--radius-sm);
+    }
+    .message-flow img {
+      height: 100px;
+      vertical-align: middle;
+      margin: 0 4px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+    /* Measured images have width set in the style attribute too, so
+       the browser reserves their box before bytes decode. */
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="./">preimage demos</a>
+    <a href="./masonry.html">Masonry</a>
+    <a href="./editorial.html">Editorial</a>
+    <a href="./ttfs.html">TTFS</a>
+    <a href="./decode-pool.html">Decode pool</a>
+    <a href="./scale.html">Scale</a>
+    <a href="./dropzone.html" aria-current="page">Drop zone</a>
+    <span class="spacer"></span>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page wide">
+    <header class="page-header">
+      <h1>Drop zone — inline images from <code>Blob</code> input</h1>
+      <p>Drag any images from your desktop into the drop zone. Each file is a <code>File</code> — a <code>Blob</code>, no network, no URL to measure from. The left panel inlines each file as <code>&lt;img height="56"&gt;</code> with no width; the browser knows the height but not the width until the bytes decode, so text to the right of each image shifts. The right panel runs <code>prepare(file)</code> — <strong>the byte-probe path, ~5ms per file</strong> — and writes the resolved width into the <code>&lt;img&gt;</code> before it's inserted. Text around it never moves.</p>
+    </header>
+
+    <div class="drop-area" id="dropArea">
+      <div><strong>Drop image files here</strong> — or <button id="pickBtn">pick from disk</button></div>
+      <div class="hint">PNG, JPEG, WebP, GIF, BMP, SVG. Larger files make the delta more visible.</div>
+      <input type="file" id="picker" accept="image/*" multiple hidden />
+    </div>
+
+    <span id="meta" class="meta"></span>
+
+    <div class="panels two">
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Naive inline <code>&lt;img&gt;</code></h2>
+        </div>
+        <div class="panel-stats stat-list" id="naiveStats">
+          <div class="row"><span class="label">Images dropped</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Avg time to width-known</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Strategy</span><span class="value"><b>onload (full decode)</b></span></div>
+        </div>
+        <div id="naive" class="message-flow"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Preimage <code>prepare(Blob)</code></h2>
+        </div>
+        <div class="panel-stats stat-list" id="measuredStats">
+          <div class="row"><span class="label">Images dropped</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Avg time to width-known</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Strategy</span><span class="value"><b>byte-probe, first 4KB</b></span></div>
+        </div>
+        <div id="measured" class="message-flow"></div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="./dropzone.ts"></script>
+</body>
+</html>

@@ -26,6 +26,7 @@
     <a href="./ttfs.html">TTFS</a>
     <a href="./decode-pool.html">Decode pool</a>
     <a href="./scale.html">Scale</a>
+    <a href="./dropzone.html">Drop zone</a>
     <span class="spacer"></span>
     <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
   </nav>
@@ -59,6 +60,10 @@
         <a class="demo-card" href="./scale.html">
           <h3>Scale — hundreds of tiles</h3>
           <p>Up to 500 cache-busted tiles, naive vs <code>PrepareQueue</code> + <code>dimsOnly</code> + <code>IntersectionObserver</code>. Measured panel takes header bytes for all tiles, lays out the whole grid, then full-fetches only what scrolls into view. Bytes-transferred readout shows what the library saves.</p>
+        </a>
+        <a class="demo-card" href="./dropzone.html">
+          <h3>Drop zone — Blob inputs</h3>
+          <p>Drag images from your desktop. Left panel inlines them as naive <code>&lt;img&gt;</code> — each file's width is unknown until decode, so surrounding text shifts. Right panel runs <code>prepare(file)</code> — byte-probe on the first 4KB of the blob, ~5ms — and writes the exact width into the <code>&lt;img&gt;</code> before insert.</p>
         </a>
       </div>
     </section>
