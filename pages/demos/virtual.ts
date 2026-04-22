@@ -157,6 +157,20 @@ async function runNaive(): Promise<void> {
 }
 
 // --- Measured run with true DOM recycling ---
+//
+// Vibescript-shaped: transient state lives in a few locals, probe
+// resolves mutate state and schedule a frame, the frame does all DOM
+// writes in one pass. Per-probe DOM writes were re-doing style.height,
+// pool.setPlacements, and two stat rows on every one of up to 2000
+// microtasks — rAF-batching collapses them to one pass per frame.
+
+function markTileLoaded(el: HTMLElement, img: HTMLImageElement): void {
+  img.classList.add('loaded')
+  // Full className assignment (not a toggle) per vibescript: every
+  // branch sets the complete attribute value so nothing from a prior
+  // state leaks through.
+  el.className = 'vtile has-image'
+}
 
 async function runMeasured(): Promise<void> {
   runMeasuredBtn.disabled = true
@@ -186,11 +200,12 @@ async function runMeasured(): Promise<void> {
     panelWidth: measuredPanel.getBoundingClientRect().width,
   })
 
-  // `placements[i]` is the i-th resolved tile in resolution order.
-  // `indexUrl[i]` is the URL that `mount` should render for that
-  // tile. Both arrays grow monotonically as prepare() resolves fire.
+  // Transient state. Promise resolves only mutate these; all DOM
+  // writes live in render().
   const placements: Placement[] = []
   const indexUrl: string[] = []
+  let dimsProbed = 0
+  let firstPlacedMs: number | null = null
 
   const pool = createVirtualTilePool({
     scrollContainer: measuredScroll,
@@ -202,34 +217,20 @@ async function runMeasured(): Promise<void> {
       el.style.top = `${place.y}px`
       el.style.width = `${place.width}px`
       el.style.height = `${place.height}px`
-      el.dataset['idx'] = String(idx)
 
       const img = new Image()
       img.alt = ''
       img.src = indexUrl[idx]!
       // Cache-hit fast path: scroll-back re-mounts a tile whose
       // bytes the browser already has. `complete` is synchronously
-      // true after src is set when cached, so add `.loaded` up
-      // front — no opacity transition runs because we apply the
-      // end-state before the node is inserted.
+      // true after src is set when cached — apply the final class
+      // state before the node is inserted so no fade runs.
       if (img.complete && img.naturalWidth > 0) {
-        img.classList.add('loaded')
-        el.classList.add('has-image')
-        el.classList.remove('pending')
+        markTileLoaded(el, img)
       } else {
-        img.addEventListener(
-          'load',
-          () => {
-            img.classList.add('loaded')
-            el.classList.add('has-image')
-            el.classList.remove('pending')
-          },
-          { once: true },
-        )
+        img.addEventListener('load', () => markTileLoaded(el, img), { once: true })
       }
       el.appendChild(img)
-
-      setRowValue(measuredStats, 1, `<b>${fmtCount(pool.activeCount)}</b>`)
     },
     unmount: (_idx, el) => {
       // Cancel any in-flight image fetch before discarding the <img>.
@@ -238,11 +239,33 @@ async function runMeasured(): Promise<void> {
       const img = el.querySelector('img')
       if (img !== null) img.src = ''
       el.innerHTML = ''
-      el.classList.remove('has-image')
-      el.classList.add('pending')
-      setRowValue(measuredStats, 1, `<b>${fmtCount(pool.activeCount)}</b>`)
+      el.className = 'vtile pending'
     },
   })
+
+  // rAF-batched render. All the DOM writes that used to fire per
+  // probe-resolve now coalesce into one pass per frame. With up to
+  // 20 concurrent probes per frame this trims 20× redundant layout
+  // reads inside pool.setPlacements and 20× stat-row innerHTML ops
+  // down to a single pass.
+  let renderPending = false
+  function scheduleRender(): void {
+    if (renderPending) return
+    renderPending = true
+    requestAnimationFrame(() => {
+      renderPending = false
+      render()
+    })
+  }
+  function render(): void {
+    measuredPanel.style.height = `${packer.totalHeight()}px`
+    pool.setPlacements(placements)
+    setRowValue(measuredStats, 1, `<b>${fmtCount(pool.activeCount)}</b>`)
+    setRowValue(measuredStats, 2, `<b>${fmtCount(dimsProbed)} / ${fmtCount(urls.length)}</b>`)
+    if (firstPlacedMs !== null) {
+      setRowValue(measuredStats, 3, `<b>${fmtMs(firstPlacedMs)}</b>`)
+    }
+  }
 
   // Fire every prepare(dimsOnly) through the queue. concurrency: 20
   // is the H2 sweet spot; on H1 the browser's 6-slot cap gatekeeps
@@ -251,33 +274,22 @@ async function runMeasured(): Promise<void> {
   // hundreds of MB for full-body fetches.
   const queue = new PrepareQueue({ concurrency: 20 })
 
-  let firstPlacedMs: number | null = null
-  let dimsProbed = 0
-
   const placePromises = urls.map((url) =>
     queue.enqueue(url, { dimsOnly: true }).then((prepared) => {
       const aspect = getMeasurement(prepared).aspectRatio
-      const place = packer.add(aspect)
-      placements.push(place)
+      placements.push(packer.add(aspect))
       indexUrl.push(url)
-
-      // Grow the spacer monotonically so the scrollbar length tracks
-      // "how much layout exists so far." After the last probe resolves,
-      // the height is final and stays put.
-      measuredPanel.style.height = `${packer.totalHeight()}px`
-      pool.setPlacements(placements)
-
       dimsProbed++
-      setRowValue(measuredStats, 2, `<b>${fmtCount(dimsProbed)} / ${fmtCount(urls.length)}</b>`)
-
-      if (firstPlacedMs === null) {
-        firstPlacedMs = performance.now() - t0
-        setRowValue(measuredStats, 3, `<b>${fmtMs(firstPlacedMs)}</b>`)
-      }
+      if (firstPlacedMs === null) firstPlacedMs = performance.now() - t0
+      scheduleRender()
     }),
   )
   await Promise.all(placePromises)
 
+  // Final render — inline, not rAF, because we're reporting the
+  // terminal state and a possibly-still-pending scheduled rAF would
+  // race with the stat writes below.
+  render()
   const allPlacedMs = performance.now() - t0
   setRowValue(measuredStats, 4, `<b>${fmtMs(allPlacedMs)}</b>`)
 

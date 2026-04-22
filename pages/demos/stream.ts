@@ -116,6 +116,14 @@ function seedStage(stage: HTMLElement, progressBar: HTMLElement): HTMLElement {
   return fig
 }
 
+// Full-assignment class transition for a figure: drops the shimmer,
+// marks the image visible. Per vibescript, replace the whole className
+// rather than toggling members so the branches can't drift.
+function markFigureLoaded(fig: HTMLElement, img: HTMLImageElement): void {
+  img.classList.add('loaded')
+  fig.className = 'figure'
+}
+
 // --- Naive run: wait for the entire stream, then render ---
 
 async function runNaive(): Promise<void> {
@@ -156,19 +164,18 @@ async function runNaive(): Promise<void> {
   const blobUrl = URL.createObjectURL(blob)
   const img = new Image()
   img.alt = ''
+  img.src = blobUrl
+  fig.appendChild(img)
   const renderedAt = await new Promise<number>((resolve) => {
-    img.addEventListener('load', () => {
-      img.classList.add('loaded')
-      fig.classList.remove('pending')
-      fig.classList.add('loaded')
+    const finish = (): void => {
+      markFigureLoaded(fig, img)
       // Resize the figure to the image's natural dims now that we
       // know them — same moment dims are "known" in this model.
-      fig.style.width = '240px'
       fig.style.height = `${(240 / img.naturalWidth) * img.naturalHeight}px`
       resolve(performance.now() - t0)
-    })
-    img.src = blobUrl
-    fig.appendChild(img)
+    }
+    if (img.complete && img.naturalWidth > 0) finish()
+    else img.addEventListener('load', finish, { once: true })
   })
 
   naiveProgress.style.width = '100%'
@@ -245,15 +252,15 @@ async function runMeasured(): Promise<void> {
   const blobUrl = URL.createObjectURL(blob)
   const img = new Image()
   img.alt = ''
+  img.src = blobUrl
+  fig.appendChild(img)
   const renderedAt = await new Promise<number>((resolve) => {
-    img.addEventListener('load', () => {
-      img.classList.add('loaded')
-      fig.classList.remove('pending')
-      fig.classList.add('loaded')
+    const finish = (): void => {
+      markFigureLoaded(fig, img)
       resolve(performance.now() - t0)
-    })
-    img.src = blobUrl
-    fig.appendChild(img)
+    }
+    if (img.complete && img.naturalWidth > 0) finish()
+    else img.addEventListener('load', finish, { once: true })
   })
 
   measuredProgress.style.width = '100%'
