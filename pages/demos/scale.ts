@@ -212,16 +212,22 @@ async function runMeasured(): Promise<void> {
         if (tile === undefined || tile.img !== null) continue
         const img = new Image()
         img.alt = ''
-        img.addEventListener(
-          'load',
-          () => {
-            img.classList.add('loaded')
-            tile.container.classList.add('has-image')
-            tile.container.classList.remove('pending')
-          },
-          { once: true },
-        )
         img.src = tile.url
+        if (img.complete && img.naturalWidth > 0) {
+          img.classList.add('loaded')
+          tile.container.classList.add('has-image')
+          tile.container.classList.remove('pending')
+        } else {
+          img.addEventListener(
+            'load',
+            () => {
+              img.classList.add('loaded')
+              tile.container.classList.add('has-image')
+              tile.container.classList.remove('pending')
+            },
+            { once: true },
+          )
+        }
         tile.container.appendChild(img)
         tile.img = img
         io.unobserve(entry.target)

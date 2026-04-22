@@ -336,18 +336,20 @@ async function runNative(): Promise<void> {
     Array.from(figNodes).map((fig, i) => {
       const img = fig.querySelector('img')
       if (img === null) return Promise.resolve()
+      img.src = urls[i]!
+      if (img.complete && img.naturalWidth > 0) {
+        img.classList.add('loaded')
+        fig.classList.add('has-image')
+        return Promise.resolve()
+      }
       return new Promise<void>((resolve) => {
         const done = (): void => {
           img.classList.add('loaded')
           fig.classList.add('has-image')
           resolve()
         }
-        if (img.complete && img.naturalWidth > 0) done()
-        else {
-          img.addEventListener('load', done, { once: true })
-          img.addEventListener('error', done, { once: true })
-        }
-        img.src = urls[i]!
+        img.addEventListener('load', done, { once: true })
+        img.addEventListener('error', done, { once: true })
       })
     }),
   )
@@ -394,21 +396,29 @@ async function runMeasured(): Promise<void> {
       if (placeholder === null) return Promise.resolve()
       const warmed = getElement(prepared[i]!)
       const img = warmed ?? placeholder
+      if (warmed === null) img.src = urls[i]!
+      // If the warmed <img> (or the newly-set src) already has bytes,
+      // flag before replaceChild so the element enters the DOM at
+      // opacity: 1 with no fade-in.
+      if (img.complete && img.naturalWidth > 0) {
+        img.classList.add('loaded')
+        fig.classList.add('has-image')
+      }
       if (warmed !== null && warmed !== placeholder) {
         fig.replaceChild(warmed, placeholder)
       }
-      if (warmed === null) img.src = urls[i]!
       return new Promise<void>((resolve) => {
+        if (img.complete && img.naturalWidth > 0) {
+          resolve()
+          return
+        }
         const done = (): void => {
           img.classList.add('loaded')
           fig.classList.add('has-image')
           resolve()
         }
-        if (img.complete && img.naturalWidth > 0) done()
-        else {
-          img.addEventListener('load', done, { once: true })
-          img.addEventListener('error', done, { once: true })
-        }
+        img.addEventListener('load', done, { once: true })
+        img.addEventListener('error', done, { once: true })
       })
     }),
   )

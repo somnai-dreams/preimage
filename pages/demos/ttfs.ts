@@ -167,16 +167,22 @@ async function runNative(): Promise<void> {
   const img = document.createElement('img')
   img.width = PHOTO.width
   img.height = PHOTO.height
+  img.src = url
+  // Cache-hit fast path — flag before insertion to avoid a fade.
+  if (img.complete && img.naturalWidth > 0) img.classList.add('loaded')
   frame.appendChild(img)
   const stage = f2.parentElement!
   const monitor = observeShifts(stage)
   await new Promise<void>((resolve) => {
+    if (img.complete && img.naturalWidth > 0) {
+      resolve()
+      return
+    }
     img.onload = () => {
       img.classList.add('loaded')
       resolve()
     }
     img.onerror = () => resolve()
-    img.src = url
   })
   const paintedAt = performance.now() - t0
   monitor.stop()
@@ -221,19 +227,23 @@ async function runPreimage(): Promise<void> {
   const warmed = getElement(prepared)
   const img = warmed ?? new Image()
   if (warmed === null) img.src = url
+  // Cache-hit / warmed-and-already-loaded fast path — flag before
+  // DOM insertion so no fade-in transition runs.
+  if (img.complete && img.naturalWidth > 0) img.classList.add('loaded')
   frame.appendChild(img)
   const stage = f3.parentElement!
   const monitor = observeShifts(stage)
   await new Promise<void>((resolve) => {
+    if (img.complete && img.naturalWidth > 0) {
+      resolve()
+      return
+    }
     const done = (): void => {
       img.classList.add('loaded')
       resolve()
     }
-    if (img.complete && img.naturalWidth > 0) done()
-    else {
-      img.addEventListener('load', done, { once: true })
-      img.addEventListener('error', done, { once: true })
-    }
+    img.addEventListener('load', done, { once: true })
+    img.addEventListener('error', done, { once: true })
   })
   const paintedAt = performance.now() - t0
   monitor.stop()

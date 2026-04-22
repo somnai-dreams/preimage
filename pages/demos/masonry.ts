@@ -105,6 +105,13 @@ function createTile(place: Placement, img: HTMLImageElement): Tile {
   container.style.width = `${place.width}px`
   container.style.height = `${place.height}px`
   img.alt = ''
+  // If the bytes were already in hand when the tile mounts (warmed
+  // <img> from getElement(), or a browser HTTP-cache hit), flag as
+  // loaded before DOM insertion so no fade-in transition fires.
+  if (img.complete && img.naturalWidth > 0) {
+    img.classList.add('loaded')
+    container.classList.add('has-image')
+  }
   container.appendChild(img)
   return { container, img }
 }

@@ -92,7 +92,8 @@ function renderBubble(items: readonly RichInlineItem[], width: number): void {
         container.style.marginLeft = `${frag.gapBefore}px`
         const img = document.createElement('img')
         img.src = getMeasurement(imageItem.image).src
-        img.addEventListener('load', () => img.classList.add('loaded'), { once: true })
+        if (img.complete && img.naturalWidth > 0) img.classList.add('loaded')
+        else img.addEventListener('load', () => img.classList.add('loaded'), { once: true })
         container.appendChild(img)
         lineDiv.appendChild(container)
       } else {

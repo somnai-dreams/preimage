@@ -103,8 +103,8 @@ function renderGrid(
     const img = p.element ?? new Image()
     img.alt = ''
     if (p.element === null) img.src = p.url
-    img.addEventListener('load', () => img.classList.add('loaded'), { once: true })
     if (img.complete && img.naturalWidth > 0) img.classList.add('loaded')
+    else img.addEventListener('load', () => img.classList.add('loaded'), { once: true })
     tile.appendChild(img)
     frag.appendChild(tile)
   }

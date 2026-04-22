@@ -17,15 +17,14 @@ const runMeasuredBtn = document.getElementById('runMeasured') as HTMLButtonEleme
 
 const COLUMNS = 5
 const GAP = 3
-// Asymmetric overscan, biased toward scroll direction. `ahead` (the
-// direction the user is scrolling) is a scroll-budget head start so
-// images load before they enter the viewport; `behind` is tight so
-// off-screen tiles release quickly and their in-flight fetches get
-// cancelled. On a ~620px viewport, 400px ahead ≈ two-thirds of a
-// screen worth of incoming tiles, 150px behind ≈ a row or two of
-// safety for a momentary scroll reversal.
-const OVERSCAN_AHEAD = 400
-const OVERSCAN_BEHIND = 150
+// Asymmetric overscan, biased hard toward scroll direction. `ahead`
+// is the parallel-load budget: every mounted tile fires an image
+// fetch, and on HTTP/2 more concurrent fetches = more bandwidth in
+// flight, so a bigger ahead-band makes the grid feel snappier.
+// `behind` is tight so off-screen tiles release quickly and their
+// in-flight fetches get cancelled via the unmount callback.
+const OVERSCAN_AHEAD = 1200
+const OVERSCAN_BEHIND = 200
 
 function getCount(): number {
   return Number(countSlider.value)
