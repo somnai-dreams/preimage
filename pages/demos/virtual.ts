@@ -17,14 +17,10 @@ const runMeasuredBtn = document.getElementById('runMeasured') as HTMLButtonEleme
 
 const COLUMNS = 5
 const GAP = 3
-// Asymmetric overscan, biased hard toward scroll direction. `ahead`
-// is the parallel-load budget: every mounted tile fires an image
-// fetch, and on HTTP/2 more concurrent fetches = more bandwidth in
-// flight, so a bigger ahead-band makes the grid feel snappier.
-// `behind` is tight so off-screen tiles release quickly and their
-// in-flight fetches get cancelled via the unmount callback.
-const OVERSCAN_AHEAD = 1200
-const OVERSCAN_BEHIND = 200
+// Symmetric overscan. Asymmetric biasing sounded like a win on paper
+// but the ticker rate regressed measurably — restore the old 600 and
+// investigate before reintroducing direction-aware behavior.
+const OVERSCAN = 600
 
 function getCount(): number {
   return Number(countSlider.value)
@@ -199,7 +195,7 @@ async function runMeasured(): Promise<void> {
   const pool = createVirtualTilePool({
     scrollContainer: measuredScroll,
     contentContainer: measuredPanel,
-    overscan: { ahead: OVERSCAN_AHEAD, behind: OVERSCAN_BEHIND },
+    overscan: OVERSCAN,
     mount: (idx, el, place) => {
       el.className = 'vtile pending'
       el.style.left = `${place.x}px`
