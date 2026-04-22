@@ -1,7 +1,7 @@
 import { prepare, getMeasurement, getElement, clearCache } from '@somnai-dreams/preimage'
 import { recordKnownMeasurement } from '@somnai-dreams/preimage/core'
 import { packShortestColumn } from '@somnai-dreams/layout-algebra'
-import { PHOTOS, photoUrl, newCacheBustToken, type Photo } from './photo-source.js'
+import { newCacheBustToken } from './photo-source.js'
 import manifest from '../assets/demos/photos-manifest.json'
 
 const coldGrid = document.getElementById('coldGrid')!
@@ -38,7 +38,13 @@ function resetStats(host: HTMLElement): void {
   }
 }
 
-// --- Manifest preview (top of page) ---
+// --- Source of truth is the manifest itself ---
+//
+// Every URL the demo uses comes from iterating manifest entries. The
+// manifest keys are root-absolute server paths (e.g. `/assets/demos/
+// photos/01.png`); to keep GitHub Pages-friendly relative resolution,
+// we prepend `.` to turn them into `./assets/...` before fetching,
+// and append `?v=<token>` to defeat HTTP cache between runs.
 
 const manifestEntries = Object.entries(manifest) as Array<[string, { width: number; height: number }]>
 manifestSize.textContent = String(manifestEntries.length)
@@ -47,12 +53,20 @@ manifestPreview.innerHTML = manifestEntries
   .map(([src, { width, height }]) => `<b>${src}</b>: { width: ${width}, height: ${height} }`)
   .join('<br>') + (manifestEntries.length > 6 ? `<br>… and ${manifestEntries.length - 6} more` : '')
 
-// Turn a demo URL like `./assets/demos/photos/01.png?v=123` into the
-// manifest key `/assets/demos/photos/01.png` by stripping the query
-// and making the path absolute relative to the page. Used to look up
-// dims during hydration.
-function manifestKeyFor(photo: Photo): string {
-  return `/assets/demos/photos/${photo.file}`
+type HydratableEntry = {
+  manifestKey: string
+  url: string
+  width: number
+  height: number
+}
+
+function freshEntries(token: string): HydratableEntry[] {
+  return manifestEntries.map(([manifestKey, dims]) => ({
+    manifestKey,
+    url: `.${manifestKey}?v=${token}`,
+    width: dims.width,
+    height: dims.height,
+  }))
 }
 
 // --- Shared layout + render ---
@@ -110,21 +124,20 @@ async function runCold(): Promise<void> {
   // HTTP cache can't collapse a second run — each Run issues fresh
   // GETs that actually go to the server.
   clearCache()
-  const token = newCacheBustToken()
-  const urls = PHOTOS.map((p) => photoUrl(p, token))
+  const entries = freshEntries(newCacheBustToken())
 
   const t0 = performance.now()
   let firstMs: number | null = null
   const prepared = await Promise.all(
-    urls.map((url) =>
-      prepare(url).then((p) => {
+    entries.map((e) =>
+      prepare(e.url).then((p) => {
         if (firstMs === null) {
           firstMs = performance.now() - t0
           setRowValue(coldStats, 2, `<b>${fmtMs(firstMs)}</b>`)
         }
         const m = getMeasurement(p)
         return {
-          url,
+          url: e.url,
           width: m.displayWidth,
           height: m.displayHeight,
           element: getElement(p),
@@ -134,7 +147,7 @@ async function runCold(): Promise<void> {
   )
   const layoutMs = performance.now() - t0
 
-  setRowValue(coldStats, 1, `<b>${urls.length}</b>`)
+  setRowValue(coldStats, 1, `<b>${entries.length}</b>`)
   setRowValue(coldStats, 3, `<b>${fmtMs(layoutMs)}</b>`)
   renderGrid(coldGrid, prepared)
 
@@ -152,18 +165,14 @@ async function runHydrated(): Promise<void> {
   hydratedGrid.style.height = '300px'
 
   clearCache()
-  const token = newCacheBustToken()
-  const urls = PHOTOS.map((p) => photoUrl(p, token))
+  const entries = freshEntries(newCacheBustToken())
 
-  // Hydrate the measurement cache for the URLs we're about to
-  // prepare(). The manifest key is the un-busted path; we record
-  // the ephemeral URL so normalizeSrc matches on lookup.
+  // Hydrate the measurement cache for every URL we're about to
+  // prepare(). `entries` zips manifest dims with the cache-busted
+  // URL so there's no lookup table that could go stale.
   const tHydrate0 = performance.now()
-  for (let i = 0; i < PHOTOS.length; i++) {
-    const dims = manifest[manifestKeyFor(PHOTOS[i]!) as keyof typeof manifest]
-    if (dims !== undefined) {
-      recordKnownMeasurement(urls[i]!, dims.width, dims.height)
-    }
+  for (const e of entries) {
+    recordKnownMeasurement(e.url, e.width, e.height)
   }
   const hydrateMs = performance.now() - tHydrate0
   setRowValue(hydratedStats, 2, `<b>${fmtMs(hydrateMs)}</b>`)
@@ -173,11 +182,11 @@ async function runHydrated(): Promise<void> {
   // no polling, no network round-trip for dims.
   const t0 = performance.now()
   const prepared = await Promise.all(
-    urls.map((url) =>
-      prepare(url).then((p) => {
+    entries.map((e) =>
+      prepare(e.url).then((p) => {
         const m = getMeasurement(p)
         return {
-          url,
+          url: e.url,
           width: m.displayWidth,
           height: m.displayHeight,
           element: getElement(p),

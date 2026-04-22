@@ -12,6 +12,8 @@ import editorialHtml from './demos/editorial.html'
 import ttfsHtml from './demos/ttfs.html'
 import decodePoolHtml from './demos/decode-pool.html'
 import scaleHtml from './demos/scale.html'
+import virtualHtml from './demos/virtual.html'
+import manifestHtml from './demos/manifest.html'
 import dropzoneHtml from './demos/dropzone.html'
 import chatHtml from './demos/chat.html'
 
@@ -30,6 +32,8 @@ const server = serve({
     '/ttfs.html': ttfsHtml,
     '/decode-pool.html': decodePoolHtml,
     '/scale.html': scaleHtml,
+    '/virtual.html': virtualHtml,
+    '/manifest.html': manifestHtml,
     '/dropzone.html': dropzoneHtml,
     '/chat.html': chatHtml,
     '/assets/*': async (req) => {
