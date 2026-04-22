@@ -27,6 +27,7 @@
     <a href="./decode-pool.html">Decode pool</a>
     <a href="./scale.html">Scale</a>
     <a href="./dropzone.html">Drop zone</a>
+    <a href="./chat.html">Chat</a>
     <span class="spacer"></span>
     <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
   </nav>
@@ -64,6 +65,10 @@
         <a class="demo-card" href="./dropzone.html">
           <h3>Drop zone — Blob inputs</h3>
           <p>Drag images from your desktop. Left panel inlines them as naive <code>&lt;img&gt;</code> — each file's width is unknown until decode, so surrounding text shifts. Right panel runs <code>prepare(file)</code> — byte-probe on the first 4KB of the blob, ~5ms — and writes the exact width into the <code>&lt;img&gt;</code> before insert.</p>
+        </a>
+        <a class="demo-card" href="./chat.html">
+          <h3>Chat — pretext rich-inline</h3>
+          <p>A chat bubble with text, avatar icons, stickers, and photo attachments mixed inline. <code>inlineImage</code> turns each image into a pretext <code>RichInlineItem</code> with its measured width reserved as <code>extraWidth</code>. Drag the bubble-width slider — text rebreaks and images shuffle to new positions in one synchronous flow pass.</p>
         </a>
       </div>
     </section>

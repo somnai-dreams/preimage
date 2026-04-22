@@ -13,6 +13,7 @@ import ttfsHtml from './demos/ttfs.html'
 import decodePoolHtml from './demos/decode-pool.html'
 import scaleHtml from './demos/scale.html'
 import dropzoneHtml from './demos/dropzone.html'
+import chatHtml from './demos/chat.html'
 
 const port = Number(Bun.env.PORT ?? 3000)
 const hostname = Bun.env.HOST ?? '0.0.0.0'
@@ -30,6 +31,7 @@ const server = serve({
     '/decode-pool.html': decodePoolHtml,
     '/scale.html': scaleHtml,
     '/dropzone.html': dropzoneHtml,
+    '/chat.html': chatHtml,
     '/assets/*': async (req) => {
       // Strip leading "/" and map into pages/assets/.
       const url = new URL(req.url)

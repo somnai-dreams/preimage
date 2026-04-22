@@ -55,7 +55,10 @@ export function cycledUrls(count: number, baseToken: string): string[] {
   const out: string[] = []
   for (let i = 0; i < count; i++) {
     const photo = PHOTOS[i % PHOTOS.length]!
-    const base = `/assets/demos/photos/${photo.file}`
+    // Relative — matches photoUrl() so the demos work both under our
+    // dev server and under a GitHub Pages project path
+    // (https://user.github.io/preimage/...).
+    const base = `./assets/demos/photos/${photo.file}`
     out.push(`${base}?v=${baseToken}-${i}`)
   }
   return out

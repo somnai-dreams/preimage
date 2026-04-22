@@ -49,7 +49,7 @@
   ],
   "scripts": {
     "build:package": "rm -rf dist && tsc -p tsconfig.build.json",
-    "build:demos": "rm -rf dist-demos && bun build pages/demos/index.html pages/demos/masonry.html pages/demos/editorial.html pages/demos/ttfs.html pages/demos/decode-pool.html pages/demos/scale.html pages/demos/dropzone.html --outdir dist-demos && cp -r pages/assets dist-demos/",
+    "build:demos": "rm -rf dist-demos && bun build pages/demos/index.html pages/demos/masonry.html pages/demos/editorial.html pages/demos/ttfs.html pages/demos/decode-pool.html pages/demos/scale.html pages/demos/dropzone.html pages/demos/chat.html --outdir dist-demos && cp -r pages/assets dist-demos/",
     "check": "tsc",
     "prepack": "rm -rf dist && tsc -p tsconfig.build.json",
     "start": "HOST=${HOST:-0.0.0.0} PORT=${PORT:-3000} bun --hot pages/server.ts",

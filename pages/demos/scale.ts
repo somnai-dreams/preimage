@@ -135,8 +135,11 @@ async function runNaive(): Promise<void> {
   setMeta(count, 'naive running')
   const urls = cycledUrls(count, token)
 
-  const urlSet = new Set(urls)
-  const bytesMeter = measureBytes((u) => urlSet.has(new URL(u, location.origin).pathname + (new URL(u, location.origin).search)))
+  const urlSet = new Set(urls.map((u) => new URL(u, location.href).pathname + new URL(u, location.href).search))
+  const bytesMeter = measureBytes((u) => {
+    const parsed = new URL(u, location.href)
+    return urlSet.has(parsed.pathname + parsed.search)
+  })
 
   const t0 = performance.now()
   const monitor = observeShifts(naivePanel)
@@ -198,9 +201,9 @@ async function runMeasured(): Promise<void> {
   setMeta(count, 'measured running')
   const urls = cycledUrls(count, token)
 
-  const urlSet = new Set(urls.map((u) => new URL(u, location.origin).pathname + new URL(u, location.origin).search))
+  const urlSet = new Set(urls.map((u) => new URL(u, location.href).pathname + new URL(u, location.href).search))
   const bytesMeter = measureBytes((u) => {
-    const parsed = new URL(u, location.origin)
+    const parsed = new URL(u, location.href)
     return urlSet.has(parsed.pathname + parsed.search)
   })
 
