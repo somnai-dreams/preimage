@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- **New: `justifiedRowCursor(config)`.** Streaming form of `packJustifiedRows`. `add(aspect)` buffers items into an open row and emits `{ closed: JustifiedRowClose[] }` — a batch of finalized placements — exactly when a row fills. `finish(justifyLast?)` flushes the trailing row. Output matches the batch packer byte-for-byte for the same input sequence; the difference is you can start rendering as soon as each row closes instead of waiting for all aspects to arrive. Masonry demo's rows + progressive combination now uses this path.
+
 ## 0.2.0
 
 - **New: `visibleIndices(placements, { viewTop, viewBottom, overscan? })`.** Returns the indices of placements overlapping a vertical window. Linear scan in placement order; pure function over the same `Placement` type the packers emit. Intended for virtual-scroll grids where you need to answer "which tiles should be mounted right now" on every scroll tick.

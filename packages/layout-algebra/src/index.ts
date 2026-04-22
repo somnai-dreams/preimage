@@ -226,6 +226,145 @@ function placeJustifiedRow(
   return y + rowH + gap
 }
 
+// --- Justified-rows cursor (streaming) ---
+//
+// Cursor form of the justified-row packer. Aspects arrive one at a
+// time; the cursor buffers them into an "open" row and only emits
+// placements when a row closes (the next aspect would overflow
+// panelWidth at targetRowHeight). A trailing `finish()` flushes any
+// items still in the buffer.
+//
+// This is stable under incremental appending the same way the
+// shortest-column cursor is: once a row is closed, its placements
+// never change. Items still in the buffer don't have placements yet
+// — callers that want to show a pending state can track the add-
+// order index and render a placeholder.
+//
+// Unlike `shortestColumnCursor`, `add(aspect)` does not return a
+// single Placement; it returns the items (possibly zero) that this
+// add just finalized by closing the prior row.
+
+export type JustifiedRowsCursorConfig = {
+  panelWidth: number
+  targetRowHeight: number
+  gap: number
+}
+
+export type JustifiedRowClose = {
+  index: number
+  placement: Placement
+}
+
+export type JustifiedRowAddResult = {
+  // Items whose placements were finalized by this add. Empty when
+  // the new aspect fit into the open row without closing it. Non-
+  // empty when this add triggered a row close (the closed row's
+  // items are placed, then the new aspect opens a fresh row).
+  closed: JustifiedRowClose[]
+}
+
+export type JustifiedRowCursor = {
+  add(aspect: number): JustifiedRowAddResult
+  // Place the items still buffered in the open row and return their
+  // placements. `justifyLast: false` (default) leaves the trailing
+  // row at targetRowHeight; `true` scales it to fill panelWidth.
+  finish(justifyLast?: boolean): JustifiedRowClose[]
+  totalHeight(): number
+  count(): number
+  // Number of items currently buffered in the open row (not yet
+  // placed). Useful for callers that want to show a placeholder for
+  // pending items.
+  pendingCount(): number
+  reset(): void
+}
+
+export function justifiedRowCursor(config: JustifiedRowsCursorConfig): JustifiedRowCursor {
+  const { panelWidth, targetRowHeight, gap } = config
+  if (!Number.isFinite(panelWidth) || panelWidth <= 0) {
+    throw new RangeError(`justifiedRowCursor: panelWidth must be positive, got ${panelWidth}.`)
+  }
+  if (!Number.isFinite(targetRowHeight) || targetRowHeight <= 0) {
+    throw new RangeError(
+      `justifiedRowCursor: targetRowHeight must be positive, got ${targetRowHeight}.`,
+    )
+  }
+  if (!Number.isFinite(gap) || gap < 0) {
+    throw new RangeError(`justifiedRowCursor: gap must be non-negative, got ${gap}.`)
+  }
+
+  let openAspects: number[] = []
+  let openIndices: number[] = []
+  let nextIndex = 0
+  let y = 0
+
+  function closeOpen(justify: boolean): JustifiedRowClose[] {
+    if (openAspects.length === 0) return []
+    const count = openAspects.length
+    const totalGap = gap * Math.max(0, count - 1)
+    let widthAtTarget = 0
+    for (let i = 0; i < count; i++) widthAtTarget += openAspects[i]! * targetRowHeight
+    const availWidth = panelWidth - totalGap
+    const rowH = justify ? targetRowHeight * (availWidth / widthAtTarget) : targetRowHeight
+    const closed: JustifiedRowClose[] = []
+    let x = 0
+    for (let i = 0; i < count; i++) {
+      const w = openAspects[i]! * rowH
+      closed.push({ index: openIndices[i]!, placement: { x, y, width: w, height: rowH } })
+      x += w + gap
+    }
+    y += rowH + gap
+    openAspects = []
+    openIndices = []
+    return closed
+  }
+
+  return {
+    add(aspect: number): JustifiedRowAddResult {
+      if (!Number.isFinite(aspect) || aspect <= 0) {
+        throw new RangeError(`justifiedRowCursor.add: aspect must be positive, got ${aspect}.`)
+      }
+      const idx = nextIndex++
+
+      if (openAspects.length > 0) {
+        let widthIfAdded = aspect * targetRowHeight
+        for (let i = 0; i < openAspects.length; i++) {
+          widthIfAdded += openAspects[i]! * targetRowHeight
+        }
+        const gapsIfAdded = gap * openAspects.length
+        if (widthIfAdded + gapsIfAdded > panelWidth) {
+          const closed = closeOpen(true)
+          openAspects.push(aspect)
+          openIndices.push(idx)
+          return { closed }
+        }
+      }
+      openAspects.push(aspect)
+      openIndices.push(idx)
+      return { closed: [] }
+    },
+    finish(justifyLast = false): JustifiedRowClose[] {
+      return closeOpen(justifyLast)
+    },
+    totalHeight(): number {
+      // Whatever's been closed so far. Pending items contribute
+      // nothing until finish() is called.
+      return Math.max(0, y - gap)
+    },
+    count(): number {
+      return nextIndex
+    },
+    pendingCount(): number {
+      return openAspects.length
+    },
+    reset(): void {
+      openAspects = []
+      openIndices = []
+      nextIndex = 0
+      y = 0
+    },
+  }
+}
+
 // --- Visibility query ---
 //
 // Given a set of placements and a vertical window [viewTop, viewBottom],

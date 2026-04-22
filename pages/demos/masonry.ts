@@ -1,5 +1,6 @@
 import { prepare, getMeasurement, getElement } from '@somnai-dreams/preimage'
 import {
+  justifiedRowCursor,
   packJustifiedRows,
   packShortestColumn,
   shortestColumnCursor,
@@ -249,14 +250,10 @@ async function runMeasured(): Promise<void> {
   setMeta(count, cacheBust)
   const urls = buildUrls(count, cacheBust)
 
-  // Justified rows can't be laid out progressively — closing a row
-  // scales every tile in it, so an incremental version would reflow
-  // already-placed tiles. Fall back to batch when the user picks
-  // rows.
-  if (layout === 'rows' || mode === 'batch') {
+  if (mode === 'batch') {
     await runMeasuredBatch(urls, layout)
   } else {
-    await runMeasuredProgressive(urls)
+    await runMeasuredProgressive(urls, layout)
   }
 
   runMeasuredBtn.disabled = false
@@ -311,45 +308,85 @@ async function runMeasuredBatch(urls: readonly string[], layout: Layout): Promis
   await Promise.all(tiles.map((tile) => waitForImage(tile)))
 }
 
-async function runMeasuredProgressive(urls: readonly string[]): Promise<void> {
+async function runMeasuredProgressive(urls: readonly string[], layout: Layout): Promise<void> {
   const t0 = performance.now()
-  const packer = shortestColumnCursor({
-    columns: COLUMNS,
-    gap: GAP,
-    panelWidth: measuredPanel.getBoundingClientRect().width,
-  })
+  const panelWidth = measuredPanel.getBoundingClientRect().width
 
+  // Pick the cursor. Shortest-column emits a Placement per add();
+  // justified-rows buffers items in an open row and emits batches
+  // (one row's worth) when a row fills.
+  const column = layout === 'column'
+    ? shortestColumnCursor({ columns: COLUMNS, gap: GAP, panelWidth })
+    : null
+  const rows = layout === 'rows'
+    ? justifiedRowCursor({ panelWidth, targetRowHeight: TARGET_ROW_HEIGHT, gap: GAP })
+    : null
+
+  // Warmed <img> + URL for each addIndex — the cursor returns
+  // placements keyed by addIndex, so we look up render inputs here.
+  const urlByIdx: string[] = []
+  const warmedByIdx: (HTMLImageElement | null)[] = []
+  let addOrder = 0
+
+  const tiles: Tile[] = []
   let firstReservedMs: number | null = null
   let lastReservedMs: number | null = null
   const dimTimes: number[] = []
 
+  function placeAt(idx: number, place: Placement): void {
+    const img = imgForPrepared(urlByIdx[idx]!, warmedByIdx[idx]!)
+    const tile = createTile(place, img)
+    measuredPanel.appendChild(tile.container)
+    tiles.push(tile)
+  }
+
+  function reportPlacement(): void {
+    const now = performance.now() - t0
+    if (firstReservedMs === null) {
+      firstReservedMs = now
+      setRowValue(measuredStats, 1, `<b>${fmtMs(firstReservedMs)}</b>`)
+    }
+    lastReservedMs = now
+    const avg = dimTimes.reduce((a, b) => a + b, 0) / dimTimes.length
+    setRowValue(measuredStats, 2, `<b>${fmtMs(avg)}</b>`)
+    setRowValue(measuredStats, 3, `<b>${fmtMs(lastReservedMs)}</b>`)
+  }
+
   await Promise.all(
     urls.map((url) =>
       prepare(url).then((p) => {
-        const dimMs = performance.now() - t0
-        dimTimes.push(dimMs)
+        dimTimes.push(performance.now() - t0)
+        const aspect = getMeasurement(p).aspectRatio
+        const idx = addOrder++
+        urlByIdx[idx] = url
+        warmedByIdx[idx] = getElement(p)
 
-        const place = packer.add(getMeasurement(p).aspectRatio)
-        measuredPanel.style.height = `${packer.totalHeight()}px`
-
-        const img = imgForPrepared(url, getElement(p))
-        const tile = createTile(place, img)
-        measuredPanel.appendChild(tile.container)
-
-        const now = performance.now() - t0
-        if (firstReservedMs === null) {
-          firstReservedMs = now
-          setRowValue(measuredStats, 1, `<b>${fmtMs(firstReservedMs)}</b>`)
+        if (column !== null) {
+          const place = column.add(aspect)
+          measuredPanel.style.height = `${column.totalHeight()}px`
+          placeAt(idx, place)
+          reportPlacement()
+        } else {
+          const { closed } = rows!.add(aspect)
+          for (const c of closed) placeAt(c.index, c.placement)
+          measuredPanel.style.height = `${rows!.totalHeight()}px`
+          if (closed.length > 0) reportPlacement()
         }
-        lastReservedMs = now
-        const avgSoFar = dimTimes.reduce((a, b) => a + b, 0) / dimTimes.length
-        setRowValue(measuredStats, 2, `<b>${fmtMs(avgSoFar)}</b>`)
-        setRowValue(measuredStats, 3, `<b>${fmtMs(lastReservedMs)}</b>`)
-
-        return waitForImage(tile)
       }),
     ),
   )
+
+  if (rows !== null) {
+    // Flush the trailing row. `justifyLast: false` keeps it at
+    // targetRowHeight with whatever whitespace remains — matches
+    // Flickr-style "what's newest" trailing strips.
+    const trailing = rows.finish(false)
+    for (const c of trailing) placeAt(c.index, c.placement)
+    measuredPanel.style.height = `${rows.totalHeight()}px`
+    if (trailing.length > 0) reportPlacement()
+  }
+
+  await Promise.all(tiles.map((tile) => waitForImage(tile)))
 }
 
 // --- Controls ---
