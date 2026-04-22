@@ -211,16 +211,27 @@ async function runMeasured(): Promise<void> {
 
       const img = new Image()
       img.alt = ''
-      img.addEventListener(
-        'load',
-        () => {
-          img.classList.add('loaded')
-          el.classList.add('has-image')
-          el.classList.remove('pending')
-        },
-        { once: true },
-      )
       img.src = indexUrl[idx]!
+      // Cache-hit fast path: scroll-back re-mounts a tile whose
+      // bytes the browser already has. `complete` is synchronously
+      // true after src is set when cached, so add `.loaded` up
+      // front — no opacity transition runs because we apply the
+      // end-state before the node is inserted.
+      if (img.complete && img.naturalWidth > 0) {
+        img.classList.add('loaded')
+        el.classList.add('has-image')
+        el.classList.remove('pending')
+      } else {
+        img.addEventListener(
+          'load',
+          () => {
+            img.classList.add('loaded')
+            el.classList.add('has-image')
+            el.classList.remove('pending')
+          },
+          { once: true },
+        )
+      }
       el.appendChild(img)
 
       setRowValue(measuredStats, 1, `<b>${fmtCount(pool.activeCount)}</b>`)
