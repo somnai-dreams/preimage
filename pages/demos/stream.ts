@@ -95,13 +95,15 @@ function getBytesPerSec(): number {
 
 // Clear and re-seed a stage with a pending figure. Returns the
 // figure element ready to be populated.
-function seedStage(stage: HTMLElement, progressEl: HTMLElement): HTMLElement {
-  // Wipe everything except the progress bar.
+function seedStage(stage: HTMLElement, progressBar: HTMLElement): HTMLElement {
+  // Wipe everything except the progress wrapper (the inner bar's
+  // parent). We preserve it so a rerun doesn't lose the progress UI.
+  const progressWrapper = stage.querySelector<HTMLElement>('.progress')!
   for (const child of Array.from(stage.children)) {
-    if (child.classList.contains('progress')) continue
+    if (child === progressWrapper) continue
     child.remove()
   }
-  progressEl.style.width = '0%'
+  progressBar.style.width = '0%'
 
   const fig = document.createElement('div')
   fig.className = 'figure pending'
@@ -110,7 +112,7 @@ function seedStage(stage: HTMLElement, progressEl: HTMLElement): HTMLElement {
   // render; the measured side overwrites it at onDims.
   fig.style.width = '240px'
   fig.style.height = '240px'
-  stage.insertBefore(fig, progressEl)
+  stage.insertBefore(fig, progressWrapper)
   return fig
 }
 
