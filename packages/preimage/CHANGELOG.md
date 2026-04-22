@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- **New bin `preimage-manifest` + subpath `@somnai-dreams/preimage/manifest`.** A build-time CLI that walks a directory, header-probes every image via the DOM-free core (no decode, reads only the first 4KB of each file), and emits a JSON manifest keyed by URL path with `{ width, height }`. Clients hydrate at startup with `recordKnownMeasurement` from `/core` — `prepare(url)` then resolves synchronously from cache on first paint, skipping the network-for-dims step entirely. Usage: `preimage-manifest ./public/photos --base /photos/ --out ./src/photos.json`. Programmatic access via `buildManifest({ root, base })`. Covers PNG/JPEG/GIF/BMP/WebP/SVG (the formats `probeImageBytes` handles); skips AVIF/HEIC with a stderr warning.
+
 ## 0.2.0
 
 - **New subpath `@somnai-dreams/preimage/core`** — DOM-free exports. `probeImageBytes`, `fitRect`, the URL-dimension parsers, `measureFromSvgText`, EXIF orientation helpers, `recordKnownMeasurement`/`peekImageMeasurement`, analysis helpers. No `Image`, no `HTMLImageElement`, no `createImageBitmap` — runs in Node, Deno, Bun, Web Workers, and edge runtimes. Use for SSR precompute, build-time manifest generation, and worker-side byte probing. The main entry still ships `prepare`, `PrepareQueue`, `DecodePool`, and pretext integration; those require the DOM.

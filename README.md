@@ -288,6 +288,33 @@ fitRect(naturalW, naturalH, boxW, boxH, fit?): FittedRect
 
 Use for SSR precompute, build-time manifest generation, and worker-side byte probing. For rendering-path APIs (`prepare`, `PrepareQueue`, `DecodePool`, pretext integration), import from the main entry or `./pretext`.
 
+### Build-time manifest (`preimage-manifest` + `@somnai-dreams/preimage/manifest`)
+
+Ship dimensions in the bundle so the client skips network-for-dims on every URL in the manifest.
+
+```bash
+npx preimage-manifest ./public/photos --base /photos/ --out ./src/photos.json
+```
+
+```ts
+import manifest from './photos.json'
+import { recordKnownMeasurement } from '@somnai-dreams/preimage/core'
+
+for (const [src, { width, height }] of Object.entries(manifest)) {
+  recordKnownMeasurement(src, width, height)
+}
+// prepare(url) now resolves synchronously from cache for any URL in the manifest
+```
+
+Programmatic (e.g. from a vite plugin or astro integration):
+
+```ts
+import { buildManifest } from '@somnai-dreams/preimage/manifest'
+const manifest = await buildManifest({ root: './public/photos', base: '/photos/' })
+```
+
+Reads only `MAX_HEADER_BYTES` (4KB) per file; the full image is never decoded. Covers PNG/JPEG/GIF/BMP/WebP/SVG; AVIF/HEIC are skipped with a stderr warning.
+
 ### Pretext integration (`@somnai-dreams/preimage/pretext`)
 
 ```ts
