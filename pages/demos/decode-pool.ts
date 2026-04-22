@@ -4,8 +4,6 @@ import { newCacheBustToken, photoUrl, takePhotos, type Photo } from './photo-sou
 const metaEl = document.getElementById('meta')!
 const runNaiveBtn = document.getElementById('runNaive') as HTMLButtonElement
 const runPoolBtn = document.getElementById('runPool') as HTMLButtonElement
-const naiveResult = document.getElementById('naiveResult')!
-const poolResult = document.getElementById('poolResult')!
 
 const naiveCanvas = document.getElementById('naiveCanvas') as HTMLCanvasElement
 const poolCanvas = document.getElementById('poolCanvas') as HTMLCanvasElement
@@ -19,6 +17,8 @@ const naiveTimeTag = document.getElementById('naiveTimeTag')!
 const poolTimeTag = document.getElementById('poolTimeTag')!
 const naiveEmpty = document.getElementById('naiveEmpty')!
 const poolEmpty = document.getElementById('poolEmpty')!
+const naiveStats = document.getElementById('naiveStats')!
+const poolStats = document.getElementById('poolStats')!
 
 const FRAME_COUNT = 16
 
@@ -86,15 +86,24 @@ function newStats(setupMs: number): Stats {
   return { setupMs, scrubCount: 0, totalScrubMs: 0, slowest: 0 }
 }
 
-function renderResult(el: HTMLElement, stats: Stats, setupLabel: string): void {
-  const avg = stats.scrubCount === 0 ? 0 : stats.totalScrubMs / stats.scrubCount
-  const parts = [`${setupLabel} <b>${stats.setupMs.toFixed(0)}ms</b>`]
-  if (stats.scrubCount > 0) {
-    parts.push(`avg scrub <b>${avg.toFixed(1)}ms</b>`)
-    parts.push(`slowest <b>${stats.slowest.toFixed(1)}ms</b>`)
-    parts.push(`<b>${stats.scrubCount}</b> scrubs`)
+function setStatRow(host: HTMLElement, nth: number, html: string): void {
+  const b = host.querySelector(`.row:nth-child(${nth}) .value b`)
+  if (b !== null) b.innerHTML = html
+}
+
+function resetStatHost(host: HTMLElement): void {
+  for (const row of host.querySelectorAll<HTMLElement>('.row')) {
+    const b = row.querySelector('.value b')
+    if (b !== null) b.innerHTML = '—'
   }
-  el.innerHTML = parts.join(' · ')
+}
+
+function renderStats(el: HTMLElement, stats: Stats): void {
+  const avg = stats.scrubCount === 0 ? null : stats.totalScrubMs / stats.scrubCount
+  setStatRow(el, 1, `<b>${stats.setupMs.toFixed(0)}ms</b>`)
+  setStatRow(el, 2, avg === null ? '<b>—</b>' : `<b>${avg.toFixed(1)}ms</b>`)
+  setStatRow(el, 3, stats.scrubCount === 0 ? '<b>—</b>' : `<b>${stats.slowest.toFixed(1)}ms</b>`)
+  setStatRow(el, 4, `<b>${stats.scrubCount}</b>`)
 }
 
 // --- Naive path ---
@@ -102,7 +111,7 @@ function renderResult(el: HTMLElement, stats: Stats, setupLabel: string): void {
 async function runNaive(): Promise<void> {
   runNaiveBtn.disabled = true
   runNaiveBtn.textContent = 'Loading…'
-  naiveResult.innerHTML = ''
+  resetStatHost(naiveStats)
   naiveEmpty.style.display = 'flex'
   naiveEmpty.textContent = 'loading…'
   naiveFrameTag.textContent = '—'
@@ -157,7 +166,7 @@ async function runNaive(): Promise<void> {
     if (dt > stats.slowest) stats.slowest = dt
     updateFrameTag(naiveTimeTag, dt)
     naiveFrameTag.textContent = `frame ${i + 1}`
-    renderResult(naiveResult, stats, 'setup')
+    renderStats(naiveStats, stats)
   }
 
   naiveSlider.disabled = false
@@ -174,7 +183,7 @@ async function runNaive(): Promise<void> {
   stats.scrubCount = 0
   stats.totalScrubMs = 0
   stats.slowest = 0
-  renderResult(naiveResult, stats, 'setup')
+  renderStats(naiveStats, stats)
   runNaiveBtn.disabled = false
   runNaiveBtn.textContent = 'Reload frames'
 }
@@ -184,7 +193,7 @@ async function runNaive(): Promise<void> {
 async function runPool(): Promise<void> {
   runPoolBtn.disabled = true
   runPoolBtn.textContent = 'Warming…'
-  poolResult.innerHTML = ''
+  resetStatHost(poolStats)
   poolEmpty.style.display = 'flex'
   poolEmpty.textContent = 'warming pool…'
   poolFrameTag.textContent = '—'
@@ -222,7 +231,7 @@ async function runPool(): Promise<void> {
     if (dt > stats.slowest) stats.slowest = dt
     updateFrameTag(poolTimeTag, dt)
     poolFrameTag.textContent = `frame ${i + 1}`
-    renderResult(poolResult, stats, 'warm')
+    renderStats(poolStats, stats)
   }
 
   poolSlider.disabled = false
@@ -237,7 +246,7 @@ async function runPool(): Promise<void> {
   stats.scrubCount = 0
   stats.totalScrubMs = 0
   stats.slowest = 0
-  renderResult(poolResult, stats, 'warm')
+  renderStats(poolStats, stats)
   runPoolBtn.disabled = false
   runPoolBtn.textContent = 'Reload frames'
 }

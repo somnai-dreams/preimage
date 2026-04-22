@@ -6,24 +6,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="./demo-styles.css" />
   <style>
-    .panel-run { display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; font-size: 12px; color: var(--text-soft); }
+    .panel-run { margin: 4px 0 12px; }
     .panel-run button { font: inherit; font-weight: 500; padding: 7px 14px; background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm); cursor: pointer; transition: background 120ms; }
     .panel-run button:hover:not(:disabled) { background: var(--accent-hover); }
     .panel-run button:disabled { background: var(--border-strong); cursor: not-allowed; }
-    .panel-run .result { min-height: 18px; font-variant-numeric: tabular-nums; }
-    .panel-run .result b { color: var(--text); font-weight: 600; }
+    .panel-stats { border-top: 1px solid var(--border); padding-top: 10px; margin-bottom: 14px; }
 
-    .article { font-size: 14px; line-height: 1.6; color: var(--text); }
-    .article p { margin: 0 0 0.8em; }
-    .naive-article figure { margin: 0 0 6px 14px; float: right; width: 44%; }
-    .naive-article figure figcaption { font-size: 11px; color: var(--text-soft); margin-top: 4px; }
-    .naive-article figure img { width: 100%; display: block; }
-
-    .measured-article { position: relative; }
-    .measured-article .line { position: absolute; white-space: pre; font: 14px/22px -apple-system, 'SF Pro Text', 'Inter', system-ui, sans-serif; color: var(--text); }
-    .measured-article .fig { position: absolute; border-radius: var(--radius-sm); overflow: hidden; background: var(--surface-muted); }
-    .measured-article .fig img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 240ms ease-out; }
-    .measured-article .fig img.loaded { opacity: 1; }
+    .article { font-size: 14px; line-height: 1.6; color: var(--text); position: relative; }
+    .article .line { position: absolute; white-space: pre; font: 14px/22px -apple-system, 'SF Pro Text', 'Inter', system-ui, sans-serif; color: var(--text); }
+    .article .fig {
+      position: absolute;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: #e4e7eb;
+      animation: fig-shimmer 1.3s ease-in-out infinite;
+    }
+    .article .fig.has-image { animation: none; }
+    .article .fig img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      opacity: 0; transition: opacity 240ms ease-out;
+    }
+    .article .fig img.loaded { opacity: 1; }
+    @keyframes fig-shimmer {
+      0%, 100% { background-color: #e4e7eb; }
+      50%      { background-color: #d4d8de; }
+    }
   </style>
 </head>
 <body>
@@ -39,8 +47,8 @@
 
   <main class="page">
     <header class="page-header">
-      <h1>Editorial article — floated figures</h1>
-      <p>Article content with three floated figures, same URLs, separate Run buttons. The left panel uses plain <code>&lt;figure&gt;&lt;img&gt;</code> — text reflows as each figure's bytes decode. The right panel measures every figure before layout, then pretext's <code>flowColumnWithFloats</code> places lines around the measured rects in a single synchronous pass.</p>
+      <h1>Editorial — same layout engine, different measurement</h1>
+      <p>Same article, same three floated figures, same <code>flowColumnWithFloats</code> engine on both sides. The only difference is where the figure dimensions come from. Left: native <code>&lt;img&gt;</code> with dims read after <code>onload</code> — pretext has to re-run its flow each time a figure loads, so text shifts under existing lines. Right: <code>prepare()</code> returns dims from the first ~2KB of each image, so pretext flows once with correct rects and nothing moves.</p>
     </header>
 
     <div class="controls">
@@ -55,24 +63,34 @@
     <div class="panels two">
       <section class="panel">
         <div class="panel-header">
-          <h2 class="panel-title">Naive HTML floats</h2>
+          <h2 class="panel-title">Pretext + native <code>&lt;img&gt;</code></h2>
         </div>
         <div class="panel-run">
-          <button id="runNaive" class="primary">Run</button>
-          <span id="naiveResult" class="result"></span>
+          <button id="runNative" class="primary">Run</button>
         </div>
-        <div id="naive" class="article naive-article"></div>
+        <div class="panel-stats stat-list" id="nativeStats">
+          <div class="row"><span class="label">Flow runs</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">First flow</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Final flow</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row shift"><span class="label">Visible shifts</span><span class="value"><b>&mdash;</b></span></div>
+        </div>
+        <div id="native" class="article"></div>
       </section>
 
       <section class="panel">
         <div class="panel-header">
-          <h2 class="panel-title">Pretext + preimage</h2>
+          <h2 class="panel-title">Pretext + <code>preimage</code></h2>
         </div>
         <div class="panel-run">
           <button id="runMeasured" class="primary">Run</button>
-          <span id="measuredResult" class="result"></span>
         </div>
-        <div id="measured" class="article measured-article"></div>
+        <div class="panel-stats stat-list" id="measuredStats">
+          <div class="row"><span class="label">Flow runs</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">First flow</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Final flow</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row shift"><span class="label">Visible shifts</span><span class="value"><b>&mdash;</b></span></div>
+        </div>
+        <div id="measured" class="article"></div>
       </section>
     </div>
   </main>

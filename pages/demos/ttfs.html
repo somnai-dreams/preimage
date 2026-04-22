@@ -14,16 +14,11 @@
     .ttfs-frame.measured img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 240ms ease-out; }
     .ttfs-frame.measured img.loaded { opacity: 1; }
     .ttfs-below { color: var(--text-muted); font-size: 12.5px; line-height: 1.55; }
-    .panel-run { display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; font-size: 12px; color: var(--text-soft); }
+    .panel-run { margin: 4px 0 14px; }
     .panel-run button { font: inherit; font-weight: 500; padding: 7px 14px; background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm); cursor: pointer; transition: background 120ms; }
     .panel-run button:hover:not(:disabled) { background: var(--accent-hover); }
     .panel-run button:disabled { background: var(--border-strong); cursor: not-allowed; }
-    .panel-run .result { min-height: 18px; font-variant-numeric: tabular-nums; }
-    .panel-run .result b { color: var(--text); font-weight: 600; }
-    .events { border-top: 1px solid var(--border); padding-top: 8px; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; display: flex; flex-direction: column; gap: 3px; min-height: 80px; }
-    .events .row { display: flex; justify-content: space-between; }
-    .events b { color: var(--text); font-weight: 600; }
-    .events .shift { color: var(--reflow); }
+    .events { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -59,11 +54,15 @@
         </div>
         <div class="panel-run">
           <button id="run1" class="primary">Run</button>
-          <span id="r1" class="result"></span>
         </div>
         <div class="ttfs-stage">
           <div class="ttfs-frame empty" id="f1"></div>
-          <div class="events" id="e1"><div class="row"><span>dims known (onload)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div></div>
+          <div class="events stat-list" id="e1">
+            <div class="row"><span class="label">Dims known</span><span class="value"><b>&mdash;</b></span></div>
+            <div class="row"><span class="label">Space reserved</span><span class="value"><b>&mdash;</b></span></div>
+            <div class="row"><span class="label">Image painted</span><span class="value"><b>&mdash;</b></span></div>
+            <div class="row shift"><span class="label">Visible shifts</span><span class="value"><b>&mdash;</b></span></div>
+          </div>
         </div>
       </section>
 
@@ -73,11 +72,15 @@
         </div>
         <div class="panel-run">
           <button id="run2" class="primary">Run</button>
-          <span id="r2" class="result"></span>
         </div>
         <div class="ttfs-stage">
           <div class="ttfs-frame empty" id="f2"></div>
-          <div class="events" id="e2"><div class="row"><span>dims known (from attrs)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div></div>
+          <div class="events stat-list" id="e2">
+            <div class="row"><span class="label">Dims known</span><span class="value"><b>&mdash;</b></span></div>
+            <div class="row"><span class="label">Space reserved</span><span class="value"><b>&mdash;</b></span></div>
+            <div class="row"><span class="label">Image painted</span><span class="value"><b>&mdash;</b></span></div>
+            <div class="row shift"><span class="label">Visible shifts</span><span class="value"><b>&mdash;</b></span></div>
+          </div>
         </div>
       </section>
 
@@ -87,11 +90,15 @@
         </div>
         <div class="panel-run">
           <button id="run3" class="primary">Run</button>
-          <span id="r3" class="result"></span>
         </div>
         <div class="ttfs-stage">
           <div class="ttfs-frame empty" id="f3"></div>
-          <div class="events" id="e3"><div class="row"><span>dims known (prepare)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div></div>
+          <div class="events stat-list" id="e3">
+            <div class="row"><span class="label">Dims known</span><span class="value"><b>&mdash;</b></span></div>
+            <div class="row"><span class="label">Space reserved</span><span class="value"><b>&mdash;</b></span></div>
+            <div class="row"><span class="label">Image painted</span><span class="value"><b>&mdash;</b></span></div>
+            <div class="row shift"><span class="label">Visible shifts</span><span class="value"><b>&mdash;</b></span></div>
+          </div>
         </div>
       </section>
     </div>

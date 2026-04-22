@@ -9,14 +9,11 @@ const f3 = document.getElementById('f3')!
 const e1 = document.getElementById('e1')!
 const e2 = document.getElementById('e2')!
 const e3 = document.getElementById('e3')!
-const r1 = document.getElementById('r1')!
-const r2 = document.getElementById('r2')!
-const r3 = document.getElementById('r3')!
 const run1 = document.getElementById('run1') as HTMLButtonElement
 const run2 = document.getElementById('run2') as HTMLButtonElement
 const run3 = document.getElementById('run3') as HTMLButtonElement
 
-// Pick the beefiest PNG in the manifest — 13.png (battle field) is
+// The biggest PNG in the manifest — 13.png (battle field) is
 // 1344×896 at ~2.9MB. PNGs at this scale take meaningful time to
 // transfer, which is the window where "dims from first 2KB" beats
 // "dims after full transfer".
@@ -24,22 +21,6 @@ const PHOTO = PHOTOS[12]!
 
 const PANEL_WIDTH = 340
 const MAX_FRAME_HEIGHT = 260
-
-type Event = { label: string; t: number; note?: string }
-
-function renderEvents(host: HTMLElement, events: Event[], shifts: number): void {
-  host.innerHTML = ''
-  for (const ev of events) {
-    const row = document.createElement('div')
-    row.className = 'row'
-    row.innerHTML = `<span>${ev.label}</span><span><b>${ev.t.toFixed(1)}ms</b>${ev.note !== undefined ? ` · ${ev.note}` : ''}</span>`
-    host.appendChild(row)
-  }
-  const shiftRow = document.createElement('div')
-  shiftRow.className = 'row'
-  shiftRow.innerHTML = `<span>visible shifts</span><span${shifts > 0 ? ' class="shift"' : ''}><b>${shifts}</b></span>`
-  host.appendChild(shiftRow)
-}
 
 function getCacheBust(): string | null {
   const checked = document.querySelector<HTMLInputElement>('input[name="cache"]:checked')
@@ -72,6 +53,52 @@ function sizedFrame(
   return host
 }
 
+// --- Stat rendering: fill the pre-rendered rows by index. Values swap
+//     into fixed slots so nothing reflows. ---
+
+function fmtMs(ms: number | null): string {
+  return ms === null ? '—' : `${ms.toFixed(1)}ms`
+}
+
+function fill(
+  host: HTMLElement,
+  values: Array<{ value: string; note?: string }>,
+  shifts: number,
+): void {
+  const rows = host.querySelectorAll<HTMLElement>('.row')
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i]!
+    const row = rows[i]
+    if (row === undefined) continue
+    const b = row.querySelector('.value b')!
+    b.innerHTML = v.value
+    const existingNote = row.querySelector('.value .note')
+    if (existingNote) existingNote.remove()
+    if (v.note !== undefined) {
+      const n = document.createElement('span')
+      n.className = 'note'
+      n.textContent = v.note
+      row.querySelector('.value')!.appendChild(n)
+    }
+  }
+  const shiftRow = host.querySelector<HTMLElement>('.row.shift')
+  if (shiftRow !== null) {
+    shiftRow.classList.toggle('has-shifts', shifts > 0)
+    shiftRow.querySelector('.value b')!.innerHTML = String(shifts)
+  }
+}
+
+function resetStatHost(host: HTMLElement): void {
+  const rows = host.querySelectorAll<HTMLElement>('.row')
+  for (const row of rows) {
+    const b = row.querySelector('.value b')
+    if (b !== null) b.innerHTML = '—'
+    const note = row.querySelector('.value .note')
+    if (note) note.remove()
+  }
+  host.querySelector<HTMLElement>('.row.shift')?.classList.remove('has-shifts')
+}
+
 // --- Panel 1: naive img ---
 
 async function runNaive(): Promise<void> {
@@ -81,12 +108,7 @@ async function runNaive(): Promise<void> {
   f1.classList.add('empty')
   f1.style.width = ''
   f1.style.height = ''
-  r1.innerHTML = ''
-  renderEvents(e1, [
-    { label: 'dims known (onload)', t: 0 },
-    { label: 'image painted', t: 0 },
-  ], 0)
-  e1.innerHTML = `<div class="row"><span>dims known (onload)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div>`
+  resetStatHost(e1)
 
   const cacheBust = getCacheBust()
   setMeta(cacheBust)
@@ -105,15 +127,17 @@ async function runNaive(): Promise<void> {
   })
   const t = performance.now() - t0
   monitor.stop()
-  renderEvents(
+  // Naive: dims, space, and image all land at onload — no placeholder
+  // reserves space beforehand.
+  fill(
     e1,
     [
-      { label: 'dims known (onload)', t },
-      { label: 'image painted', t },
+      { value: fmtMs(t) },
+      { value: fmtMs(t) },
+      { value: fmtMs(t) },
     ],
     monitor.shifts(),
   )
-  r1.innerHTML = `<b>${t.toFixed(0)}ms</b> · ${monitor.shifts()} shifts`
   run1.disabled = false
   run1.textContent = 'Run again'
 }
@@ -127,16 +151,19 @@ async function runNative(): Promise<void> {
   f2.classList.add('empty')
   f2.style.width = ''
   f2.style.height = ''
-  r2.innerHTML = ''
-  e2.innerHTML = `<div class="row"><span>dims known (from attrs)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div>`
+  resetStatHost(e2)
 
   const cacheBust = getCacheBust()
   setMeta(cacheBust)
   const url = resolveUrl(cacheBust)
 
   const t0 = performance.now()
+  // With declared attrs, dims are known the instant the <img> tag is
+  // constructed — no network, no decode. Sizing the frame is the same
+  // tick.
   const frame = sizedFrame(f2, PHOTO.width, PHOTO.height)
-  const frameAt = performance.now() - t0
+  const dimsAt = performance.now() - t0
+  const reservedAt = performance.now() - t0
   const img = document.createElement('img')
   img.width = PHOTO.width
   img.height = PHOTO.height
@@ -153,15 +180,15 @@ async function runNative(): Promise<void> {
   })
   const paintedAt = performance.now() - t0
   monitor.stop()
-  renderEvents(
+  fill(
     e2,
     [
-      { label: 'dims known (from attrs)', t: frameAt },
-      { label: 'image painted', t: paintedAt },
+      { value: fmtMs(dimsAt) },
+      { value: fmtMs(reservedAt) },
+      { value: fmtMs(paintedAt) },
     ],
     monitor.shifts(),
   )
-  r2.innerHTML = `<b>${paintedAt.toFixed(0)}ms</b> · ${monitor.shifts()} shifts`
   run2.disabled = false
   run2.textContent = 'Run again'
 }
@@ -175,8 +202,7 @@ async function runPreimage(): Promise<void> {
   f3.classList.add('empty')
   f3.style.width = ''
   f3.style.height = ''
-  r3.innerHTML = ''
-  e3.innerHTML = `<div class="row"><span>dims known (prepare)</span><span><b>&mdash;</b></span></div><div class="row"><span>image painted</span><span><b>&mdash;</b></span></div><div class="row"><span>visible shifts</span><span><b>&mdash;</b></span></div>`
+  resetStatHost(e3)
 
   const cacheBust = getCacheBust()
   setMeta(cacheBust)
@@ -185,8 +211,9 @@ async function runPreimage(): Promise<void> {
   const t0 = performance.now()
   const prepared = await prepare(url)
   const m = getMeasurement(prepared)
-  const preparedAt = performance.now() - t0
+  const dimsAt = performance.now() - t0
   const frame = sizedFrame(f3, m.naturalWidth, m.naturalHeight)
+  const reservedAt = performance.now() - t0
   const img = document.createElement('img')
   frame.appendChild(img)
   const stage = f3.parentElement!
@@ -205,12 +232,15 @@ async function runPreimage(): Promise<void> {
   })
   const paintedAt = performance.now() - t0
   monitor.stop()
-  const events: Event[] = [
-    { label: 'dims known (prepare)', t: preparedAt, note: `${m.naturalWidth}×${m.naturalHeight}` },
-    { label: 'image painted', t: paintedAt },
-  ]
-  renderEvents(e3, events, monitor.shifts())
-  r3.innerHTML = `dims in <b>${preparedAt.toFixed(0)}ms</b> · painted at <b>${paintedAt.toFixed(0)}ms</b> · ${monitor.shifts()} shifts`
+  fill(
+    e3,
+    [
+      { value: fmtMs(dimsAt), note: `${m.naturalWidth}×${m.naturalHeight}` },
+      { value: fmtMs(reservedAt) },
+      { value: fmtMs(paintedAt) },
+    ],
+    monitor.shifts(),
+  )
   run3.disabled = false
   run3.textContent = 'Run again'
 }

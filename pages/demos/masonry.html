@@ -14,12 +14,11 @@
     .count-control .count-val { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; min-width: 2ch; text-align: right; }
 
     .masonry-pair { gap: 20px; }
-    .panel-run { display: flex; align-items: center; gap: 10px; margin: 4px 0 14px; font-size: 12px; color: var(--text-soft); }
+    .panel-run { margin: 4px 0 12px; }
     .panel-run button { font: inherit; font-weight: 500; padding: 7px 14px; background: var(--accent); color: #fff; border: 0; border-radius: var(--radius-sm); cursor: pointer; transition: background 120ms; }
     .panel-run button:hover:not(:disabled) { background: var(--accent-hover); }
     .panel-run button:disabled { background: var(--border-strong); cursor: not-allowed; }
-    .panel-run .result { min-height: 18px; font-variant-numeric: tabular-nums; }
-    .panel-run .result b { color: var(--text); font-weight: 600; }
+    .panel-stats { border-top: 1px solid var(--border); padding-top: 10px; margin-bottom: 14px; }
 
     /* Naive grid: stock <img> tags in a CSS column layout. No reserved
        space, so the column grows as each image finishes decoding. */
@@ -27,11 +26,29 @@
     .naive-grid img { width: 100%; display: block; margin-bottom: 6px; break-inside: avoid; }
 
     /* Measured grid: absolutely-positioned tiles over a container
-       whose height is computed from the measured aspect ratios. */
+       whose height is computed from the measured aspect ratios.
+       Shimmer runs on every tile until its image has loaded, so
+       the moment a tile is placed is actually visible — not lost
+       in pale-gray-on-white. */
     .packed { position: relative; }
-    .packed .item { position: absolute; overflow: hidden; border-radius: var(--radius-sm); background: var(--surface-muted); }
-    .packed .item img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 240ms ease-out; }
+    .packed .item {
+      position: absolute;
+      overflow: hidden;
+      border-radius: var(--radius-sm);
+      background: #e4e7eb;
+      animation: tile-shimmer 1.3s ease-in-out infinite;
+    }
+    .packed .item.has-image { animation: none; }
+    .packed .item img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      opacity: 0; transition: opacity 240ms ease-out;
+    }
     .packed .item img.loaded { opacity: 1; }
+    @keyframes tile-shimmer {
+      0%, 100% { background-color: #e4e7eb; }
+      50%      { background-color: #d4d8de; }
+    }
   </style>
 </head>
 <body>
@@ -58,6 +75,11 @@
           <input id="countSlider" type="range" min="6" max="34" value="24" step="1" />
           <span id="countVal" class="count-val">24</span>
         </div>
+        <span class="controls-label">Placement</span>
+        <div class="segmented" role="radiogroup" aria-label="Placement mode">
+          <label><input type="radio" name="mode" value="batch" checked> Wait for all</label>
+          <label><input type="radio" name="mode" value="progressive"> When size known</label>
+        </div>
         <span class="controls-label">Cache-bust</span>
         <div class="segmented" role="radiogroup" aria-label="Cache-bust">
           <label><input type="radio" name="cache" value="on" checked> On</label>
@@ -74,7 +96,12 @@
         </div>
         <div class="panel-run">
           <button id="runNaive" class="primary">Run</button>
-          <span id="naiveResult" class="result"></span>
+        </div>
+        <div class="panel-stats stat-list" id="naiveStats">
+          <div class="row"><span class="label">Dims known</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Space reserved</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">All tiles loaded</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row shift"><span class="label">Visible shifts</span><span class="value"><b>&mdash;</b></span></div>
         </div>
         <div id="naive" class="naive-grid"></div>
       </section>
@@ -85,7 +112,12 @@
         </div>
         <div class="panel-run">
           <button id="runMeasured" class="primary">Run</button>
-          <span id="measuredResult" class="result"></span>
+        </div>
+        <div class="panel-stats stat-list" id="measuredStats">
+          <div class="row"><span class="label">Dims known</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Space reserved</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">All tiles loaded</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row shift"><span class="label">Visible shifts</span><span class="value"><b>&mdash;</b></span></div>
         </div>
         <div id="measured" class="packed"></div>
       </section>
