@@ -229,3 +229,83 @@ export function probeImageBytes(bytes: Uint8Array): ProbedDimensions | null {
     null
   )
 }
+
+// --- Streaming probe ---
+//
+// Consume a ReadableStream of image bytes (WebSocket, fetch().body,
+// AI-gen output, anything producing Uint8Array chunks), retrying
+// probeImageBytes on the growing buffer after each chunk arrives.
+// Dimensions fire as soon as the header is in hand — for PNG that's
+// the first 24 bytes, for JPEG typically under 2KB — via `onDims`.
+// The returned promise resolves with the dims and the complete Blob
+// once the stream drains.
+//
+// The Blob is assembled from every chunk so the caller can turn it
+// into a blob URL (URL.createObjectURL(result.blob)) and pass to an
+// <img> for render — no second network fetch needed.
+//
+// maxProbeBytes caps how many bytes we'll retain as a contiguous
+// buffer for retrying the probe. After that threshold we stop
+// retrying but keep buffering for the final Blob. Default 64KB —
+// comfortably past the largest header any supported format needs.
+
+export type ProbeImageStreamOptions = {
+  onDims?: (dims: ProbedDimensions) => void
+  maxProbeBytes?: number
+}
+
+export type ProbeImageStreamResult = {
+  dims: ProbedDimensions | null
+  blob: Blob
+}
+
+export async function probeImageStream(
+  readable: ReadableStream<Uint8Array>,
+  options: ProbeImageStreamOptions = {},
+): Promise<ProbeImageStreamResult> {
+  const maxProbeBytes = options.maxProbeBytes ?? 64 * 1024
+  const onDims = options.onDims
+
+  const chunks: Uint8Array[] = []
+  let totalBytes = 0
+  let dims: ProbedDimensions | null = null
+  let probingDone = false
+
+  const reader = readable.getReader()
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(value)
+      totalBytes += value.byteLength
+
+      if (!probingDone) {
+        const probed = probeImageBytes(concatChunks(chunks, totalBytes))
+        if (probed !== null) {
+          dims = probed
+          probingDone = true
+          if (onDims !== undefined) onDims(probed)
+        } else if (totalBytes >= maxProbeBytes) {
+          // Stop retrying — we've buffered more than any supported
+          // header needs. Stream continues draining into the Blob.
+          probingDone = true
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  return { dims, blob: new Blob(chunks as BlobPart[]) }
+}
+
+function concatChunks(chunks: readonly Uint8Array[], totalBytes: number): Uint8Array {
+  if (chunks.length === 1) return chunks[0]!
+  const buf = new Uint8Array(totalBytes)
+  let offset = 0
+  for (const c of chunks) {
+    buf.set(c, offset)
+    offset += c.byteLength
+  }
+  return buf
+}

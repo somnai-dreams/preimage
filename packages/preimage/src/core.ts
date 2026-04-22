@@ -18,8 +18,11 @@
 
 export {
   probeImageBytes,
+  probeImageStream,
   MAX_HEADER_BYTES,
   type ProbedDimensions,
+  type ProbeImageStreamOptions,
+  type ProbeImageStreamResult,
 } from './probe.js'
 
 export { fitRect, type FittedRect, type ObjectFit } from './fit.js'

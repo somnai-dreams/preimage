@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- **New: `probeImageStream(readable, { onDims, maxProbeBytes? })`** in `@somnai-dreams/preimage/core`. Consume a `ReadableStream<Uint8Array>` — WebSocket bytes, `fetch().body`, AI-gen output, whatever — and fire dimensions the moment the header is in hand (PNG: 24 bytes; JPEG: usually under 2KB). The returned promise resolves with the dims and a complete `Blob` after the stream drains; `URL.createObjectURL(blob)` gives a renderable `<img src>` without a second network fetch. DOM-free surface: runs in Node, Deno, Bun, workers, edge runtimes. Replaces the concat-and-retry loop every streaming caller would otherwise have to write.
+
 ## 0.4.0
 
 - **New subpath `@somnai-dreams/preimage/virtual`.** `createVirtualTilePool({ scrollContainer, contentContainer, overscan, mount, unmount })` returns a DOM-recycled tile pool for scrollable grids of `Placement[]`. Pairs naturally with `shortestColumnCursor` from layout-algebra: feed placements in via `pool.setPlacements(next)` as prepare() resolves fire, and the pool mounts/unmounts tiles as the user scrolls. Handles the scroll listener (rAF-throttled), the pool of reusable `<div>`s, the active-index map, and cleanup. `unmount` is the place to cancel in-flight image fetches (`img.src = ''`) so a fast scroll through 10k tiles doesn't leave dozens of abandoned requests in the pipeline.
