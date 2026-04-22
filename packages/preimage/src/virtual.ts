@@ -116,6 +116,17 @@ export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualT
   // matters when scrolled to the top).
   let scrollDir: 1 | -1 = 1
   let lastScrollTop = scrollContainer.scrollTop
+  // Cached scroll metrics. refresh() is called synchronously from
+  // setPlacements on every placement update (e.g. per prepare()
+  // resolve in a scale demo). Reading scrollTop/clientHeight from the
+  // DOM would force a layout flush on each call — right after the
+  // caller likely wrote to contentContainer.style.height — turning
+  // the run into N layout thrashes. Instead we read the DOM only when
+  // something actually moved: on scroll events, and on container
+  // resize via ResizeObserver. refresh() reads the cache and never
+  // touches layout.
+  let cachedScrollTop = scrollContainer.scrollTop
+  let cachedClientHeight = scrollContainer.clientHeight
 
   function acquire(): HTMLElement {
     const reused = pool.pop()
@@ -137,7 +148,7 @@ export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualT
 
   function refresh(): void {
     if (destroyed) return
-    const scrollTop = scrollContainer.scrollTop
+    const scrollTop = cachedScrollTop
     if (scrollTop > lastScrollTop) scrollDir = 1
     else if (scrollTop < lastScrollTop) scrollDir = -1
     lastScrollTop = scrollTop
@@ -149,7 +160,7 @@ export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualT
     const topOver = scrollDir === 1 ? behind : ahead
     const bottomOver = scrollDir === 1 ? ahead : behind
     const top = scrollTop - topOver
-    const bottom = scrollTop + scrollContainer.clientHeight + bottomOver
+    const bottom = scrollTop + cachedClientHeight + bottomOver
 
     const wanted = new Set<number>()
     for (let i = 0; i < placements.length; i++) {
@@ -174,8 +185,26 @@ export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualT
     }
   }
 
-  const onScroll = rafThrottle(refresh)
+  // Scroll handler: update cached scrollTop, then refresh. Throttled
+  // to rAF so a burst of scroll events coalesces to one DOM read + one
+  // visibility recompute per frame.
+  const onScroll = rafThrottle(() => {
+    cachedScrollTop = scrollContainer.scrollTop
+    refresh()
+  })
   scrollContainer.addEventListener('scroll', onScroll, { passive: true })
+
+  // Container resize: refresh cached clientHeight, then recompute.
+  // Only path that changes clientHeight — browser resize, container
+  // parent layout change, explicit style tweaks all come through here.
+  const hasResizeObserver = typeof ResizeObserver !== 'undefined'
+  const resizeObserver = hasResizeObserver
+    ? new ResizeObserver(() => {
+        cachedClientHeight = scrollContainer.clientHeight
+        refresh()
+      })
+    : null
+  resizeObserver?.observe(scrollContainer)
 
   return {
     setPlacements(next): void {
@@ -187,6 +216,7 @@ export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualT
       if (destroyed) return
       destroyed = true
       scrollContainer.removeEventListener('scroll', onScroll)
+      resizeObserver?.disconnect()
       for (const [idx, el] of active) {
         if (unmount !== undefined) unmount(idx, el)
         el.remove()

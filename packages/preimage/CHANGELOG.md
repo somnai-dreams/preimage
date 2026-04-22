@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+
+- **Fix: `createVirtualTilePool` no longer forces layout on every `setPlacements()` call.** Previously `refresh()` read `scrollContainer.scrollTop` and `clientHeight` inline, so a caller's typical pattern — `contentContainer.style.height = ...; pool.setPlacements(next)` — triggered a forced reflow per call. For a probe-driven flow (one `setPlacements` per prepare() resolve), that's N reflows over the run. Now scroll position is cached and refreshed only on `scroll` events; `clientHeight` is refreshed via `ResizeObserver`. `refresh()` reads from the cache and doesn't touch layout.
+
 ## 0.6.0
 
 - **`createVirtualTilePool`'s `overscan` option now accepts an asymmetric `{ ahead, behind }`** in addition to a single number. `ahead` is applied on the side the user just scrolled toward; `behind` on the opposite side. Asymmetric is almost always what you want — tiles coming into view need a head start so their images load before the user sees them, tiles leaving should release quickly so their in-flight fetches get cancelled. Scroll direction flips transparently from the internal scroll handler; callers don't need to tell the pool anything. Number form still works for the symmetric case (default 200).
