@@ -27,6 +27,7 @@
     <a href="./decode-pool.html">Decode pool</a>
     <a href="./scale.html">Scale</a>
     <a href="./virtual.html">Virtual</a>
+    <a href="./manifest.html">Manifest</a>
     <a href="./dropzone.html">Drop zone</a>
     <a href="./chat.html">Chat</a>
     <span class="spacer"></span>
@@ -66,6 +67,10 @@
         <a class="demo-card" href="./virtual.html">
           <h3>Virtual — ten thousand tiles, DOM-recycled</h3>
           <p>The chicken-and-egg of windowing: you need heights to position items, but heights come from loading them. Crank to 10k tiles — naive side opens 10k parallel fetches and the CSS column layout thrashes on every arriving image. Measured side probes dims-only, packs the full layout synchronously, and recycles ~40 DOM nodes as you scroll. Scrollbar is honest from frame one.</p>
+        </a>
+        <a class="demo-card" href="./manifest.html">
+          <h3>Manifest — build-time dimensions, instant layout</h3>
+          <p>Cold <code>prepare(url)</code> versus <code>recordKnownMeasurement</code> hydrated from a <code>preimage-manifest</code> JSON. Same 34 photos, same cache-bust, same layout. Cold pays a network probe per URL. Hydrated resolves every <code>prepare()</code> synchronously from cache — layout commits in microseconds.</p>
         </a>
         <a class="demo-card" href="./dropzone.html">
           <h3>Drop zone — Blob inputs</h3>
