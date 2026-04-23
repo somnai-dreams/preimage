@@ -1,9 +1,15 @@
 # Changelog
 
+## 0.11.0
+
+- **New subpath `@somnai-dreams/preimage/predict`** — scroll observer + baseline predictors for predictive pre-rendering. `createScrollObserver(container, { sampleRateMs })` samples scroll position at a configurable rate, exposes `current()`, `velocity()`, `smoothedVelocity(windowSize)`, and `acceleration()`. `createStationaryPredictor`, `createLinearPredictor`, and `createMomentumPredictor` (physics-based with exponential drag) take the observer + a horizon and return `{ scrollY, confidence }`. `evaluatePrediction` runs a predictor against a ground-truth trajectory and reports mean/p50/p95/max error + hit-rate within a tolerance band. Phase 0 of a potential ML swing — the bench at `/bench/predict.html` answers "does cheap physics beat fixed overscan?" before committing to model training.
+- **`createLinearPredictor` default `velocityWindow: 2`** (was 4). Selected via `scripts/predict-sweep.ts` which grid-searches the predictor hyperparameters against synthesized scroll patterns (constant / accelerating / decelerating / direction-change / fling at three peak velocities). Window=2 hits **92.4% within ±400px at 500ms horizon** averaged across patterns, vs 37.3% for stationary baseline — a 55-point lift. Larger windows smooth noise but lag behind velocity changes, which dominates at the horizons most callers care about.
+
 ## 0.10.1
 
 - **Fix: SVG dimension parsing when `width` / `height` are not the first attribute.** Both `probeImageBytes` and `measureFromSvgText` used a regex prefix `[^>"']*` that couldn't skip across quoted attribute values. Effect: `<svg xmlns="..." width="240" height="180">` and `<svg width="240" height="180" xmlns="...">` both failed to find `height` because the regex engine couldn't cross the earlier `"` character. Fix isolates the opening `<svg ...>` tag first, then runs per-attribute regexes over just the attribute block. Caught by `scripts/parser-robustness-test.ts`.
 - **Fix: URL-dimension vendor parsers now validate dims when called directly.** `cloudinaryParser`, `shopifyParser`, `picsumParser`, and `queryParamDimensionParser` all returned objects like `{ width: 0, height: 100 }` or `{ width: 500, height: -100 }` when URLs encoded invalid values — the `parseUrlDimensions` dispatcher filtered them via `isValidDims`, but consumers calling exported parsers standalone saw garbage. Each parser now validates before returning. Caught by `scripts/url-pattern-corpus.ts`, a 38-case corpus covering real-world URL shapes per vendor.
+- **Fix: explicit strategy selection no longer poisons `'auto'`'s origin cache.** Previously, picking `'stream'` (or any explicit strategy) wrote the result to the per-origin discovery cache; switching back to `'auto'` would then silently inherit the manual choice instead of rediscovering from scratch. `resolveStrategy` now tracks whether its result came from auto vs explicit; only auto-originated probes record their outcome.
 
 ## 0.10.0
 

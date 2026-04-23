@@ -60,6 +60,10 @@
           <h3>Virtual-scroll synthetic</h3>
           <p>Packs N tiles, then scripts a constant-velocity scroll from top to bottom while sampling every rAF. Reports frame-time distribution, dropped frames, active tile count, mount/unmount churn. Regressions in <code>createVirtualTilePool</code> surface here: rising frame times, or active-tile-count drift away from the overscan band, both fail this bench loudly.</p>
         </a>
+        <a class="bench-card" href="./predict.html">
+          <h3>Predictive pre-rendering · baselines</h3>
+          <p>Scripted scroll trajectories (constant / accelerating / decelerating / direction-change / fling) evaluated against <code>stationary</code>, <code>linear</code>, and <code>momentum</code> predictors at multiple horizons. Reports mean/p95 error + hit-rate within a tolerance band. Answers "does cheap physics beat fixed overscan?" before committing to ML.</p>
+        </a>
       </div>
     </section>
 
