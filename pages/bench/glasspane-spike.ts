@@ -37,6 +37,7 @@ const CANVAS_HEIGHT = 620
 const nInput = document.getElementById('nInput') as HTMLInputElement
 const velInput = document.getElementById('velInput') as HTMLInputElement
 const runBtn = document.getElementById('run') as HTMLButtonElement
+const saveBtn = document.getElementById('save') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
 const statHost = document.getElementById('stat-host')!
 const jsonHost = document.getElementById('json-host')!
@@ -72,6 +73,11 @@ type SpikeResults = {
   gpuAdapterInfo: string | null
   activeTilesAtEnd: number
   visibleTilesAtEnd: number
+  // True iff the tab was backgrounded at any point during the scripted
+  // scroll. rAF throttles when `document.hidden`, so the recorded
+  // frame-interval distribution is contaminated — treat the run as
+  // advisory only.
+  tabHiddenDuring: boolean
 }
 
 type MemorySnapshot = {
@@ -87,9 +93,14 @@ let lastRun: {
 } | null = null
 
 runBtn.addEventListener('click', () => { void run() })
+saveBtn.addEventListener('click', () => {
+  if (lastRun === null) return
+  saveRun(lastRun.meta, lastRun.params, lastRun.results)
+})
 
 async function run(): Promise<void> {
   runBtn.disabled = true
+  saveBtn.disabled = true
   runBtn.textContent = 'Running…'
   metaEl.textContent = ''
   statHost.innerHTML = ''
@@ -299,6 +310,31 @@ type ScrollResult = {
   scrolledPx: number
   frames: number
   frameIntervals: number[]
+  // Set if the user alt-tabbed / switched spaces / locked the screen
+  // at any point. rAF throttles to ~1 Hz (or stops) when the tab is
+  // hidden, so the interval captured on the next rAF after return
+  // includes the whole backgrounded gap — it looks like a single
+  // 20-second frame. We discard those post-hidden samples and taint
+  // the whole run.
+  tabHiddenDuring: boolean
+}
+
+// Listen for visibility transitions across the scripted scroll. When
+// the tab becomes hidden we flag `tainted = true`; when it returns we
+// reset the clock so the very next frame's interval starts from now,
+// not from before the background gap.
+function trackVisibility(state: { tainted: boolean; lastFrameTs: number }): () => void {
+  const onChange = (): void => {
+    if (document.hidden) {
+      state.tainted = true
+    } else {
+      // Next rAF will measure `now - lastFrameTs`; reset to now so the
+      // post-return interval doesn't include the hidden gap.
+      state.lastFrameTs = performance.now()
+    }
+  }
+  document.addEventListener('visibilitychange', onChange)
+  return () => { document.removeEventListener('visibilitychange', onChange) }
 }
 
 async function scriptedScroll(
@@ -310,24 +346,27 @@ async function scriptedScroll(
   const scrollDurationMs = (target / velocityPxPerSec) * 1000
   const t0 = performance.now()
   const frameIntervals: number[] = []
-  let lastFrameTs = t0
+  const state = { tainted: false, lastFrameTs: t0 }
+  const untrack = trackVisibility(state)
   await new Promise<void>((resolve) => {
     function step(now: number): void {
       const elapsed = now - t0
       const progress = Math.min(1, elapsed / scrollDurationMs)
       container.scrollTop = progress * target
-      frameIntervals.push(now - lastFrameTs)
-      lastFrameTs = now
+      frameIntervals.push(now - state.lastFrameTs)
+      state.lastFrameTs = now
       if (progress < 1) requestAnimationFrame(step)
       else resolve()
     }
     requestAnimationFrame(step)
   })
+  untrack()
   return {
     scrollWallMs: performance.now() - t0,
     scrolledPx: target,
     frames: frameIntervals.length,
     frameIntervals,
+    tabHiddenDuring: state.tainted,
   }
 }
 
@@ -341,7 +380,8 @@ async function scriptedScrollCanvas(
   const scrollDurationMs = (target / velocityPxPerSec) * 1000
   const t0 = performance.now()
   const frameIntervals: number[] = []
-  let lastFrameTs = t0
+  const state = { tainted: false, lastFrameTs: t0 }
+  const untrack = trackVisibility(state)
   await new Promise<void>((resolve) => {
     function step(now: number): void {
       const elapsed = now - t0
@@ -349,18 +389,20 @@ async function scriptedScrollCanvas(
       const sy = progress * target
       container.scrollTop = sy
       onScroll(sy)
-      frameIntervals.push(now - lastFrameTs)
-      lastFrameTs = now
+      frameIntervals.push(now - state.lastFrameTs)
+      state.lastFrameTs = now
       if (progress < 1) requestAnimationFrame(step)
       else resolve()
     }
     requestAnimationFrame(step)
   })
+  untrack()
   return {
     scrollWallMs: performance.now() - t0,
     scrolledPx: target,
     frames: frameIntervals.length,
     frameIntervals,
+    tabHiddenDuring: state.tainted,
   }
 }
 
@@ -434,6 +476,7 @@ function buildResults(input: {
     gpuAdapterInfo: input.gpuAdapterInfo,
     activeTilesAtEnd: input.activeTilesAtEnd,
     visibleTilesAtEnd: input.visibleTilesAtEnd,
+    tabHiddenDuring: input.scroll.tabHiddenDuring,
   }
 }
 
@@ -443,7 +486,6 @@ async function finalize(params: SpikeParams, results: SpikeResults): Promise<voi
     new URL('../assets/preimage-symbol.svg', location.href).href,
   )
   lastRun = { meta, params, results }
-  void lastRun
 
   renderStats(results, params)
   const pre = document.createElement('pre')
@@ -455,6 +497,7 @@ async function finalize(params: SpikeParams, results: SpikeResults): Promise<voi
   metaEl.textContent = `${params.backend} · n=${params.n} · ${meta.protocol ?? '?'}${labelBit} · ${new Date(meta.date).toLocaleTimeString()}`
   runBtn.disabled = false
   runBtn.textContent = 'Run again'
+  saveBtn.disabled = false
 }
 
 function renderStats(r: SpikeResults, params: SpikeParams): void {
@@ -495,15 +538,13 @@ function renderStats(r: SpikeResults, params: SpikeParams): void {
   add('Active tiles at end', String(r.activeTilesAtEnd))
   add('Visible at end', String(r.visibleTilesAtEnd))
   if (r.gpuAdapterInfo !== null) add('GPU adapter', r.gpuAdapterInfo)
+  if (r.tabHiddenDuring) {
+    add('Tab backgrounded', 'yes — run tainted', '', 'bad')
+  }
 
   statHost.innerHTML = ''
   statHost.appendChild(grid)
 }
 
-// Save is wired via a button in a followup; for now the JSON is
-// visible in the <pre> and the user can copy it manually. Not
-// committing the bench with full save machinery in the first pass
-// so the bench file stays focused on the measurement itself.
-void saveRun
 void setNetworkLabel
 void getNetworkLabel
