@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · container</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./demo-styles.css" />
+  <style>
+    .page.wide { max-width: 1500px; }
+
+    pre.prefix-dump {
+      font: 11.5px/1.5 ui-monospace, 'SF Mono', Consolas, monospace;
+      background: var(--surface-muted);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      overflow: auto;
+      max-height: 260px;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+
+    .grid {
+      position: relative;
+      padding: 4px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-muted);
+      min-height: 240px;
+    }
+    .grid .item {
+      position: absolute;
+      overflow: hidden;
+      border-radius: var(--radius-sm);
+      background: #e4e7eb;
+    }
+    .grid .item img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      opacity: 0; transition: opacity 20ms linear;
+    }
+    .grid .item img.loaded { opacity: 1; outline: var(--image-outline); outline-offset: -1px; }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="./">preimage demos</a>
+    <a href="./masonry.html">Masonry</a>
+    <a href="./editorial.html">Editorial</a>
+    <a href="./ttfs.html">TTFS</a>
+    <a href="./decode-pool.html">Decode pool</a>
+    <a href="./scale.html">Scale</a>
+    <a href="./virtual.html">Virtual</a>
+    <a href="./manifest.html">Manifest</a>
+    <a href="./stream.html">Stream</a>
+    <a href="./dropzone.html">Drop zone</a>
+    <a href="./chat.html">Chat</a>
+    <a href="./container.html" aria-current="page">Container</a>
+    <span class="spacer"></span>
+    <button type="button" id="warmCdn" class="warm-btn">Warm CDN</button>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page wide">
+    <header class="page-header">
+      <h1>Container — <code>.prei</code> wrappers, 128-byte deterministic probe</h1>
+      <p>Each image on this page is served through the <code>.prei</code> synthesis endpoint: the dev server reads the underlying PNG/JPEG, runs the existing header parser once, and prepends a 128-byte preimage container carrying <code>width</code>, <code>height</code>, <code>hasAlpha</code>, <code>isProgressive</code>, format, <code>byteLength</code>, and a CRC32. The client asks for <code>Range: bytes=0-127</code> via <code>strategy: 'container'</code>, parses the prefix deterministically, and has everything needed to lay out without touching a format-specific byte parser at all.</p>
+      <p style="color: var(--text-muted); font-size: 13px;">Compare against <code>strategy: 'range'</code> (4KB fetched, format parser walked) and <code>strategy: 'img'</code> (full <code>&lt;img&gt;</code> + poll). Byte counts and timings are reported per strategy. All three race against fresh cache-bust URLs so the browser HTTP cache can't collapse runs.</p>
+    </header>
+
+    <div class="panel-run">
+      <button id="run" class="primary">Run all three strategies</button>
+      <span id="meta" class="meta"></span>
+    </div>
+
+    <section style="margin-top: 18px;">
+      <h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-soft); margin: 0 0 8px;">Decoded prefix (first probe)</h2>
+      <pre class="prefix-dump" id="prefixDump">Run to see a decoded container prefix here.</pre>
+    </section>
+
+    <div class="panels three">
+      <section class="panel">
+        <div class="panel-header"><h2 class="panel-title">container (<code>bytes=0-127</code>)</h2></div>
+        <div class="panel-stats stat-list" id="containerStats">
+          <div class="row"><span class="label">Time to all dims</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Bytes / probe</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Total bytes</span><span class="value"><b>&mdash;</b></span></div>
+        </div>
+        <div id="containerGrid" class="grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header"><h2 class="panel-title">range (<code>bytes=0-4095</code>)</h2></div>
+        <div class="panel-stats stat-list" id="rangeStats">
+          <div class="row"><span class="label">Time to all dims</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Bytes / probe</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Total bytes</span><span class="value"><b>&mdash;</b></span></div>
+        </div>
+        <div id="rangeGrid" class="grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header"><h2 class="panel-title">img (<code>&lt;img&gt;</code> + poll)</h2></div>
+        <div class="panel-stats stat-list" id="imgStats">
+          <div class="row"><span class="label">Time to all dims</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Bytes / probe</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Total bytes</span><span class="value"><b>&mdash;</b></span></div>
+        </div>
+        <div id="imgGrid" class="grid"></div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="./container.ts"></script>
+  <script type="module" src="./nav-concurrency.ts"></script>
+  <script type="module" src="./warm-cdn.ts"></script>
+</body>
+</html>

@@ -11,6 +11,7 @@
       "@somnai-dreams/preimage/core": ["./packages/preimage/src/core.ts"],
       "@somnai-dreams/preimage/manifest": ["./packages/preimage/src/manifest.ts"],
       "@somnai-dreams/preimage/virtual": ["./packages/preimage/src/virtual.ts"],
+      "@somnai-dreams/preimage/container": ["./packages/preimage/src/container.ts"],
       "@somnai-dreams/layout-algebra": ["./packages/layout-algebra/src/index.ts"]
     }
   },

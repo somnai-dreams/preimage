@@ -25,6 +25,7 @@ import {
   type MeasureOptions,
 } from './measurement.js'
 import { MAX_HEADER_BYTES, probeImageBytes, probeImageStream, type ProbedDimensions } from './probe.js'
+import { decodeContainerPrefix, PREIMAGE_CONTAINER_SIZE, type ContainerFormat } from './container.js'
 import { parseUrlDimensions } from './url-dimensions.js'
 
 // --- Prepared handle ---
@@ -161,17 +162,26 @@ export type PrepareOptions = MeasureOptions & {
    *    "server noticed my abort." Most deterministic of the three.
    *    Falls back silently to the `'stream'` behavior if the server
    *    answers with 200 (no Range support).
+   *  - `'container'`: `fetch(url, { headers: { Range: 'bytes=0-127' } })`
+   *    for a preimage `.prei` container. The 128-byte prefix carries
+   *    dims, alpha, progressive flag, byteLength, format, optional
+   *    thumbhash — all deterministic, no header-parser heuristics.
+   *    Falls back to `'range'` on 200 or on bad-magic (URL isn't a
+   *    container) so the caller always gets dims.
    *  - `'auto'`: pick per-origin. First probe against a new origin
    *    tries `'range'`; the library remembers whether the server
    *    answered 206 (stay on `'range'`) or 200 (switch to `'stream'`
    *    for this origin). Subsequent probes consult the cache. No
-   *    warmed element.
+   *    warmed element. Does not attempt `'container'` automatically —
+   *    callers opt into it by passing the strategy explicitly, because
+   *    a random URL with a 128-byte prefix that happens to match
+   *    "PREI" would mis-decode.
    *
    *  Default: `'auto'` when `dimsOnly === true` (no warmed element is
    *  expected), `'img'` otherwise (caller likely wants to reuse
    *  `prepared.element` for render). Blob sources ignore this entirely;
    *  they always byte-probe directly. */
-  strategy?: 'img' | 'stream' | 'range' | 'auto'
+  strategy?: 'img' | 'stream' | 'range' | 'container' | 'auto'
   /** Number of bytes to request when `strategy: 'range'`. Defaults to
    *  4096 — comfortably past any supported header parser's max. */
   rangeBytes?: number
@@ -281,7 +291,7 @@ export function getElement(prepared: PreparedImage): HTMLImageElement | null {
 
 // --- URL path dispatch ---
 
-type ConcreteStrategy = 'img' | 'stream' | 'range'
+type ConcreteStrategy = 'img' | 'stream' | 'range' | 'container'
 
 // Per-origin strategy memory. First probe against a new origin tries
 // 'range'; the result records which strategy the server actually
@@ -335,7 +345,9 @@ function resolveStrategy(
   options: PrepareOptions,
 ): { strategy: ConcreteStrategy; fromAuto: boolean } {
   const s = options.strategy
-  if (s === 'img' || s === 'stream' || s === 'range') return { strategy: s, fromAuto: false }
+  if (s === 'img' || s === 'stream' || s === 'range' || s === 'container') {
+    return { strategy: s, fromAuto: false }
+  }
   if (s !== 'auto' && options.dimsOnly !== true) return { strategy: 'img', fromAuto: false }
   const origin = originOf(src)
   if (origin !== null) {
@@ -361,9 +373,75 @@ async function prepareFromUrl(src: string, options: PrepareOptions): Promise<Pre
   }
 
   const { strategy, fromAuto } = resolveStrategy(src, options)
+  if (strategy === 'container') return await prepareFromUrlContainer(src, key, options)
   if (strategy === 'range') return await prepareFromUrlRange(src, key, options, fromAuto)
   if (strategy === 'stream') return await prepareFromUrlStream(src, key, options, fromAuto)
   return await prepareFromUrlImg(src, key, options)
+}
+
+// --- URL path: preimage container ---
+//
+// Asks the server for the first 128 bytes (`Range: bytes=0-127`). If
+// they parse as a valid `.prei` container prefix, we have every
+// metadata field we care about deterministically — no format-parser
+// walk, no abort race.
+//
+// Fallbacks:
+//   - 200 instead of 206: server ignored Range. Fall through to the
+//     stream path so the caller still gets dims.
+//   - valid 206 but prefix doesn't parse (bad magic, bad CRC, etc.):
+//     URL isn't a container. Fall through to `prepareFromUrlRange`,
+//     which will do its own 4 KB range and parse the image header.
+
+async function prepareFromUrlContainer(
+  src: string,
+  key: string,
+  options: PrepareOptions,
+): Promise<PreparedImage> {
+  const credentials =
+    options.crossOrigin === 'use-credentials'
+      ? 'include'
+      : options.crossOrigin === 'anonymous'
+      ? 'omit'
+      : 'same-origin'
+
+  const fetchInit: RequestInit = {
+    headers: { Range: `bytes=0-${PREIMAGE_CONTAINER_SIZE - 1}` },
+    credentials,
+  }
+  if (options.signal !== undefined) fetchInit.signal = options.signal
+  const response = await fetch(src, fetchInit)
+  if (!response.ok && response.status !== 206) {
+    throw new Error(`preimage: fetch ${src} failed with status ${response.status}`)
+  }
+
+  if (response.status === 200) {
+    // Server returned the whole body instead of a range. Can't be a
+    // container (or can be, but we'd need to parse the first 128 of
+    // the full body). Hand off to the range path; the next probe for
+    // this origin will remember it as stream-only.
+    return await prepareFromUrlRange(src, key, options, false)
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  const decoded = decodeContainerPrefix(bytes)
+  if (!decoded.valid) {
+    // URL returned 206 with 128 bytes but they aren't a container.
+    // Fall through to the range path for a conventional probe.
+    return await prepareFromUrlRange(src, key, options, false)
+  }
+
+  // Deliberately don't write to originStrategyCache: 'container' is
+  // only reachable via explicit strategy selection, and explicit
+  // selections shouldn't pollute auto's per-origin discovery.
+  const meta = decoded.meta
+  const measurement = recordKnownMeasurement(key, meta.width, meta.height, {
+    orientation: options.orientation ?? 1,
+    byteLength: meta.payloadByteLength,
+    hasAlpha: meta.hasAlpha,
+    isProgressive: meta.isProgressive,
+  })
+  return wrap(measurement, null, 'network')
 }
 
 // --- URL path: HTTP Range request ---

@@ -1,9 +1,16 @@
 # Changelog
 
+## 0.11.0
+
+- **New subpath `@somnai-dreams/preimage/container`** — a 128-byte fixed-layout wrapper for any JPEG/PNG/WebP/AVIF payload. The prefix carries width, height, hasAlpha, isProgressive, payload byteLength, format tag, optional 24-byte thumbhash, optional 8-byte sha256 prefix, and a CRC32 over the metadata. `encodeContainerPrefix(meta)` and `decodeContainerPrefix(bytes)` are pure, DOM-free, and work in any runtime. `buildContainer(meta, payload)` concatenates prefix + payload for the encode side.
+- **New `strategy: 'container'`** on `prepare()`. Fetches `Range: bytes=0-127`, decodes the prefix, records dims + alpha + progressive + byteLength deterministically — no format-parser walk, no abort-race, one TCP flight. Falls through to the `'range'` path on 200 responses or on prefix-decode failure (URL isn't a container), so the caller always gets dims. `'auto'` does not attempt `'container'` automatically (a random 128-byte prefix that happened to match "PREI" could mis-decode); callers opt in explicitly. Container selections don't pollute the per-origin auto-discovery cache.
+- **New CLI `preimage-transcode`** — wraps image files in the container without re-encoding. `preimage-transcode in.jpg out.prei` writes the 128-byte prefix + byte-identical payload. `--batch in-dir out-dir` walks a directory tree and mirrors the output. `--extract in.prei out.jpg` strips the prefix, producing the original file. Supported payload formats for v1: jpeg, png, webp. GIF/BMP/AVIF/SVG aren't wrapped; AVIF needs an `ispe` walker the current probe stack doesn't yet have.
+
 ## 0.10.1
 
 - **Fix: SVG dimension parsing when `width` / `height` are not the first attribute.** Both `probeImageBytes` and `measureFromSvgText` used a regex prefix `[^>"']*` that couldn't skip across quoted attribute values. Effect: `<svg xmlns="..." width="240" height="180">` and `<svg width="240" height="180" xmlns="...">` both failed to find `height` because the regex engine couldn't cross the earlier `"` character. Fix isolates the opening `<svg ...>` tag first, then runs per-attribute regexes over just the attribute block. Caught by `scripts/parser-robustness-test.ts`.
 - **Fix: URL-dimension vendor parsers now validate dims when called directly.** `cloudinaryParser`, `shopifyParser`, `picsumParser`, and `queryParamDimensionParser` all returned objects like `{ width: 0, height: 100 }` or `{ width: 500, height: -100 }` when URLs encoded invalid values — the `parseUrlDimensions` dispatcher filtered them via `isValidDims`, but consumers calling exported parsers standalone saw garbage. Each parser now validates before returning. Caught by `scripts/url-pattern-corpus.ts`, a 38-case corpus covering real-world URL shapes per vendor.
+- **Fix: explicit strategy selection no longer poisons `'auto'`'s origin cache.** Previously, picking `'stream'` (or any explicit strategy) wrote the result to the per-origin discovery cache; switching back to `'auto'` would then silently inherit the manual choice instead of rediscovering from scratch. `resolveStrategy` now tracks whether its result came from auto vs explicit; only auto-originated probes record their outcome.
 
 ## 0.10.0
 
