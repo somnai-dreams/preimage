@@ -1,0 +1,52 @@
+{
+  "bench": "probe-concurrency",
+  "date": "2026-04-23T02:31:35.081Z",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+  "origin": "https://somnai-dreams.github.io",
+  "commit": null,
+  "protocol": "h2",
+  "network": {
+    "warmupRttMs": 55.700000047683716,
+    "warmupBytes": 13120,
+    "effectiveType": "4g",
+    "downlinkMbps": 10,
+    "navigatorRttMs": 150,
+    "saveData": false,
+    "label": "Phone Tether 5G"
+  },
+  "params": {
+    "n": 500,
+    "concurrency": 50,
+    "dimsOnly": true,
+    "strategy": "img"
+  },
+  "results": {
+    "totalMs": 17921.89999985695,
+    "bytesTransferred": 150000,
+    "perceivedMs": {
+      "count": 500,
+      "min": 323.60000014305115,
+      "p50": 9302.599999904633,
+      "p95": 16840.200000047684,
+      "max": 17919.299999952316,
+      "mean": 9115.211800016403
+    },
+    "probeMs": {
+      "count": 500,
+      "min": 323.60000014305115,
+      "p50": 2205,
+      "p95": 2205,
+      "max": 2205,
+      "mean": 2084.4485999999047
+    },
+    "queueWaitMs": {
+      "count": 500,
+      "min": 0,
+      "p50": 8200.099999904633,
+      "p95": 15737.700000047684,
+      "max": 16816.799999952316,
+      "mean": 8034.049000014782
+    },
+    "throughputProbesPerSec": 27.898827691483103
+  }
+}
