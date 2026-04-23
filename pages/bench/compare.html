@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage bench · compare</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../demos/demo-styles.css" />
+  <style>
+    .page { max-width: 1200px; }
+    .dropzone {
+      border: 2px dashed var(--border-strong);
+      border-radius: var(--radius-md);
+      padding: 28px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      background: var(--surface-muted);
+      cursor: pointer;
+      margin-bottom: 16px;
+      transition: border-color 120ms, background 120ms;
+    }
+    .dropzone.dragover { border-color: var(--accent); background: var(--surface-accent); }
+    .dropzone input { display: none; }
+    .dropzone .hint { font-size: 12px; color: var(--text-soft); margin-top: 4px; }
+
+    table.cmp { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; margin-bottom: 16px; }
+    table.cmp th, table.cmp td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+    table.cmp th { color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; font-weight: 600; }
+    table.cmp td:first-child, table.cmp th:first-child { text-align: left; }
+    table.cmp td.label { color: var(--text); font-weight: 600; }
+    table.cmp td.best { color: var(--accent); font-weight: 600; }
+    table.cmp tr.group-header td { background: var(--surface-muted); color: var(--text-soft); text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em; font-weight: 600; padding-top: 10px; }
+
+    .run-card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      font-size: 12.5px;
+      margin-bottom: 8px;
+    }
+    .run-card .file { color: var(--text); font-weight: 600; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; }
+    .run-card .meta { color: var(--text-muted); font-size: 11.5px; }
+    .run-card button {
+      font: inherit; font-size: 11px; padding: 2px 8px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text-muted);
+      cursor: pointer;
+    }
+    .run-card button:hover { border-color: var(--reflow); color: var(--reflow); }
+
+    h2.section { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-soft); margin: 24px 0 8px; font-weight: 600; }
+    .empty-msg { color: var(--text-soft); font-size: 13px; padding: 8px 2px; }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="../">preimage demos</a>
+    <a href="./">benchmarks</a>
+    <span class="spacer"></span>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page">
+    <header class="page-header">
+      <h1>Compare benchmark runs</h1>
+      <p>Drop in JSONs saved from the probe bench or probe sweep (or the node sweep). They get grouped by network label (<code>home gigabit</code> vs <code>phone tether 5g</code>), then compared strategy-by-strategy and concurrency-by-concurrency. Best throughput per row is highlighted. Everything stays client-side — nothing is uploaded.</p>
+    </header>
+
+    <label class="dropzone" id="dropzone">
+      <input id="picker" type="file" multiple accept="application/json,.json" />
+      <div>Drop bench JSON files here or click to pick</div>
+      <div class="hint">Files from <code>benchmarks/</code> in this repo work, or fresh saves from <code>/bench/probe.html</code> or <code>/bench/sweep.html</code>.</div>
+    </label>
+
+    <h2 class="section">Loaded runs</h2>
+    <div id="loaded-runs">
+      <div class="empty-msg">No runs loaded yet.</div>
+    </div>
+
+    <h2 class="section">Comparison</h2>
+    <div id="comparison">
+      <div class="empty-msg">Load two or more runs to see the comparison table.</div>
+    </div>
+  </main>
+
+  <script type="module" src="./compare.ts"></script>
+</body>
+</html>
