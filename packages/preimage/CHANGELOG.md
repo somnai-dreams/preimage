@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1
+
+- **`PrepareQueue` default concurrency bumped from 20 → 50.** HTTP/2 servers typically advertise `SETTINGS_MAX_CONCURRENT_STREAMS` of 100, so 20 was leaving throughput on the table for 4KB header probes. On HTTP/1.1 origins the browser's 6-slot cap gatekeeps automatically with no penalty; the only meaningful cost is that 44 probes queue in the browser's network layer ahead of any render-side fetches, so callers with a busy render path should still pass a lower value explicitly.
+
 ## 0.7.0
 
 - **`PreparedImage` is flat.** `.width`, `.height`, `.aspectRatio`, `.src`, `.element`, `.measurement` are all directly readable. `(await prepare(url)).width` just works — no import of `getMeasurement`, no reaching through `.measurement.displayWidth`. The legacy helpers (`getMeasurement`, `getElement`, `measureAspect`, `measureNaturalSize`) are aliases and continue to work. AI-generated code coming off this API writes what humans would.

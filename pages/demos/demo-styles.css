@@ -103,6 +103,31 @@ body {
   border-color: var(--accent);
   color: var(--accent);
 }
+.demo-nav .concurrency-knob {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.demo-nav .concurrency-knob select {
+  font: inherit;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 3px 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.demo-nav .concurrency-knob select:hover {
+  border-color: var(--accent);
+}
 
 /* Page container */
 

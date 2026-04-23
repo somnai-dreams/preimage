@@ -2,6 +2,7 @@ import { PrepareQueue } from '@somnai-dreams/preimage'
 import { createVirtualTilePool } from '@somnai-dreams/preimage/virtual'
 import { shortestColumnCursor, type Placement } from '@somnai-dreams/layout-algebra'
 import { cycledUrls } from './photo-source.js'
+import { getConcurrency } from './nav-concurrency.js'
 
 const countSlider = document.getElementById('countSlider') as HTMLInputElement
 const countVal = document.getElementById('countVal')!
@@ -272,7 +273,7 @@ async function runMeasured(): Promise<void> {
   // automatically with no penalty. Each prepare reads ~4KB of header
   // bytes and aborts — for 10k tiles at 4KB each that's ~40MB vs.
   // hundreds of MB for full-body fetches.
-  const queue = new PrepareQueue({ concurrency: 20 })
+  const queue = new PrepareQueue({ concurrency: getConcurrency() })
 
   const placePromises = urls.map((url) =>
     queue.enqueue(url, { dimsOnly: true }).then((prepared) => {

@@ -11,15 +11,16 @@
 // lets callers reorder pending work: `boost(url)` moves a URL to the
 // front so a scroll-into-view trigger actually jumps the line.
 //
-// The default concurrency is 20 — suited to HTTP/2 origins (most modern
-// CDNs, GitHub Pages, Cloudflare, Vercel, Netlify). On HTTP/1.1 origins
-// the browser's 6-slot cap gatekeeps automatically: we'd fire 20, the
+// The default concurrency is 50 — suited to HTTP/2 origins (most modern
+// CDNs, GitHub Pages, Cloudflare, Vercel, Netlify), which typically
+// advertise SETTINGS_MAX_CONCURRENT_STREAMS of 100. On HTTP/1.1 origins
+// the browser's 6-slot cap gatekeeps automatically: we'd fire 50, the
 // browser accepts all into its network layer, runs 6 in parallel, queues
 // the rest. Same effective throughput as passing concurrency: 6, no
-// penalty, no manual tuning. Set a lower value if you know you're on
-// H1 and want to stop fighting the render side for connection slots.
+// penalty. Set a lower value if you know you're on H1 and want to stop
+// blocking the render side's fetches behind 44 pending probes.
 //
-//   const queue = new PrepareQueue({ concurrency: 20 })
+//   const queue = new PrepareQueue({ concurrency: 50 })
 //   const p1 = queue.enqueue(url1)
 //   const p2 = queue.enqueue(url2)
 //   // ... user scrolls to url50 ...
@@ -56,7 +57,7 @@ export class PrepareQueue {
   private readonly shared = new Map<string, Promise<PreparedImage>>()
 
   constructor(options: PrepareQueueOptions = {}) {
-    const c = options.concurrency ?? 20
+    const c = options.concurrency ?? 50
     if (!Number.isFinite(c) || c < 1) {
       throw new RangeError(`PrepareQueue: concurrency must be a positive integer, got ${c}.`)
     }

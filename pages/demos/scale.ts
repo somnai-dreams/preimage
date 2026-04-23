@@ -2,6 +2,7 @@ import { PrepareQueue } from '@somnai-dreams/preimage'
 import { shortestColumnCursor } from '@somnai-dreams/layout-algebra'
 import { cycledUrls } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
+import { getConcurrency } from './nav-concurrency.js'
 
 const countSlider = document.getElementById('countSlider') as HTMLInputElement
 const countVal = document.getElementById('countVal')!
@@ -239,7 +240,7 @@ async function runMeasured(): Promise<void> {
   // Application-level queue. concurrency: 20 hits the sweet spot on
   // HTTP/2 origins (this site is H2 under GitHub Pages); on HTTP/1.1
   // the browser's 6-slot cap gatekeeps automatically with no penalty.
-  const queue = new PrepareQueue({ concurrency: 20 })
+  const queue = new PrepareQueue({ concurrency: getConcurrency() })
 
   await Promise.all(
     urls.map((url) =>
