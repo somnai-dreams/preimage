@@ -22,6 +22,9 @@
       border-radius: var(--radius-sm);
       background: #e4e7eb;
     }
+    /* Manifest-sourced tiles skip the gray skeleton box — the slot is
+       already correct, the image just needs to arrive. */
+    .grid .item.no-skeleton { background: transparent; }
     .grid .item img {
       position: absolute; inset: 0; width: 100%; height: 100%;
       object-fit: cover; display: block;
@@ -85,6 +88,7 @@
           <div class="row"><span class="label">Dims probed</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row"><span class="label">First dims known</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row"><span class="label">Layout committed</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Source tag</span><span class="value"><b>&mdash;</b></span></div>
         </div>
         <div id="coldGrid" class="grid"></div>
       </section>
@@ -100,6 +104,7 @@
           <div class="row"><span class="label">Dims probed</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row"><span class="label">Hydrate time</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row"><span class="label">Layout committed</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Source tag</span><span class="value"><b>&mdash;</b></span></div>
         </div>
         <div id="hydratedGrid" class="grid"></div>
       </section>

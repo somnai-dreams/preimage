@@ -1,4 +1,4 @@
-import { prepare, clearCache } from '@somnai-dreams/preimage'
+import { prepare, preparedFromMeasurement, clearCache } from '@somnai-dreams/preimage'
 import { recordKnownMeasurement } from '@somnai-dreams/preimage/core'
 import { packShortestColumn } from '@somnai-dreams/layout-algebra'
 import { newCacheBustToken, photosManifest } from './photo-source.js'
@@ -51,10 +51,15 @@ function freshEntries(token: string): HydratableEntry[] {
 
 // --- Shared layout + render ---
 
-function renderGrid(
-  container: HTMLElement,
-  preparedList: Array<{ url: string; width: number; height: number; element: HTMLImageElement | null }>,
-): void {
+type RenderableTile = {
+  url: string
+  width: number
+  height: number
+  element: HTMLImageElement | null
+  source: string
+}
+
+function renderGrid(container: HTMLElement, preparedList: RenderableTile[]): void {
   container.innerHTML = ''
   const panelWidth = container.getBoundingClientRect().width - GAP * 2
   const aspects = preparedList.map((p) => p.width / p.height)
@@ -70,7 +75,12 @@ function renderGrid(
     const place = placements[i]!
     const p = preparedList[i]!
     const tile = document.createElement('div')
-    tile.className = 'item'
+    // Manifest-sourced tiles drop the light-gray skeleton background:
+    // the slot placement is already correct, so the only thing left to
+    // wait for is the image bytes themselves, and leaving a visible
+    // gray box behind them while they arrive looks like a load state
+    // that isn't there.
+    tile.className = p.source === 'manifest' ? 'item no-skeleton' : 'item'
     tile.style.left = `${place.x + GAP}px`
     tile.style.top = `${place.y + GAP}px`
     tile.style.width = `${place.width}px`
@@ -121,6 +131,7 @@ async function runCold(): Promise<void> {
           width: p.width,
           height: p.height,
           element: p.element,
+          source: p.source,
         }
       }),
     ),
@@ -129,10 +140,21 @@ async function runCold(): Promise<void> {
 
   setRowValue(coldStats, 1, `<b>${entries.length}</b>`)
   setRowValue(coldStats, 3, `<b>${fmtMs(layoutMs)}</b>`)
+  // Every cold-path handle came through the URL probe, so source is
+  // 'network' (the library ran a probe) or 'cache' (a prior run in the
+  // same session — we clearCache() at the top so this is rare). Show
+  // the tag explicitly so the contrast with the hydrated panel reads.
+  setRowValue(coldStats, 4, `<b>${summariseSources(prepared)}</b>`)
   renderGrid(coldGrid, prepared)
 
   runColdBtn.disabled = false
   runColdBtn.textContent = 'Run again'
+}
+
+function summariseSources(list: RenderableTile[]): string {
+  const counts = new Map<string, number>()
+  for (const p of list) counts.set(p.source, (counts.get(p.source) ?? 0) + 1)
+  return Array.from(counts).map(([s, n]) => `${s} × ${n}`).join(', ')
 }
 
 // --- Hydrated run: recordKnownMeasurement from manifest, prepare() is sync ---
@@ -147,34 +169,29 @@ async function runHydrated(): Promise<void> {
   clearCache()
   const entries = freshEntries(newCacheBustToken())
 
-  // Hydrate the measurement cache for every URL we're about to
-  // prepare(). `entries` zips manifest dims with the cache-busted
-  // URL so there's no lookup table that could go stale.
+  // Hydrate the measurement cache for every URL, then mint the
+  // prepared handles directly via preparedFromMeasurement(m,
+  // 'manifest'). The 'manifest' tag propagates through to
+  // prepared.source so the render layer can branch on it (skip
+  // skeleton, etc.) without tracking provenance separately.
   const tHydrate0 = performance.now()
-  for (const e of entries) {
-    recordKnownMeasurement(e.url, e.width, e.height)
-  }
+  const prepared = entries.map((e) => {
+    const measurement = recordKnownMeasurement(e.url, e.width, e.height)
+    const handle = preparedFromMeasurement(measurement, 'manifest')
+    return {
+      url: e.url,
+      width: handle.width,
+      height: handle.height,
+      element: handle.element,
+      source: handle.source,
+    }
+  })
   const hydrateMs = performance.now() - tHydrate0
-  setRowValue(hydratedStats, 2, `<b>${fmtMs(hydrateMs)}</b>`)
-
-  // prepare() now sees a cached measurement for every URL and
-  // resolves synchronously. No <img> is created by the library,
-  // no polling, no network round-trip for dims.
-  const t0 = performance.now()
-  const prepared = await Promise.all(
-    entries.map((e) =>
-      prepare(e.url).then((p) => ({
-        url: e.url,
-        width: p.width,
-        height: p.height,
-        element: p.element,
-      })),
-    ),
-  )
-  const layoutMs = performance.now() - t0
-
+  const layoutMs = hydrateMs // no async work — hydrate IS the layout
   setRowValue(hydratedStats, 1, `<b>0</b>`)
+  setRowValue(hydratedStats, 2, `<b>${fmtMs(hydrateMs)}</b>`)
   setRowValue(hydratedStats, 3, `<b>${fmtMs(layoutMs)}</b>`)
+  setRowValue(hydratedStats, 4, `<b>${summariseSources(prepared)}</b>`)
   renderGrid(hydratedGrid, prepared)
 
   runHydratedBtn.disabled = false

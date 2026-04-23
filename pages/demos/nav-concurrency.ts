@@ -10,10 +10,10 @@ const CONCURRENCY_OPTIONS = [6, 20, 50, 100, 200]
 const CONCURRENCY_DEFAULT = 50
 
 const STRATEGY_KEY = 'preimage-strategy'
-const STRATEGY_OPTIONS = ['img', 'stream', 'range'] as const
-const STRATEGY_DEFAULT: ProbeStrategy = 'stream'
+const STRATEGY_OPTIONS = ['auto', 'img', 'stream', 'range'] as const
+const STRATEGY_DEFAULT: ProbeStrategy = 'auto'
 
-export type ProbeStrategy = 'img' | 'stream' | 'range'
+export type ProbeStrategy = 'auto' | 'img' | 'stream' | 'range'
 
 /** Read the user's currently-selected concurrency. Call at the top of
  *  each demo's run-function so the latest nav value is picked up. */
@@ -26,10 +26,12 @@ export function getConcurrency(): number {
 
 /** Read the user's currently-selected probe strategy. Passed straight
  *  to `prepare()` or `PrepareQueue.enqueue()` as `{ strategy }`. Blob
- *  sources ignore it. */
+ *  sources ignore it. `'auto'` (default) lets preimage pick per-origin:
+ *  first probe tries `'range'`; 206 → stay on range, 200 → cache as
+ *  `'stream'` for that origin. */
 export function getStrategy(): ProbeStrategy {
   const raw = localStorage.getItem(STRATEGY_KEY)
-  if (raw === 'img' || raw === 'stream' || raw === 'range') return raw
+  if (raw === 'auto' || raw === 'img' || raw === 'stream' || raw === 'range') return raw
   return STRATEGY_DEFAULT
 }
 

@@ -1,6 +1,10 @@
 import { PrepareQueue } from '@somnai-dreams/preimage'
 import { createVirtualTilePool } from '@somnai-dreams/preimage/virtual'
-import { shortestColumnCursor, type Placement } from '@somnai-dreams/layout-algebra'
+import {
+  estimateFirstScreenCount,
+  shortestColumnCursor,
+  type Placement,
+} from '@somnai-dreams/layout-algebra'
 import { cycledUrls } from './photo-source.js'
 import { getConcurrency, getStrategy } from './nav-concurrency.js'
 import { fmtMs, fmtBytes, fmtCount, setRowValue, resetStats } from './demo-formatting.js'
@@ -256,6 +260,21 @@ async function runMeasured(): Promise<void> {
       scheduleRender()
     }),
   )
+
+  // First-screen prioritization: ask layout-algebra how many leading
+  // tiles will land in the first viewport under our columns/gap/width
+  // config, then boost just those URLs to the front of the queue so
+  // they probe before the below-fold backlog. The probe-per-tile cost
+  // is the same, but the tiles you're actually looking at land first.
+  const firstK = estimateFirstScreenCount({
+    mode: 'columns',
+    panelWidth: measuredPanel.getBoundingClientRect().width,
+    viewportHeight: measuredScroll.getBoundingClientRect().height,
+    gap: GAP,
+    columns: COLUMNS,
+  })
+  queue.boostMany(urls.slice(0, firstK))
+
   await Promise.all(placePromises)
 
   // Final render — inline, not rAF, because we're reporting the
