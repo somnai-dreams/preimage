@@ -22,4 +22,13 @@ jobs:
         run: bun run check
 
       - name: Regression harnesses
-        run: bun run check:all
+        # PR branches that predate the harness suite don't have the
+        # check:all script or scripts/run-all-harnesses.ts. Skip
+        # rather than fail; the gate runs on every push to main and
+        # on every branch that does have the suite.
+        run: |
+          if grep -q '"check:all"' package.json && [ -f scripts/run-all-harnesses.ts ]; then
+            bun run check:all
+          else
+            echo "check:all not present on this branch — skipping"
+          fi
