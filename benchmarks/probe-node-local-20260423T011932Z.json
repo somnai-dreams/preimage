@@ -1,0 +1,96 @@
+{
+  "bench": "probe-concurrency-node",
+  "date": "2026-04-23T01:19:19.782Z",
+  "runtime": "node v24.3.0",
+  "base": "http://localhost:3002",
+  "n": 500,
+  "concurrencies": [
+    6,
+    20,
+    50,
+    100,
+    200
+  ],
+  "sweep": [
+    {
+      "concurrency": 6,
+      "totalMs": 344.617802,
+      "probeMs": {
+        "count": 500,
+        "min": 0.44334100000000376,
+        "p50": 2.636540999999994,
+        "p95": 7.574992000000009,
+        "max": 21.212885,
+        "mean": 3.2842185239999986
+      },
+      "bytesTransferred": 202594404,
+      "throughputProbesPerSec": 1450.882679589489,
+      "resolved": 500,
+      "errors": 0
+    },
+    {
+      "concurrency": 20,
+      "totalMs": 125.02873999999997,
+      "probeMs": {
+        "count": 500,
+        "min": 1.0152140000000145,
+        "p50": 3.825208000000032,
+        "p95": 5.937528999999984,
+        "max": 7.509764999999959,
+        "mean": 3.8619373940000017
+      },
+      "bytesTransferred": 66786805,
+      "throughputProbesPerSec": 3999.0805314042204,
+      "resolved": 500,
+      "errors": 0
+    },
+    {
+      "concurrency": 50,
+      "totalMs": 133.10448400000007,
+      "probeMs": {
+        "count": 500,
+        "min": 4.851178000000004,
+        "p50": 8.320724000000041,
+        "p95": 22.803346000000033,
+        "max": 25.73134900000008,
+        "mean": 11.004355078000007
+      },
+      "bytesTransferred": 63551861,
+      "throughputProbesPerSec": 3756.4474537161327,
+      "resolved": 500,
+      "errors": 0
+    },
+    {
+      "concurrency": 100,
+      "totalMs": 141.64325099999996,
+      "probeMs": {
+        "count": 500,
+        "min": 2.830259000000069,
+        "p50": 16.465453000000025,
+        "p95": 49.83179299999995,
+        "max": 50.479781,
+        "mean": 23.149604442000005
+      },
+      "bytesTransferred": 66848330,
+      "throughputProbesPerSec": 3529.9952272346536,
+      "resolved": 500,
+      "errors": 0
+    },
+    {
+      "concurrency": 200,
+      "totalMs": 101.23685699999999,
+      "probeMs": {
+        "count": 500,
+        "min": 18.31578300000001,
+        "p50": 29.421035999999958,
+        "p95": 52.367159000000015,
+        "max": 53.22804300000007,
+        "mean": 32.459130396000006
+      },
+      "bytesTransferred": 54519808,
+      "throughputProbesPerSec": 4938.912712392879,
+      "resolved": 500,
+      "errors": 0
+    }
+  ]
+}

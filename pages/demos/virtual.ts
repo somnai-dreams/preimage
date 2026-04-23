@@ -276,7 +276,7 @@ async function runMeasured(): Promise<void> {
   const queue = new PrepareQueue({ concurrency: getConcurrency() })
 
   const placePromises = urls.map((url) =>
-    queue.enqueue(url, { dimsOnly: true }).then((prepared) => {
+    queue.enqueue(url, { dimsOnly: true, strategy: 'stream' }).then((prepared) => {
       const aspect = prepared.aspectRatio
       placements.push(packer.add(aspect))
       indexUrl.push(url)
