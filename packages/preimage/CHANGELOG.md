@@ -7,7 +7,7 @@
 ## 0.8.0
 
 - **New `strategy: 'stream'` option on `prepare()`.** Default stays `'img'` (create `<img>`, poll `naturalWidth`, abort via `src = ''`), which produces a warmed element the caller can reuse. `'stream'` switches to `fetch(url)` + `probeImageStream`, aborts via `AbortController` the instant header bytes parse. Measured with a 500-image / 200-concurrency HAR: the `'img'` path's `setTimeout(0)` polling loop gets event-loop-starved at high concurrency — each probe's detect-and-abort takes 1-2 seconds even though wire-level transfer is <1 KB. `'stream'` skips the browser's image subsystem entirely, so dims land at header-bytes time (microseconds) instead of polling time. No warmed element on this path; callers rendering via `prepared.element` should stick with `'img'`.
-- `PrepareQueue` passes `strategy` through unchanged. Probe bench at `/bench/probe.html` now has a strategy toggle for side-by-side comparison.
+- `PrepareQueue` passes `strategy` through unchanged — `queue.enqueue(url, { dimsOnly: true, strategy: 'stream' })` wires the same option the direct `prepare()` call would accept, so a queued virtual-tile run gets the streaming fast path with no extra plumbing. Probe bench at `/bench/probe.html` now has a strategy toggle for side-by-side comparison.
 
 ## 0.7.1
 
@@ -15,7 +15,7 @@
 
 ## 0.7.0
 
-- **`PreparedImage` is flat.** `.width`, `.height`, `.aspectRatio`, `.src`, `.element`, `.measurement` are all directly readable. `(await prepare(url)).width` just works — no import of `getMeasurement`, no reaching through `.measurement.displayWidth`. The legacy helpers (`getMeasurement`, `getElement`, `measureAspect`, `measureNaturalSize`) are aliases and continue to work. AI-generated code coming off this API writes what humans would.
+- **`PreparedImage` is flat.** `.width`, `.height`, `.aspectRatio`, `.src`, `.element`, `.measurement` are all directly readable. `(await prepare(url)).width` just works — no import of `getMeasurement`, no reaching through `.measurement.displayWidth`. The legacy helpers (`getMeasurement`, `getElement`, `measureAspect`, `measureNaturalSize`) remain as thin wrappers that just read the corresponding field, and continue to work. AI-generated code coming off this API writes what humans would.
 - **JSDoc on every public export** in the main entry and `/core`. Short one-liners plus `@example` blocks so IDE tooltips and LLM context windows carry the usage shape.
 
 ## 0.6.2

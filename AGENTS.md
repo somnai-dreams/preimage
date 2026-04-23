@@ -15,6 +15,8 @@ Work on `main`. No feature branches, no PRs, no Claude Code commit signatures. C
 
 `packages/preimage/` is the library; `packages/layout-algebra/` is its pure-math sibling. Public shape lives in each `CHANGELOG.md` top entry and each subpath export in `package.json`. `pages/demos/` are the canonical consumers — if a refactor breaks their shape, that's the shape breaking, not the demos. `pages/bench/` are measurement pages that save runs as JSON; commit those (not raw HARs — `scripts/distill-har.ts` distills first).
 
+`DEVELOPMENT.md` has the longer form: running locally, the bench/distill workflow, how photos and the manifest are generated. Read it once before touching `scripts/` or the bench pages.
+
 When you encounter a new code pattern that isn't documented here or in vibescript, or hesitate on structure, loudly alert **NEW PATTERN DETECTED**. Then write it into the relevant doc (probably vibescript's `docs/drafts/`, not here — preimage-specific lessons belong in the package CHANGELOG; generalizable ones go upstream). Docs are **generalizable** lessons, not one-offs.
 
 **Important:** after finishing a feature with enough holistic context, do a pass over the files you touched and see if anything simplifies. Don't change things for the sake of. If there are real simplifications, YELL **I DID A HOLISTIC PASS AND FOUND SIMPLIFICATIONS** with a brief summary.

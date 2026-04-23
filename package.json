@@ -19,7 +19,11 @@
     "build:all": "bun run build:package && bun run build:layout-algebra",
     "build:demos": "rm -rf dist-demos && bun build pages/demos/*.html --outdir dist-demos --root pages/demos && bun build pages/bench/*.html --outdir dist-demos/bench --root pages/bench && cp -r pages/assets/. dist-demos/assets/",
     "start": "HOST=${HOST:-0.0.0.0} PORT=${PORT:-3000} bun --hot pages/server.ts",
-    "start:windows": "bun --hot pages/server.ts"
+    "start:windows": "bun --hot pages/server.ts",
+    "distill:har": "bun scripts/distill-har.ts",
+    "manifest": "bun scripts/rename-and-manifest.ts",
+    "screenshots": "bun scripts/screenshots.mjs",
+    "bench:probe-node": "bun scripts/bench-probe-node.ts"
   },
   "devDependencies": {
     "@chenglou/pretext": "^0.0.5",
