@@ -8,6 +8,7 @@ import {
 } from '@somnai-dreams/layout-algebra'
 import { newCacheBustToken, photoUrl, takePhotos, PHOTO_COUNT } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
+import { fmtMs, setRowValue, resetStats } from './demo-formatting.js'
 
 const countSlider = document.getElementById('countSlider') as HTMLInputElement
 const countVal = document.getElementById('countVal')!
@@ -59,17 +60,6 @@ function setMeta(count: number, cacheBust: string | null): void {
       : 'cache-busted — each run fetches fresh')
 }
 
-// --- Shared stats helpers: update pre-rendered rows in place ---
-
-function fmtMs(ms: number | null): string {
-  return ms === null ? '—' : `${ms.toFixed(0)}ms`
-}
-
-function setRowValue(host: HTMLElement, nth: number, html: string): void {
-  const b = host.querySelector(`.row:nth-child(${nth}) .value b`)
-  if (b !== null) b.innerHTML = html
-}
-
 function fillStats(
   host: HTMLElement,
   firstReservedMs: number,
@@ -79,14 +69,6 @@ function fillStats(
   setRowValue(host, 1, `<b>${fmtMs(firstReservedMs)}</b>`)
   setRowValue(host, 2, `<b>${fmtMs(avgDimMs)}</b>`)
   setRowValue(host, 3, `<b>${fmtMs(allReservedMs)}</b>`)
-}
-
-function resetStats(host: HTMLElement): void {
-  const rows = host.querySelectorAll<HTMLElement>('.row')
-  for (const row of rows) {
-    const b = row.querySelector('.value b')
-    if (b !== null) b.innerHTML = '—'
-  }
 }
 
 type Tile = { container: HTMLElement; img: HTMLImageElement }

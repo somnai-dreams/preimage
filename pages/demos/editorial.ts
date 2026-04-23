@@ -9,6 +9,7 @@ import {
 import { flowColumnWithFloats } from '@somnai-dreams/preimage/pretext'
 import { newCacheBustToken, photoUrl, PHOTOS, type Photo } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
+import { fmtMs, setRowValue, resetStats } from './demo-formatting.js'
 
 const metaEl = document.getElementById('meta')!
 const naivePanel = document.getElementById('naive')!
@@ -42,29 +43,11 @@ const FIGURES: readonly Photo[] = [
 
 // --- Stat helpers ---
 
-function fmtMs(ms: number | null): string {
-  return ms === null ? '—' : `${ms.toFixed(0)}ms`
-}
-
-function setRowValue(host: HTMLElement, nth: number, html: string): void {
-  const b = host.querySelector(`.row:nth-child(${nth}) .value b`)
-  if (b !== null) b.innerHTML = html
-}
-
 function setShifts(host: HTMLElement, n: number): void {
   const row = host.querySelector<HTMLElement>('.row.shift')
   if (row === null) return
   row.classList.toggle('has-shifts', n > 0)
   row.querySelector('.value b')!.innerHTML = String(n)
-}
-
-function resetStats(host: HTMLElement): void {
-  const rows = host.querySelectorAll<HTMLElement>('.row')
-  for (const row of rows) {
-    const b = row.querySelector('.value b')
-    if (b !== null) b.innerHTML = '—'
-  }
-  host.querySelector<HTMLElement>('.row.shift')?.classList.remove('has-shifts')
 }
 
 // --- Shared utilities ---

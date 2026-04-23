@@ -1,5 +1,6 @@
 import { probeImageStream } from '@somnai-dreams/preimage/core'
 import { PHOTOS, photoUrl, newCacheBustToken } from './photo-source.js'
+import { fmtMs, fmtBytes, setRowValue, resetStats } from './demo-formatting.js'
 
 const speedSlider = document.getElementById('speedSlider') as HTMLInputElement
 const speedVal = document.getElementById('speedVal')!
@@ -16,29 +17,6 @@ const runMeasuredBtn = document.getElementById('runMeasured') as HTMLButtonEleme
 // Pick one photo and stream it. The same URL (with per-run cache-bust)
 // is used for both panels so the byte count matches.
 const PHOTO = PHOTOS[3]! // 04.png — 816×1456, nice tall portrait
-
-// --- Stat + progress helpers ---
-
-function fmtMs(ms: number | null): string {
-  if (ms === null) return '—'
-  if (ms < 10) return `${ms.toFixed(1)}ms`
-  return `${ms.toFixed(0)}ms`
-}
-function fmtBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${bytes} B`
-}
-function setRow(host: HTMLElement, nth: number, html: string): void {
-  const b = host.querySelector(`.row:nth-child(${nth}) .value b`)
-  if (b !== null) b.innerHTML = html
-}
-function resetStats(host: HTMLElement): void {
-  for (const row of host.querySelectorAll<HTMLElement>('.row')) {
-    const b = row.querySelector('.value b')
-    if (b !== null) b.innerHTML = '—'
-  }
-}
 
 // --- Throttled stream ---
 //
@@ -153,7 +131,7 @@ async function runNaive(): Promise<void> {
       chunks.push(value)
       total += value.byteLength
       naiveProgress.style.width = `${Math.min(100, (total / (PHOTO.width * PHOTO.height * 0.001)) * 100)}%`
-      setRow(naiveStats, 1, `<b>${fmtBytes(total)}</b>`)
+      setRowValue(naiveStats, 1, `<b>${fmtBytes(total)}</b>`)
     }
   } finally {
     reader.releaseLock()
@@ -179,9 +157,9 @@ async function runNaive(): Promise<void> {
   })
 
   naiveProgress.style.width = '100%'
-  setRow(naiveStats, 2, `<b>${fmtMs(streamDoneMs)}</b>`) // dims known = stream done
-  setRow(naiveStats, 3, `<b>${fmtMs(streamDoneMs)}</b>`) // space reserved = stream done
-  setRow(naiveStats, 4, `<b>${fmtMs(renderedAt)}</b>`)
+  setRowValue(naiveStats, 2, `<b>${fmtMs(streamDoneMs)}</b>`) // dims known = stream done
+  setRowValue(naiveStats, 3, `<b>${fmtMs(streamDoneMs)}</b>`) // space reserved = stream done
+  setRowValue(naiveStats, 4, `<b>${fmtMs(renderedAt)}</b>`)
 
   runNaiveBtn.disabled = false
   runNaiveBtn.textContent = 'Stream again'
@@ -220,7 +198,7 @@ async function runMeasured(): Promise<void> {
         if (done) break
         total += value.byteLength
         measuredProgress.style.width = `${Math.min(100, (total / (PHOTO.width * PHOTO.height * 0.001)) * 100)}%`
-        setRow(measuredStats, 1, `<b>${fmtBytes(total)}</b>`)
+        setRowValue(measuredStats, 1, `<b>${fmtBytes(total)}</b>`)
       }
     } finally {
       reader.releaseLock()
@@ -232,12 +210,12 @@ async function runMeasured(): Promise<void> {
   const { dims, blob } = await probeImageStream(forProbe, {
     onDims: (d) => {
       dimsAtMs = performance.now() - t0
-      setRow(measuredStats, 2, `<b>${fmtMs(dimsAtMs)}</b>`)
+      setRowValue(measuredStats, 2, `<b>${fmtMs(dimsAtMs)}</b>`)
       // Reserve space the instant dims are known.
       fig.style.width = '240px'
       fig.style.height = `${(240 / d.width) * d.height}px`
       reservedAtMs = performance.now() - t0
-      setRow(measuredStats, 3, `<b>${fmtMs(reservedAtMs)}</b>`)
+      setRowValue(measuredStats, 3, `<b>${fmtMs(reservedAtMs)}</b>`)
     },
   })
   const streamDoneMs = performance.now() - t0
@@ -264,7 +242,7 @@ async function runMeasured(): Promise<void> {
   })
 
   measuredProgress.style.width = '100%'
-  setRow(measuredStats, 4, `<b>${fmtMs(renderedAt)}</b>`)
+  setRowValue(measuredStats, 4, `<b>${fmtMs(renderedAt)}</b>`)
   void streamDoneMs // referenced for clarity; render time is what's shown
 
   runMeasuredBtn.disabled = false

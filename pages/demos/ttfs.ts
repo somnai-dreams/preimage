@@ -1,6 +1,7 @@
 import { prepare } from '@somnai-dreams/preimage'
 import { newCacheBustToken, photoUrl, PHOTOS } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
+import { fmtMs } from './demo-formatting.js'
 
 const metaEl = document.getElementById('meta')!
 const f1 = document.getElementById('f1')!
@@ -55,10 +56,6 @@ function sizedFrame(
 
 // --- Stat rendering: fill the pre-rendered rows by index. Values swap
 //     into fixed slots so nothing reflows. ---
-
-function fmtMs(ms: number | null): string {
-  return ms === null ? '—' : `${ms.toFixed(1)}ms`
-}
 
 function fill(
   host: HTMLElement,

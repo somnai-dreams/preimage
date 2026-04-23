@@ -3,6 +3,7 @@ import { shortestColumnCursor } from '@somnai-dreams/layout-algebra'
 import { cycledUrls } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
 import { getConcurrency } from './nav-concurrency.js'
+import { fmtMs, fmtBytes, setRowValue, resetStats } from './demo-formatting.js'
 
 const countSlider = document.getElementById('countSlider') as HTMLInputElement
 const countVal = document.getElementById('countVal')!
@@ -33,36 +34,11 @@ function setMeta(count: number, running: string): void {
 
 // --- Stat helpers ---
 
-function fmtMs(ms: number | null): string {
-  return ms === null ? '—' : `${ms.toFixed(0)}ms`
-}
-
-function fmtBytes(bytes: number | null): string {
-  if (bytes === null) return '—'
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${bytes} B`
-}
-
-function setRowValue(host: HTMLElement, nth: number, html: string): void {
-  const b = host.querySelector(`.row:nth-child(${nth}) .value b`)
-  if (b !== null) b.innerHTML = html
-}
-
 function setShifts(host: HTMLElement, n: number): void {
   const row = host.querySelector<HTMLElement>('.row.shift')
   if (row === null) return
   row.classList.toggle('has-shifts', n > 0)
   row.querySelector('.value b')!.innerHTML = String(n)
-}
-
-function resetStats(host: HTMLElement): void {
-  const rows = host.querySelectorAll<HTMLElement>('.row')
-  for (const row of rows) {
-    const b = row.querySelector('.value b')
-    if (b !== null) b.innerHTML = '—'
-  }
-  host.querySelector<HTMLElement>('.row.shift')?.classList.remove('has-shifts')
 }
 
 // --- Bytes accounting via PerformanceObserver ---

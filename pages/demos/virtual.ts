@@ -3,6 +3,7 @@ import { createVirtualTilePool } from '@somnai-dreams/preimage/virtual'
 import { shortestColumnCursor, type Placement } from '@somnai-dreams/layout-algebra'
 import { cycledUrls } from './photo-source.js'
 import { getConcurrency } from './nav-concurrency.js'
+import { fmtMs, fmtBytes, fmtCount, setRowValue, resetStats } from './demo-formatting.js'
 
 const countSlider = document.getElementById('countSlider') as HTMLInputElement
 const countVal = document.getElementById('countVal')!
@@ -33,37 +34,6 @@ function freshToken(): string {
 
 function setMeta(msg: string): void {
   metaEl.textContent = msg
-}
-
-// --- Stat helpers (same shape as scale.ts so the visual reads
-// identically when both demos are open side by side) ---
-
-function fmtMs(ms: number | null): string {
-  return ms === null ? '—' : `${ms.toFixed(0)}ms`
-}
-
-function fmtBytes(bytes: number | null): string {
-  if (bytes === null) return '—'
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${bytes} B`
-}
-
-function fmtCount(n: number): string {
-  return n.toLocaleString()
-}
-
-function setRowValue(host: HTMLElement, nth: number, html: string): void {
-  const b = host.querySelector(`.row:nth-child(${nth}) .value b`)
-  if (b !== null) b.innerHTML = html
-}
-
-function resetStats(host: HTMLElement): void {
-  const rows = host.querySelectorAll<HTMLElement>('.row')
-  for (const row of rows) {
-    const b = row.querySelector('.value b')
-    if (b !== null) b.innerHTML = '—'
-  }
 }
 
 // --- Bytes accounting via PerformanceObserver ---

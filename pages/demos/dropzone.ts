@@ -1,4 +1,5 @@
 import { prepare } from '@somnai-dreams/preimage'
+import { setRowValue } from './demo-formatting.js'
 
 const dropArea = document.getElementById('dropArea')!
 const pickBtn = document.getElementById('pickBtn') as HTMLButtonElement
@@ -31,11 +32,6 @@ function initFlows(): void {
   naiveResized = 0
   measuredResized = 0
   renderStats()
-}
-
-function setRowValue(host: HTMLElement, nth: number, html: string): void {
-  const b = host.querySelector(`.row:nth-child(${nth}) .value b`)
-  if (b !== null) b.innerHTML = html
 }
 
 function setShiftRow(host: HTMLElement, count: number, total: number): void {
