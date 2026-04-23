@@ -48,4 +48,14 @@ if (nav !== null) {
   const anchor = warmBtn ?? nav.querySelector('.gh')
   if (anchor !== null) nav.insertBefore(label, anchor)
   else nav.appendChild(label)
+
+  // Also inject a "benchmarks" link so the bench pages are reachable
+  // from any demo nav without editing every HTML file.
+  if (nav.querySelector('a[href$="/bench/"]') === null) {
+    const benchLink = document.createElement('a')
+    benchLink.href = './bench/'
+    benchLink.textContent = 'benchmarks'
+    if (anchor !== null) nav.insertBefore(benchLink, label)
+    else nav.appendChild(benchLink)
+  }
 }

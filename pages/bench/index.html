@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · benchmarks</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../demos/demo-styles.css" />
+  <style>
+    .page { max-width: 920px; }
+    .lede { font-size: 15px; line-height: 1.6; color: var(--text-muted); max-width: 68ch; }
+    .bench-section { margin-top: 28px; }
+    .bench-section h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-soft); margin: 0 0 10px; font-weight: 600; }
+    .bench-list { display: grid; gap: 8px; }
+    .bench-card { display: block; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; color: var(--text); text-decoration: none; background: var(--surface); transition: border-color 120ms; }
+    .bench-card:hover { border-color: var(--accent); }
+    .bench-card h3 { margin: 0 0 3px; font-size: 13px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .bench-card p { margin: 0; color: var(--text-muted); font-size: 12.5px; line-height: 1.5; }
+    .bench-card.todo h3 { color: var(--text-soft); }
+    .bench-card.todo p::before { content: 'Planned · '; color: var(--text-soft); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="../">preimage demos</a>
+    <a href="./" aria-current="page">benchmarks</a>
+    <span class="spacer"></span>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page">
+    <header class="page-header">
+      <h1>Benchmarks</h1>
+      <p class="lede">Non-demo, non-decorative pages. Each one runs a tight loop, reports a compact distribution (min / p50 / p95 / max), and lets you save the run as JSON so you can diff against past runs and iterate.</p>
+    </header>
+
+    <section class="bench-section">
+      <h2>Available</h2>
+      <div class="bench-list">
+        <a class="bench-card" href="./probe.html">
+          <h3>Probe throughput × concurrency</h3>
+          <p>Run N image probes at configurable concurrency. Reports per-probe distribution, total wall time, bytes transferred, throughput (probes/sec). Useful for picking a default concurrency for a known server.</p>
+        </a>
+        <a class="bench-card" href="./packing.html">
+          <h3>Packer speed + determinism</h3>
+          <p>Runs <code>packShortestColumn</code> and <code>packJustifiedRows</code> over seeded aspect arrays. Reports per-call distribution across N iterations, then verifies bit-identical output for repeated runs with the same seed.</p>
+        </a>
+      </div>
+    </section>
+
+    <section class="bench-section">
+      <h2>Planned</h2>
+      <div class="bench-list">
+        <a class="bench-card todo" href="#">
+          <h3>First-screen strategies</h3>
+          <p>Compare naive &lt;img&gt;, prepare+dimsOnly, manifest-hydrated prepare, and probeImageStream for time-to-skeleton-placed and time-to-images-loaded on the first viewport, while allowing mid-run scroll.</p>
+        </a>
+        <a class="bench-card todo" href="#">
+          <h3>Virtual scroll under load</h3>
+          <p>Scripted scroll at configurable velocity through 10k tiles, measure dropped frames, active tile count, mount/unmount rate, in-flight fetches.</p>
+        </a>
+        <a class="bench-card todo" href="#">
+          <h3>Manifest build speed</h3>
+          <p>Time the <code>preimage-manifest</code> CLI on directories of varying size. Node-side via a Bun script, separate from this browser-facing page.</p>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="../demos/nav-concurrency.ts"></script>
+</body>
+</html>

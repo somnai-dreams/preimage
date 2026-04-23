@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage bench · probe</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../demos/demo-styles.css" />
+  <style>
+    .page { max-width: 1000px; }
+    .bench-controls { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 14px; align-items: center; padding: 14px 16px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 16px; font-size: 13px; }
+    .bench-controls label { font-size: 12px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+    .bench-controls input[type=range] { width: 100%; }
+    .bench-controls .val { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; min-width: 6ch; text-align: right; }
+    .bench-run { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .bench-run .meta { color: var(--text-muted); font-size: 12px; flex: 1; min-width: 200px; font-variant-numeric: tabular-nums; }
+    .bench-results { margin-top: 16px; }
+    pre.bench-json { font: 12px/1.5 ui-monospace, 'SF Mono', Consolas, monospace; background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; overflow: auto; color: var(--text); }
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .stat-cell { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--surface); }
+    .stat-cell .label { font-size: 11px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat-cell .value { font-size: 16px; color: var(--text); font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .stat-cell .value .unit { font-size: 11px; color: var(--text-muted); margin-left: 3px; }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="../">preimage demos</a>
+    <a href="./">benchmarks</a>
+    <span class="spacer"></span>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page">
+    <header class="page-header">
+      <h1>Probe throughput × concurrency</h1>
+      <p>Fires N <code>prepare(url, { dimsOnly: true })</code> calls through a <code>PrepareQueue</code> of configurable concurrency. Each URL is cache-busted so the server actually serves the bytes. Reports per-probe time distribution, total wall time, bytes transferred, and probe throughput. Save the run as JSON to diff against past runs.</p>
+    </header>
+
+    <div class="bench-controls">
+      <label>N</label>
+      <input id="nSlider" type="range" min="50" max="2000" value="500" step="50" />
+      <span id="nVal" class="val">500</span>
+
+      <label>Concurrency</label>
+      <input id="concSlider" type="range" min="1" max="200" value="50" step="1" />
+      <span id="concVal" class="val">50</span>
+
+      <label>dimsOnly</label>
+      <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; text-transform: none; color: var(--text);">
+        <input type="checkbox" id="dimsOnly" checked />
+        <span>Abort after dims known</span>
+      </label>
+      <span></span>
+    </div>
+
+    <div class="bench-run">
+      <button id="run" class="primary">Run benchmark</button>
+      <button id="save" class="primary" disabled style="background: var(--surface); color: var(--text); border: 1px solid var(--border);">Save as JSON</button>
+      <span id="meta" class="meta"></span>
+    </div>
+
+    <div id="results" class="bench-results"></div>
+  </main>
+
+  <script type="module" src="./probe.ts"></script>
+</body>
+</html>

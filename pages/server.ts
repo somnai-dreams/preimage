@@ -17,6 +17,9 @@ import manifestHtml from './demos/manifest.html'
 import streamHtml from './demos/stream.html'
 import dropzoneHtml from './demos/dropzone.html'
 import chatHtml from './demos/chat.html'
+import benchIndexHtml from './bench/index.html'
+import benchProbeHtml from './bench/probe.html'
+import benchPackingHtml from './bench/packing.html'
 
 const port = Number(Bun.env.PORT ?? 3000)
 const hostname = Bun.env.HOST ?? '0.0.0.0'
@@ -38,6 +41,10 @@ const server = serve({
     '/stream.html': streamHtml,
     '/dropzone.html': dropzoneHtml,
     '/chat.html': chatHtml,
+    '/bench/': benchIndexHtml,
+    '/bench/index.html': benchIndexHtml,
+    '/bench/probe.html': benchProbeHtml,
+    '/bench/packing.html': benchPackingHtml,
     '/assets/*': async (req) => {
       // Strip leading "/" and map into pages/assets/.
       const url = new URL(req.url)
