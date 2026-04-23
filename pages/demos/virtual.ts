@@ -196,6 +196,30 @@ async function runMeasured(): Promise<void> {
   let dimsProbed = 0
   let firstPlacedMs: number | null = null
 
+  // Phase separation. During the probe phase tiles mount as skeletons
+  // only — placement + background, no `<img>`. Image fetches are
+  // gated behind `renderPhase = true`, flipped after every probe has
+  // resolved. Why: a probe is ~4 KB and a full image is ~1 MB; if we
+  // start image fetches on probe resolve the images saturate the
+  // network pipe and the remaining probes starve behind them. Full
+  // skeletons first, then images, is both faster overall and easier
+  // on the eye (homogeneous state throughout, no partial-loaded flash).
+  let renderPhase = false
+  const mountedTiles = new Map<number, HTMLElement>()
+
+  function attachImage(idx: number, el: HTMLElement): void {
+    if (el.querySelector('img') !== null) return
+    const img = new Image()
+    img.alt = ''
+    img.src = indexUrl[idx]!
+    if (img.complete && img.naturalWidth > 0) {
+      markTileLoaded(el, img)
+    } else {
+      img.addEventListener('load', () => markTileLoaded(el, img), { once: true })
+    }
+    el.appendChild(img)
+  }
+
   const pool = createVirtualTilePool({
     scrollContainer: measuredScroll,
     contentContainer: measuredPanel,
@@ -206,29 +230,17 @@ async function runMeasured(): Promise<void> {
       el.style.top = `${place.y}px`
       el.style.width = `${place.width}px`
       el.style.height = `${place.height}px`
-
-      const img = new Image()
-      img.alt = ''
-      img.src = indexUrl[idx]!
-      // Cache-hit fast path: scroll-back re-mounts a tile whose
-      // bytes the browser already has. `complete` is synchronously
-      // true after src is set when cached — apply the final class
-      // state before the node is inserted so no fade runs.
-      if (img.complete && img.naturalWidth > 0) {
-        markTileLoaded(el, img)
-      } else {
-        img.addEventListener('load', () => markTileLoaded(el, img), { once: true })
-      }
-      el.appendChild(img)
+      mountedTiles.set(idx, el)
+      // Only attach the image if probing is done; otherwise the tile
+      // sits as a skeleton until phase 2 flips renderPhase.
+      if (renderPhase) attachImage(idx, el)
     },
-    unmount: (_idx, el) => {
-      // Cancel any in-flight image fetch before discarding the <img>.
-      // Removing the element from the DOM alone doesn't stop the
-      // browser from finishing the request in the background.
+    unmount: (idx, el) => {
       const img = el.querySelector('img')
       if (img !== null) img.src = ''
       el.innerHTML = ''
       el.className = 'vtile pending'
+      mountedTiles.delete(idx)
     },
   })
   activeMeasuredPool = pool
@@ -291,6 +303,13 @@ async function runMeasured(): Promise<void> {
   queue.boostMany(urls.slice(0, firstK))
 
   await Promise.all(placePromises)
+
+  // Phase 2: probing is done, all skeletons are placed. Flip the
+  // flag and attach images to every currently-mounted tile. Future
+  // scroll-triggered mounts will attach images immediately via the
+  // same code path in the mount callback.
+  renderPhase = true
+  for (const [idx, el] of mountedTiles) attachImage(idx, el)
 
   // Final render — inline, not rAF, because we're reporting the
   // terminal state and a possibly-still-pending scheduled rAF would
