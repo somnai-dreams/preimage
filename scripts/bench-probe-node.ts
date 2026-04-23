@@ -19,10 +19,15 @@
 import { writeFile } from 'node:fs/promises'
 import { probeImageStream } from '../packages/preimage/dist/core.js'
 
+type Strategy = 'stream' | 'range'
+
 type Args = {
   base: string
   n: number
   concurrencies: number[]
+  strategy: Strategy
+  rangeBytes: number
+  networkLabel: string | null
   out: string | null
   photosPath: string
   photoCount: number
@@ -33,6 +38,9 @@ function parseArgs(argv: readonly string[]): Args {
     base: 'http://localhost:3000',
     n: 500,
     concurrencies: [6, 20, 50, 100, 200],
+    strategy: 'stream',
+    rangeBytes: 4096,
+    networkLabel: null,
     out: null,
     photosPath: '/assets/demos/photos',
     photoCount: 34,
@@ -42,12 +50,32 @@ function parseArgs(argv: readonly string[]): Args {
     if (a === '--base') args.base = argv[++i]!
     else if (a === '--n') args.n = Number(argv[++i])
     else if (a === '--c') args.concurrencies = argv[++i]!.split(',').map((s) => Number(s))
+    else if (a === '--strategy') {
+      const v = argv[++i]
+      if (v !== 'stream' && v !== 'range') {
+        process.stderr.write(`bench-probe-node: --strategy must be 'stream' or 'range', got ${v}\n`)
+        process.exit(2)
+      }
+      args.strategy = v
+    } else if (a === '--range-bytes') args.rangeBytes = Number(argv[++i])
+    else if (a === '--network-label') args.networkLabel = argv[++i]!
     else if (a === '--out') args.out = argv[++i]!
     else if (a === '--photos-path') args.photosPath = argv[++i]!
     else if (a === '--photo-count') args.photoCount = Number(argv[++i])
     else if (a === '--help' || a === '-h') {
       process.stdout.write(
-        'bun scripts/bench-probe-node.ts [--base URL] [--n N] [--c 6,20,50,100,200] [--out path.json]\n',
+        [
+          'Usage: bun scripts/bench-probe-node.ts [options]',
+          '',
+          '  --base URL              origin to probe against (default localhost:3000)',
+          '  --n N                   number of probes (default 500)',
+          '  --c 6,20,50,100,200     comma-separated concurrency sweep',
+          '  --strategy stream|range probe approach (default stream)',
+          '  --range-bytes N         bytes to request in range mode (default 4096)',
+          '  --network-label LABEL   free-form label like "home gigabit"',
+          '  --out path.json         write JSON to file instead of stdout',
+          '',
+        ].join('\n'),
       )
       process.exit(0)
     }
@@ -86,7 +114,7 @@ function distribution(samples: readonly number[]): {
   }
 }
 
-async function probeOne(url: string): Promise<{ probeMs: number; bytes: number } | null> {
+async function probeOneStream(url: string): Promise<{ probeMs: number; bytes: number } | null> {
   const tStart = performance.now()
   const controller = new AbortController()
   let probeMs: number | null = null
@@ -95,8 +123,6 @@ async function probeOne(url: string): Promise<{ probeMs: number; bytes: number }
   try {
     const response = await fetch(url, { signal: controller.signal })
     if (!response.ok || response.body === null) return null
-    // Tee the body to count bytes received (since transferSize isn't
-    // exposed without server Timing-Allow-Origin).
     const [forProbe, forCount] = response.body.tee()
     ;(async () => {
       const reader = forCount.getReader()
@@ -117,10 +143,48 @@ async function probeOne(url: string): Promise<{ probeMs: number; bytes: number }
         controller.abort()
       },
     })
-  } catch (err) {
+  } catch {
     if (!aborted) return null
   }
   return probeMs === null ? null : { probeMs, bytes }
+}
+
+async function probeOneRange(
+  url: string,
+  rangeBytes: number,
+): Promise<{ probeMs: number; bytes: number; fellBackTo200: boolean } | null> {
+  const tStart = performance.now()
+  try {
+    const response = await fetch(url, {
+      headers: { Range: `bytes=0-${rangeBytes - 1}` },
+    })
+    if (!response.ok && response.status !== 206) return null
+    const buf = new Uint8Array(await response.arrayBuffer())
+    return {
+      probeMs: performance.now() - tStart,
+      bytes: buf.byteLength,
+      fellBackTo200: response.status === 200,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function warmupRtt(probeUrl: string, count: number): Promise<number | null> {
+  const samples: number[] = []
+  for (let i = 0; i < count; i++) {
+    const t = performance.now()
+    try {
+      const r = await fetch(`${probeUrl}?warmup=${Date.now()}-${i}`, { cache: 'no-store' })
+      await r.arrayBuffer()
+      samples.push(performance.now() - t)
+    } catch {
+      return null
+    }
+  }
+  if (samples.length === 0) return null
+  samples.sort((a, b) => a - b)
+  return samples[Math.floor(samples.length / 2)]!
 }
 
 async function runSweep(args: Args, concurrency: number): Promise<{
@@ -130,6 +194,7 @@ async function runSweep(args: Args, concurrency: number): Promise<{
   throughputProbesPerSec: number
   resolved: number
   errors: number
+  rangeFellBackTo200: number
 }> {
   const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const urls = cycledUrls(args, token)
@@ -139,16 +204,21 @@ async function runSweep(args: Args, concurrency: number): Promise<{
   const probes: number[] = []
   let totalBytes = 0
   let errors = 0
+  let rangeFellBackTo200 = 0
 
   const workers = Array.from({ length: concurrency }, async () => {
     while (idx < urls.length) {
       const i = idx++
-      const r = await probeOne(urls[i]!)
+      const url = urls[i]!
+      const r = args.strategy === 'range'
+        ? await probeOneRange(url, args.rangeBytes)
+        : await probeOneStream(url)
       if (r === null) {
         errors++
       } else {
         probes.push(r.probeMs)
         totalBytes += r.bytes
+        if ('fellBackTo200' in r && r.fellBackTo200) rangeFellBackTo200++
       }
     }
   })
@@ -162,11 +232,20 @@ async function runSweep(args: Args, concurrency: number): Promise<{
     throughputProbesPerSec: (args.n / totalMs) * 1000,
     resolved: probes.length,
     errors,
+    rangeFellBackTo200,
   }
 }
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2))
+
+  // Warmup probe against a tiny known asset to capture network RTT
+  // independent of the bench workload. The manifest is small and
+  // present on every deploy of this repo.
+  const probeUrl = `${args.base}/assets/demos/photos-manifest.json`
+  process.stderr.write(`warmup ${probeUrl} …`)
+  const warmupRttMs = await warmupRtt(probeUrl, 5)
+  process.stderr.write(`  median rtt ${warmupRttMs?.toFixed(0) ?? '?'}ms\n`)
 
   const report = {
     bench: 'probe-concurrency-node',
@@ -175,15 +254,22 @@ async function main(): Promise<void> {
     base: args.base,
     n: args.n,
     concurrencies: args.concurrencies,
+    strategy: args.strategy,
+    rangeBytes: args.strategy === 'range' ? args.rangeBytes : null,
+    network: {
+      label: args.networkLabel,
+      warmupRttMs,
+    },
     sweep: [] as Array<{ concurrency: number } & Awaited<ReturnType<typeof runSweep>>>,
   }
 
   for (const c of args.concurrencies) {
-    process.stderr.write(`c=${String(c).padStart(3)} …`)
+    process.stderr.write(`c=${String(c).padStart(3)} ${args.strategy} …`)
     const result = await runSweep(args, c)
     report.sweep.push({ concurrency: c, ...result })
+    const fallbackBit = result.rangeFellBackTo200 > 0 ? `  ⚠ ${result.rangeFellBackTo200} 200-fallbacks` : ''
     process.stderr.write(
-      `  total=${result.totalMs.toFixed(0)}ms  tp=${result.throughputProbesPerSec.toFixed(0)}/s  probe p50=${result.probeMs.p50.toFixed(0)}ms  p95=${result.probeMs.p95.toFixed(0)}ms  bytes=${(result.bytesTransferred / 1024 / 1024).toFixed(2)}MB  errors=${result.errors}\n`,
+      `  total=${result.totalMs.toFixed(0)}ms  tp=${result.throughputProbesPerSec.toFixed(0)}/s  probe p50=${result.probeMs.p50.toFixed(0)}ms  p95=${result.probeMs.p95.toFixed(0)}ms  bytes=${(result.bytesTransferred / 1024 / 1024).toFixed(2)}MB  errors=${result.errors}${fallbackBit}\n`,
     )
   }
 

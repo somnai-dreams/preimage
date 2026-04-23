@@ -46,9 +46,10 @@
       <span id="concVal" class="val">50</span>
 
       <label>Strategy</label>
-      <label style="display: flex; align-items: center; gap: 12px; font-size: 13px; text-transform: none; color: var(--text);">
+      <label style="display: flex; align-items: center; gap: 12px; font-size: 13px; text-transform: none; color: var(--text); flex-wrap: wrap;">
         <span style="display: flex; align-items: center; gap: 6px;"><input type="radio" name="strategy" value="img" checked /> img + poll</span>
         <span style="display: flex; align-items: center; gap: 6px;"><input type="radio" name="strategy" value="stream" /> fetch + stream</span>
+        <span style="display: flex; align-items: center; gap: 6px;"><input type="radio" name="strategy" value="range" /> Range request</span>
       </label>
       <span></span>
 
@@ -58,6 +59,10 @@
         <span>Abort after dims known</span>
       </label>
       <span></span>
+
+      <label>Network</label>
+      <input id="networkLabel" type="text" placeholder="e.g. home gigabit, phone tether 5g" style="font: inherit; font-size: 13px; padding: 4px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text);" />
+      <span style="font-size: 11px; color: var(--text-soft);">persists across runs</span>
     </div>
 
     <div class="bench-run">

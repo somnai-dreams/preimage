@@ -35,26 +35,113 @@ export function distribution(samples: readonly number[]): Distribution {
   }
 }
 
+export type NetworkSignal = {
+  /** Median round-trip in ms over a small warmup probe. Always set
+   *  if `captureNetwork` was awaited; otherwise null. */
+  warmupRttMs: number | null
+  /** Total bytes received during warmup. Useful sanity-check that the
+   *  RTT measurement landed against the asset we expected. */
+  warmupBytes: number | null
+  /** `navigator.connection.effectiveType` if exposed (Chromium): one
+   *  of '4g', '3g', '2g', 'slow-2g'. Heuristic, not a measurement. */
+  effectiveType: string | null
+  /** `navigator.connection.downlink` Mbps estimate, capped by Chrome. */
+  downlinkMbps: number | null
+  /** `navigator.connection.rtt` ms estimate. Less reliable than our
+   *  warmup measurement; included for cross-reference. */
+  navigatorRttMs: number | null
+  /** Whether the user has data-saver enabled. */
+  saveData: boolean | null
+  /** Free-form label set in the bench UI, persisted to localStorage.
+   *  Lets a human distinguish "home gigabit" from "phone tether 5g"
+   *  even when warmupRttMs and effectiveType collide. */
+  label: string | null
+}
+
 export type RunMetadata = {
   bench: string
   date: string
   userAgent: string
   origin: string
   commit: string | null
-  // `nextHopProtocol` for the first resource seen during the run.
-  // Indicates whether the origin served this session over h1/h2/h3 —
-  // big effect on PrepareQueue numbers.
+  /** `nextHopProtocol` for the first resource seen during the run.
+   *  Indicates whether the origin served this session over h1/h2/h3 —
+   *  big effect on PrepareQueue numbers. */
   protocol: string | null
+  network: NetworkSignal
+}
+
+const NETWORK_LABEL_STORAGE = 'preimage-bench-network-label'
+
+/** Read the user-supplied network label from localStorage. */
+export function getNetworkLabel(): string {
+  return localStorage.getItem(NETWORK_LABEL_STORAGE) ?? ''
+}
+
+/** Write the user-supplied network label. */
+export function setNetworkLabel(label: string): void {
+  if (label === '') localStorage.removeItem(NETWORK_LABEL_STORAGE)
+  else localStorage.setItem(NETWORK_LABEL_STORAGE, label)
+}
+
+/** Time `count` HEAD-or-GET requests against `url`, return the median
+ *  round-trip in ms. Bypasses the HTTP cache via cache-busting query. */
+async function warmupRtt(
+  url: string,
+  count: number,
+): Promise<{ medianMs: number; bytes: number } | null> {
+  const samples: number[] = []
+  let bytes = 0
+  for (let i = 0; i < count; i++) {
+    const t = performance.now()
+    try {
+      const r = await fetch(`${url}?warmup=${Date.now()}-${i}`, { cache: 'no-store' })
+      // Drain the body so the timing reflects a complete round-trip.
+      const buf = await r.arrayBuffer()
+      bytes += buf.byteLength
+      samples.push(performance.now() - t)
+    } catch {
+      return null
+    }
+  }
+  if (samples.length === 0) return null
+  samples.sort((a, b) => a - b)
+  return { medianMs: samples[Math.floor(samples.length / 2)]!, bytes }
+}
+
+/** Capture a network signal: warmup RTT, navigator.connection hints,
+ *  user label. Pass the URL of a small known asset to probe (the
+ *  manifest is a good default). Pure measurement at the call site;
+ *  no assumptions about what bench is calling. */
+export async function captureNetwork(probeUrl: string): Promise<NetworkSignal> {
+  const conn = (navigator as unknown as {
+    connection?: {
+      effectiveType?: string
+      downlink?: number
+      rtt?: number
+      saveData?: boolean
+    }
+  }).connection
+  const warmup = await warmupRtt(probeUrl, 5)
+  return {
+    warmupRttMs: warmup?.medianMs ?? null,
+    warmupBytes: warmup?.bytes ?? null,
+    effectiveType: conn?.effectiveType ?? null,
+    downlinkMbps: conn?.downlink ?? null,
+    navigatorRttMs: conn?.rtt ?? null,
+    saveData: conn?.saveData ?? null,
+    label: getNetworkLabel() || null,
+  }
 }
 
 /** Capture environment metadata to tag a run with. Call once at the
- *  top of a bench so comparisons across runs can filter by protocol
- *  or browser. */
-export function captureMetadata(bench: string): RunMetadata {
-  // Protocol: peek at the most-recent resource timing entry.
+ *  top of a bench so comparisons across runs can filter by protocol,
+ *  browser, or network conditions. */
+export async function captureMetadata(bench: string, networkProbeUrl: string): Promise<RunMetadata> {
   const entries = performance.getEntriesByType('resource') as PerformanceResourceTiming[]
   const firstSameOrigin = entries.find((e) => e.name.startsWith(location.origin))
   const protocol = firstSameOrigin?.nextHopProtocol ?? null
+  const network = await captureNetwork(networkProbeUrl)
   return {
     bench,
     date: new Date().toISOString(),
@@ -62,6 +149,7 @@ export function captureMetadata(bench: string): RunMetadata {
     origin: location.origin,
     commit: (globalThis as unknown as { __PREIMAGE_COMMIT__?: string }).__PREIMAGE_COMMIT__ ?? null,
     protocol,
+    network,
   }
 }
 

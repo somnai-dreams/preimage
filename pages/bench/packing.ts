@@ -91,7 +91,12 @@ async function run(): Promise<void> {
   const jrAgain = packJustifiedRows(aspects, { panelWidth: 1200, gap: 4, targetRowHeight: 220 })
   const jrDeterministic = placementsEqual(jrRef.placements, jrAgain.placements)
 
-  const meta = captureMetadata('packing')
+  // Pure-math bench, but still capture network so cross-bench JSONs
+  // share metadata shape. Probe target is the manifest (small, cached).
+  const meta = await captureMetadata(
+    'packing',
+    new URL('../assets/demos/photos-manifest.json', location.href).href,
+  )
   const params: Params = { n, k, seed }
   const packerResults: PackerResults = {
     shortestColumn: {

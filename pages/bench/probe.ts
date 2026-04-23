@@ -4,7 +4,9 @@ import {
   captureMetadata,
   distribution,
   fmtBytes,
+  getNetworkLabel,
   saveRun,
+  setNetworkLabel,
   type Distribution,
   type RunMetadata,
 } from './common.js'
@@ -14,6 +16,9 @@ const nVal = document.getElementById('nVal')!
 const concSlider = document.getElementById('concSlider') as HTMLInputElement
 const concVal = document.getElementById('concVal')!
 const dimsOnlyEl = document.getElementById('dimsOnly') as HTMLInputElement
+const networkLabelEl = document.getElementById('networkLabel') as HTMLInputElement
+networkLabelEl.value = getNetworkLabel()
+networkLabelEl.addEventListener('input', () => setNetworkLabel(networkLabelEl.value.trim()))
 const runBtn = document.getElementById('run') as HTMLButtonElement
 const saveBtn = document.getElementById('save') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
@@ -159,12 +164,19 @@ async function run(): Promise<void> {
     queueWaitMs: distribution(waits),
     throughputProbesPerSec: (n / totalMs) * 1000,
   }
-  const meta = captureMetadata('probe-concurrency')
+  // Use the manifest as the warmup probe target — small, cached
+  // through the same origin, almost certainly available on any deploy.
+  const meta = await captureMetadata(
+    'probe-concurrency',
+    new URL('../assets/demos/photos-manifest.json', location.href).href,
+  )
   const params: ProbeParams = { n, concurrency, dimsOnly, strategy }
   lastRun = { meta, params, results: probeResults }
 
   renderResults(probeResults, meta, params)
-  metaEl.textContent = `${strategy} · c=${concurrency} · ${meta.protocol ?? '?'} · ${new Date(meta.date).toLocaleTimeString()}`
+  const labelBit = meta.network.label !== null ? ` · ${meta.network.label}` : ''
+  const rttBit = meta.network.warmupRttMs !== null ? ` · rtt ${meta.network.warmupRttMs.toFixed(0)}ms` : ''
+  metaEl.textContent = `${strategy} · c=${concurrency} · ${meta.protocol ?? '?'}${rttBit}${labelBit} · ${new Date(meta.date).toLocaleTimeString()}`
   runBtn.disabled = false
   runBtn.textContent = 'Run again'
   saveBtn.disabled = false
@@ -198,6 +210,20 @@ function renderResults(r: ProbeResults, meta: RunMetadata, params: ProbeParams):
   add('Queue wait p50', r.queueWaitMs.p50.toFixed(1), 'ms')
   add('Bytes / probe', fmtBytes(r.bytesTransferred / params.n))
   add('Protocol', meta.protocol ?? 'unknown')
+  add(
+    'Network label',
+    meta.network.label ?? '—',
+  )
+  add(
+    'Warmup RTT',
+    meta.network.warmupRttMs !== null ? meta.network.warmupRttMs.toFixed(0) : '—',
+    meta.network.warmupRttMs !== null ? 'ms' : '',
+  )
+  add(
+    'Connection',
+    meta.network.effectiveType ?? '—',
+    meta.network.downlinkMbps !== null ? ` · ${meta.network.downlinkMbps} Mbps est` : '',
+  )
   results.appendChild(grid)
 
   const pre = document.createElement('pre')

@@ -101,9 +101,18 @@ export type PrepareOptions = MeasureOptions & {
    *    header-bytes time instead of poll-loop time — much faster at
    *    high concurrency (~200 parallel probes), where the `'img'`
    *    path's `setTimeout(0)` polling gets event-loop-starved.
+   *  - `'range'`: `fetch(url, { headers: { Range: 'bytes=0-N' } })`.
+   *    Server returns 206 Partial Content with just the requested
+   *    bytes — no abort dance, no race between "header parsed" and
+   *    "server noticed my abort." Most deterministic of the three.
+   *    Falls back silently to the `'stream'` behavior if the server
+   *    answers with 200 (no Range support).
    *
    *  Blob sources ignore this; they always byte-probe directly. */
-  strategy?: 'img' | 'stream'
+  strategy?: 'img' | 'stream' | 'range'
+  /** Number of bytes to request when `strategy: 'range'`. Defaults to
+   *  4096 — comfortably past any supported header parser's max. */
+  rangeBytes?: number
 }
 
 // --- Public API ---
@@ -225,10 +234,72 @@ async function prepareFromUrl(src: string, options: PrepareOptions): Promise<Pre
     return wrap(measurement, null)
   }
 
+  if (options.strategy === 'range') {
+    return await prepareFromUrlRange(src, key, options)
+  }
   if (options.strategy === 'stream') {
     return await prepareFromUrlStream(src, key, options)
   }
   return await prepareFromUrlImg(src, key, options)
+}
+
+// --- URL path: HTTP Range request ---
+//
+// Asks the server upfront for `bytes=0-(rangeBytes-1)`. Server returns
+// 206 Partial Content with just those bytes. No streaming, no abort
+// dance, no race between "we parsed the header" and "server noticed."
+// Best for node/CLI workflows scanning many URLs and for any host that
+// honors Range (most static CDNs do).
+//
+// Fallback: if the server returns 200 instead of 206 it doesn't honor
+// Range. We fall through to the stream path so the caller still gets
+// dims rather than a hard error.
+
+async function prepareFromUrlRange(
+  src: string,
+  key: string,
+  options: PrepareOptions,
+): Promise<PreparedImage> {
+  const rangeBytes = options.rangeBytes ?? 4096
+  const credentials =
+    options.crossOrigin === 'use-credentials'
+      ? 'include'
+      : options.crossOrigin === 'anonymous'
+      ? 'omit'
+      : 'same-origin'
+
+  const fetchInit: RequestInit = {
+    headers: { Range: `bytes=0-${rangeBytes - 1}` },
+    credentials,
+  }
+  if (options.signal !== undefined) fetchInit.signal = options.signal
+  const response = await fetch(src, fetchInit)
+  if (!response.ok && response.status !== 206) {
+    throw new Error(`preimage: fetch ${src} failed with status ${response.status}`)
+  }
+
+  // 200 means the server ignored our Range header. Fall back to the
+  // stream path so we still abort once dims are known.
+  if (response.status === 200) {
+    if (response.body === null) {
+      throw new Error(`preimage: fetch ${src} returned no body`)
+    }
+    return await consumeStreamForDims(src, key, response.body, options)
+  }
+
+  // 206: read the partial body and parse directly. No abort needed —
+  // the response body is already short.
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  const probed = probeImageBytes(bytes)
+  if (probed === null) {
+    throw new Error(
+      `preimage: range probe of ${src} (${bytes.length} bytes) yielded no dimensions`,
+    )
+  }
+  const measurement = recordKnownMeasurement(key, probed.width, probed.height, {
+    orientation: options.orientation ?? 1,
+  })
+  return wrap(measurement, null)
 }
 
 // --- URL path: fetch + probeImageStream ---
@@ -268,14 +339,26 @@ async function prepareFromUrlStream(
   if (response.body === null) {
     throw new Error(`preimage: fetch ${src} returned no body`)
   }
+  return await consumeStreamForDims(src, key, response.body, options, controller)
+}
 
+/** Read a body stream through `probeImageStream`, abort the optional
+ *  controller as soon as dims are known when `dimsOnly`. Shared by
+ *  the stream strategy and the range strategy's 200-fallback path. */
+async function consumeStreamForDims(
+  src: string,
+  key: string,
+  body: ReadableStream<Uint8Array>,
+  options: PrepareOptions,
+  controller?: AbortController,
+): Promise<PreparedImage> {
   let aborted = false
   let dims: { width: number; height: number } | null = null
   try {
-    const result = await probeImageStream(response.body, {
+    const result = await probeImageStream(body, {
       onDims: (d) => {
         dims = { width: d.width, height: d.height }
-        if (options.dimsOnly === true) {
+        if (options.dimsOnly === true && controller !== undefined) {
           aborted = true
           controller.abort()
         }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0
+
+- **New `strategy: 'range'` option on `prepare()`.** Sends `Range: bytes=0-4095` with the fetch and parses the 206 Partial Content response directly — no abort dance, no race between "header parsed" and "server noticed." Most deterministic of the three strategies. Falls back silently to the `'stream'` consume-and-abort path when the server answers with 200 (no Range support). Tuneable via `rangeBytes` (default 4096). Best fit for node/CLI workflows scanning many URLs against a CDN; browser callers rendering via `prepared.element` should stick with `'img'`.
+
 ## 0.8.0
 
 - **New `strategy: 'stream'` option on `prepare()`.** Default stays `'img'` (create `<img>`, poll `naturalWidth`, abort via `src = ''`), which produces a warmed element the caller can reuse. `'stream'` switches to `fetch(url)` + `probeImageStream`, aborts via `AbortController` the instant header bytes parse. Measured with a 500-image / 200-concurrency HAR: the `'img'` path's `setTimeout(0)` polling loop gets event-loop-starved at high concurrency — each probe's detect-and-abort takes 1-2 seconds even though wire-level transfer is <1 KB. `'stream'` skips the browser's image subsystem entirely, so dims land at header-bytes time (microseconds) instead of polling time. No warmed element on this path; callers rendering via `prepared.element` should stick with `'img'`.
