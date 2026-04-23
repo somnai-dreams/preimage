@@ -25,6 +25,12 @@ import {
   type MeasureOptions,
 } from './measurement.js'
 import { MAX_HEADER_BYTES, probeImageBytes, probeImageStream, type ProbedDimensions } from './probe.js'
+import {
+  decodeSidecar,
+  decodeSidecarHeaders,
+  sidecarUrlFor,
+  type SidecarMetadata,
+} from './sidecar.js'
 import { parseUrlDimensions } from './url-dimensions.js'
 
 // --- Prepared handle ---
@@ -161,17 +167,28 @@ export type PrepareOptions = MeasureOptions & {
    *    "server noticed my abort." Most deterministic of the three.
    *    Falls back silently to the `'stream'` behavior if the server
    *    answers with 200 (no Range support).
+   *  - `'headers'`: `HEAD image-url`, read `Preimage-Width` /
+   *    `Preimage-Height` / ... from the response headers. Zero body
+   *    bytes. For origins that emit preimage response headers natively
+   *    (AI-image generators, custom CDN middleware). Falls through to
+   *    the `'sidecar'` path if the HEAD lacks a `Preimage-Version`.
+   *  - `'sidecar'`: `GET image-url.prei` — a plain-text file of the
+   *    same `Key: Value` shape as the header convention, sitting next
+   *    to the image. For static origins that can drop files but can't
+   *    configure response headers. Falls through to `'range'` on 404
+   *    so the caller always gets dims.
    *  - `'auto'`: pick per-origin. First probe against a new origin
    *    tries `'range'`; the library remembers whether the server
    *    answered 206 (stay on `'range'`) or 200 (switch to `'stream'`
    *    for this origin). Subsequent probes consult the cache. No
-   *    warmed element.
+   *    warmed element. Does not attempt `'headers'` or `'sidecar'`
+   *    automatically — callers opt in explicitly.
    *
    *  Default: `'auto'` when `dimsOnly === true` (no warmed element is
    *  expected), `'img'` otherwise (caller likely wants to reuse
    *  `prepared.element` for render). Blob sources ignore this entirely;
    *  they always byte-probe directly. */
-  strategy?: 'img' | 'stream' | 'range' | 'auto'
+  strategy?: 'img' | 'stream' | 'range' | 'headers' | 'sidecar' | 'auto'
   /** Number of bytes to request when `strategy: 'range'`. Defaults to
    *  4096 — comfortably past any supported header parser's max. */
   rangeBytes?: number
@@ -281,7 +298,7 @@ export function getElement(prepared: PreparedImage): HTMLImageElement | null {
 
 // --- URL path dispatch ---
 
-type ConcreteStrategy = 'img' | 'stream' | 'range'
+type ConcreteStrategy = 'img' | 'stream' | 'range' | 'headers' | 'sidecar'
 
 // Per-origin strategy memory. First probe against a new origin tries
 // 'range'; the result records which strategy the server actually
@@ -335,7 +352,9 @@ function resolveStrategy(
   options: PrepareOptions,
 ): { strategy: ConcreteStrategy; fromAuto: boolean } {
   const s = options.strategy
-  if (s === 'img' || s === 'stream' || s === 'range') return { strategy: s, fromAuto: false }
+  if (s === 'img' || s === 'stream' || s === 'range' || s === 'headers' || s === 'sidecar') {
+    return { strategy: s, fromAuto: false }
+  }
   if (s !== 'auto' && options.dimsOnly !== true) return { strategy: 'img', fromAuto: false }
   const origin = originOf(src)
   if (origin !== null) {
@@ -361,9 +380,121 @@ async function prepareFromUrl(src: string, options: PrepareOptions): Promise<Pre
   }
 
   const { strategy, fromAuto } = resolveStrategy(src, options)
+  if (strategy === 'headers') return await prepareFromUrlHeaders(src, key, options)
+  if (strategy === 'sidecar') return await prepareFromUrlSidecar(src, key, options)
   if (strategy === 'range') return await prepareFromUrlRange(src, key, options, fromAuto)
   if (strategy === 'stream') return await prepareFromUrlStream(src, key, options, fromAuto)
   return await prepareFromUrlImg(src, key, options)
+}
+
+// --- URL path: HEAD + Preimage-* response headers ---
+//
+// Origin cooperation: a preimage-aware server (e.g. an AI-image
+// generator's endpoint) sets `Preimage-Width`, `Preimage-Height`, and
+// optional flags/format/thumbhash headers on every image response.
+// Client does a HEAD and reads them — zero body bytes transferred.
+//
+// Fallback: any missing `Preimage-Version` header means the origin
+// isn't preimage-aware. Fall through to the sidecar path (which has
+// its own fallback to range).
+
+async function prepareFromUrlHeaders(
+  src: string,
+  key: string,
+  options: PrepareOptions,
+): Promise<PreparedImage> {
+  const credentials =
+    options.crossOrigin === 'use-credentials'
+      ? 'include'
+      : options.crossOrigin === 'anonymous'
+      ? 'omit'
+      : 'same-origin'
+
+  const fetchInit: RequestInit = { method: 'HEAD', credentials }
+  if (options.signal !== undefined) fetchInit.signal = options.signal
+  let response: Response
+  try {
+    response = await fetch(src, fetchInit)
+  } catch {
+    // HEAD can fail for CORS reasons on some origins; fall through
+    // cleanly rather than surfacing a hard error.
+    return await prepareFromUrlSidecar(src, key, options)
+  }
+  if (!response.ok) {
+    return await prepareFromUrlSidecar(src, key, options)
+  }
+
+  const decoded = decodeSidecarHeaders(response.headers)
+  if (!decoded.valid) {
+    return await prepareFromUrlSidecar(src, key, options)
+  }
+
+  // Deliberately don't write to originStrategyCache: 'headers' is only
+  // reachable via explicit strategy selection, and explicit selections
+  // shouldn't pollute auto's per-origin discovery.
+  return writeSidecarMeasurement(key, decoded.meta, options)
+}
+
+// --- URL path: sidecar file ---
+//
+// Fetches `image-url.prei` — a plain-text file of the same `Key:
+// Value` shape as the `Preimage-*` response-header convention. For
+// static origins that can drop files but can't set headers.
+//
+// Fallback: 404 on the sidecar URL means no sidecar is published. Fall
+// through to `prepareFromUrlRange` so the caller always gets dims.
+
+async function prepareFromUrlSidecar(
+  src: string,
+  key: string,
+  options: PrepareOptions,
+): Promise<PreparedImage> {
+  const sidecarUrl = sidecarUrlFor(src)
+  const credentials =
+    options.crossOrigin === 'use-credentials'
+      ? 'include'
+      : options.crossOrigin === 'anonymous'
+      ? 'omit'
+      : 'same-origin'
+
+  const fetchInit: RequestInit = { credentials }
+  if (options.signal !== undefined) fetchInit.signal = options.signal
+
+  let response: Response
+  try {
+    response = await fetch(sidecarUrl, fetchInit)
+  } catch {
+    return await prepareFromUrlRange(src, key, options, false)
+  }
+  if (!response.ok) {
+    return await prepareFromUrlRange(src, key, options, false)
+  }
+
+  const text = await response.text()
+  const decoded = decodeSidecar(text)
+  if (!decoded.valid) {
+    return await prepareFromUrlRange(src, key, options, false)
+  }
+
+  // Same rationale as 'headers': explicit-only strategy, don't pollute
+  // auto's discovery cache.
+  return writeSidecarMeasurement(key, decoded.meta, options)
+}
+
+/** Record a measurement from sidecar-derived metadata. Shared by the
+ *  `'headers'` and `'sidecar'` strategies. */
+function writeSidecarMeasurement(
+  key: string,
+  meta: SidecarMetadata,
+  options: PrepareOptions,
+): PreparedImage {
+  const measurement = recordKnownMeasurement(key, meta.width, meta.height, {
+    orientation: options.orientation ?? 1,
+    byteLength: meta.byteLength,
+    hasAlpha: meta.hasAlpha,
+    isProgressive: meta.isProgressive,
+  })
+  return wrap(measurement, null, 'network')
 }
 
 // --- URL path: HTTP Range request ---

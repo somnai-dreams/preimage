@@ -1,9 +1,19 @@
 # Changelog
 
+## 0.11.0
+
+- **New subpath `@somnai-dreams/preimage/sidecar`** — a single wire format in two physical shapes. `Preimage-Width: 1920`, `Preimage-Height: 1080`, `Preimage-Format: jpeg`, ..., either as HTTP response headers on the image itself (preferred) or as a plain-text `.prei` file next to it (static-origin fallback). `encodeSidecar(meta)`, `decodeSidecar(text)`, `decodeSidecarHeaders(response.headers)`, `sidecarToResponseHeaders(meta)`, `sidecarUrlFor(url)`. Pure, DOM-free, works in any runtime.
+- **New `strategy: 'headers'` on `prepare()`**. Does a `HEAD` on the image URL and reads `Preimage-*` response headers. **Zero body bytes**, one RTT. For origins that speak preimage natively (AI-image generators, custom CDN middleware). Falls through to `'sidecar'` if the HEAD response lacks `Preimage-Version`. Explicit-only; doesn't pollute auto's per-origin discovery cache.
+- **New `strategy: 'sidecar'` on `prepare()`**. Fetches `<url>.prei` — a plain-text file of the same `Key: Value` shape as the header convention, sitting next to the image. For static origins that can drop files but can't set custom headers. Falls through to `'range'` on 404 so the caller always gets dims. Explicit-only; doesn't pollute auto's per-origin discovery cache.
+- **New CLI `preimage-sidecar`**. Walks image files, probes headers with the existing parser stack, writes text sidecars. `preimage-sidecar in.jpg out.jpg.prei` for single files; `--batch in-dir out-dir` to mirror a tree; `--batch --inplace dir` to write sidecars alongside their sources. Supported payload formats: jpeg, png, webp, gif, bmp. Image bytes are never touched.
+
+Adoption story: the same vocabulary works for origins that can set headers on the response (fastest: zero body bytes, HEAD is the probe) and origins that can only drop files (still one RTT, one small text fetch). The target adopter isn't a CDN — it's the AI-image generator pipeline (Midjourney, Stable Diffusion-as-a-service, Sora) where every image already carries dims and format internally and can emit them for free. Supersedes the binary `.prei` wrapper explored in PR #2 (archived).
+
 ## 0.10.1
 
 - **Fix: SVG dimension parsing when `width` / `height` are not the first attribute.** Both `probeImageBytes` and `measureFromSvgText` used a regex prefix `[^>"']*` that couldn't skip across quoted attribute values. Effect: `<svg xmlns="..." width="240" height="180">` and `<svg width="240" height="180" xmlns="...">` both failed to find `height` because the regex engine couldn't cross the earlier `"` character. Fix isolates the opening `<svg ...>` tag first, then runs per-attribute regexes over just the attribute block. Caught by `scripts/parser-robustness-test.ts`.
 - **Fix: URL-dimension vendor parsers now validate dims when called directly.** `cloudinaryParser`, `shopifyParser`, `picsumParser`, and `queryParamDimensionParser` all returned objects like `{ width: 0, height: 100 }` or `{ width: 500, height: -100 }` when URLs encoded invalid values — the `parseUrlDimensions` dispatcher filtered them via `isValidDims`, but consumers calling exported parsers standalone saw garbage. Each parser now validates before returning. Caught by `scripts/url-pattern-corpus.ts`, a 38-case corpus covering real-world URL shapes per vendor.
+- **Fix: explicit strategy selection no longer poisons `'auto'`'s origin cache.** Previously, picking `'stream'` (or any explicit strategy) wrote the result to the per-origin discovery cache; switching back to `'auto'` would then silently inherit the manual choice instead of rediscovering from scratch. `resolveStrategy` now tracks whether its result came from auto vs explicit; only auto-originated probes record their outcome.
 
 ## 0.10.0
 

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · sidecar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./demo-styles.css" />
+  <style>
+    .page.wide { max-width: 1500px; }
+
+    pre.header-dump {
+      font: 11.5px/1.5 ui-monospace, 'SF Mono', Consolas, monospace;
+      background: var(--surface-muted);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      overflow: auto;
+      max-height: 220px;
+      color: var(--text);
+      margin-bottom: 12px;
+      white-space: pre-wrap;
+    }
+
+    .grid {
+      position: relative;
+      padding: 4px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-muted);
+      min-height: 240px;
+    }
+    .grid .item {
+      position: absolute;
+      overflow: hidden;
+      border-radius: var(--radius-sm);
+      background: #e4e7eb;
+    }
+    .grid .item img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      opacity: 0; transition: opacity 20ms linear;
+    }
+    .grid .item img.loaded { opacity: 1; outline: var(--image-outline); outline-offset: -1px; }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="./">preimage demos</a>
+    <a href="./masonry.html">Masonry</a>
+    <a href="./editorial.html">Editorial</a>
+    <a href="./ttfs.html">TTFS</a>
+    <a href="./decode-pool.html">Decode pool</a>
+    <a href="./scale.html">Scale</a>
+    <a href="./virtual.html">Virtual</a>
+    <a href="./manifest.html">Manifest</a>
+    <a href="./stream.html">Stream</a>
+    <a href="./dropzone.html">Drop zone</a>
+    <a href="./chat.html">Chat</a>
+    <a href="./sidecar.html" aria-current="page">Sidecar</a>
+    <span class="spacer"></span>
+    <button type="button" id="warmCdn" class="warm-btn">Warm CDN</button>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page wide">
+    <header class="page-header">
+      <h1>Sidecar — <code>Preimage-*</code> headers and <code>.prei</code> files</h1>
+      <p>One wire format in two physical shapes. A preimage-aware origin sets <code>Preimage-Width</code>, <code>Preimage-Height</code>, and optional flags as HTTP response headers on every image. Client does a <code>HEAD</code> and parses the headers — zero body bytes, one RTT, no format sniffing. A static origin that can't set custom headers drops a <code>photo.jpg.prei</code> text file next to each image, same <code>Key: Value</code> layout; client fetches the sidecar and parses it identically. The image file is never modified and never wrapped.</p>
+      <p style="color: var(--text-muted); font-size: 13px;">This page runs both paths plus the baseline <code>range</code> probe against the same photo set. All three assume the dev server is acting as a cooperating origin — it attaches <code>Preimage-*</code> headers to every image response and synthesises <code>.prei</code> files from the real underlying assets on the fly.</p>
+    </header>
+
+    <div class="panel-run">
+      <button id="run" class="primary">Run all three strategies</button>
+      <span id="meta" class="meta"></span>
+    </div>
+
+    <section style="margin-top: 18px;">
+      <h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-soft); margin: 0 0 8px;">HEAD response headers (first image)</h2>
+      <pre class="header-dump" id="headerDump">Run to see Preimage-* headers from a HEAD request here.</pre>
+
+      <h2 style="font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-soft); margin: 14px 0 8px;">Sidecar text (first image)</h2>
+      <pre class="header-dump" id="sidecarDump">Run to see a .prei file's contents here.</pre>
+    </section>
+
+    <div class="panels three">
+      <section class="panel">
+        <div class="panel-header"><h2 class="panel-title">headers (<code>HEAD</code>, zero body)</h2></div>
+        <div class="panel-stats stat-list" id="headersStats">
+          <div class="row"><span class="label">Time to all dims</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Bytes / probe</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Total bytes</span><span class="value"><b>&mdash;</b></span></div>
+        </div>
+        <div id="headersGrid" class="grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header"><h2 class="panel-title">sidecar (<code>GET *.prei</code>)</h2></div>
+        <div class="panel-stats stat-list" id="sidecarStats">
+          <div class="row"><span class="label">Time to all dims</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Bytes / probe</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Total bytes</span><span class="value"><b>&mdash;</b></span></div>
+        </div>
+        <div id="sidecarGrid" class="grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header"><h2 class="panel-title">range (<code>bytes=0-4095</code>)</h2></div>
+        <div class="panel-stats stat-list" id="rangeStats">
+          <div class="row"><span class="label">Time to all dims</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Bytes / probe</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Total bytes</span><span class="value"><b>&mdash;</b></span></div>
+        </div>
+        <div id="rangeGrid" class="grid"></div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="./sidecar.ts"></script>
+  <script type="module" src="./nav-concurrency.ts"></script>
+  <script type="module" src="./warm-cdn.ts"></script>
+</body>
+</html>
