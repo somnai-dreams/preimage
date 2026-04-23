@@ -59,6 +59,16 @@ function isValidDims(d: UrlDimensions): boolean {
 
 // --- Built-in vendor parsers ---
 
+/** Return `dims` only when they pass the valid-dims predicate.
+ *  Every vendor parser threads its candidate match through this
+ *  so individual parsers stay robust when called directly —
+ *  `parseUrlDimensions` already filters, but exported parsers get
+ *  called standalone by consumers writing custom pipelines. */
+function validated(width: number, height: number): UrlDimensions | null {
+  const dims = { width, height }
+  return isValidDims(dims) ? dims : null
+}
+
 // Cloudinary: https://res.cloudinary.com/<account>/image/upload/<transforms>/<public_id>
 // Transforms are slash- or comma-separated; both w_<n> and h_<n> must
 // appear for a confident match.
@@ -67,7 +77,7 @@ export const cloudinaryParser: UrlDimensionParser = (url) => {
   const wMatch = url.match(/(?:^|[/,])w_(\d+)(?:[,/]|$)/)
   const hMatch = url.match(/(?:^|[/,])h_(\d+)(?:[,/]|$)/)
   if (wMatch === null || hMatch === null) return null
-  return { width: Number(wMatch[1]), height: Number(hMatch[1]) }
+  return validated(Number(wMatch[1]), Number(hMatch[1]))
 }
 
 // Shopify CDN: https://cdn.shopify.com/.../<name>_<W>x<H>.<ext>
@@ -78,7 +88,7 @@ export const shopifyParser: UrlDimensionParser = (url) => {
   if (!url.includes('cdn.shopify.com/')) return null
   const m = url.match(/_(\d+)x(\d+)(?:\.|_|@|\?|$)/)
   if (m === null) return null
-  return { width: Number(m[1]), height: Number(m[2]) }
+  return validated(Number(m[1]), Number(m[2]))
 }
 
 // Picsum: https://picsum.photos/<W>/<H> or /seed/<seed>/<W>/<H>
@@ -88,7 +98,7 @@ export const picsumParser: UrlDimensionParser = (url) => {
   if (!url.includes('picsum.photos/')) return null
   const m = url.match(/picsum\.photos\/(?:[^/?#]+\/[^/?#]+\/)?(\d+)\/(\d+)(?:[/?#]|$)/)
   if (m === null) return null
-  return { width: Number(m[1]), height: Number(m[2]) }
+  return validated(Number(m[1]), Number(m[2]))
 }
 
 // Unsplash images: https://images.unsplash.com/photo-...?w=400&h=300
@@ -121,10 +131,7 @@ function extractQueryDims(url: string, wKey: string, hKey: string): UrlDimension
   const w = params.get(wKey)
   const h = params.get(hKey)
   if (w === null || h === null) return null
-  const width = Number(w)
-  const height = Number(h)
-  if (!Number.isFinite(width) || !Number.isFinite(height)) return null
-  return { width, height }
+  return validated(Number(w), Number(h))
 }
 
 // Convenience: register every vendor parser the library ships with.
