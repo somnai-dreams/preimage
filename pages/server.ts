@@ -24,6 +24,7 @@ import benchPackingHtml from './bench/packing.html'
 import benchCompareHtml from './bench/compare.html'
 import benchFirstScreenHtml from './bench/first-screen.html'
 import benchVirtualScrollHtml from './bench/virtual-scroll.html'
+import benchPredictHtml from './bench/predict.html'
 
 const port = Number(Bun.env.PORT ?? 3000)
 const hostname = Bun.env.HOST ?? '0.0.0.0'
@@ -53,6 +54,7 @@ const server = serve({
     '/bench/compare.html': benchCompareHtml,
     '/bench/first-screen.html': benchFirstScreenHtml,
     '/bench/virtual-scroll.html': benchVirtualScrollHtml,
+    '/bench/predict.html': benchPredictHtml,
     '/assets/*': async (req) => {
       // Strip leading "/" and map into pages/assets/.
       const url = new URL(req.url)
