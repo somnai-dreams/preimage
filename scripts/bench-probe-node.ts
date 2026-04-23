@@ -240,9 +240,9 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2))
 
   // Warmup probe against a tiny known asset to capture network RTT
-  // independent of the bench workload. The manifest is small and
-  // present on every deploy of this repo.
-  const probeUrl = `${args.base}/assets/demos/photos-manifest.json`
+  // independent of the bench workload. The preimage symbol SVG is
+  // ~1KB and ships on every deploy.
+  const probeUrl = `${args.base}/assets/preimage-symbol.svg`
   process.stderr.write(`warmup ${probeUrl} …`)
   const warmupRttMs = await warmupRtt(probeUrl, 5)
   process.stderr.write(`  median rtt ${warmupRttMs?.toFixed(0) ?? '?'}ms\n`)

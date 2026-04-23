@@ -28,7 +28,7 @@ type ProbeParams = {
   n: number
   concurrency: number
   dimsOnly: boolean
-  strategy: 'img' | 'stream'
+  strategy: 'img' | 'stream' | 'range'
 }
 
 type ProbeResults = {
@@ -67,7 +67,9 @@ async function run(): Promise<void> {
   const concurrency = Number(concSlider.value)
   const dimsOnly = dimsOnlyEl.checked
   const strategyEl = document.querySelector<HTMLInputElement>('input[name="strategy"]:checked')
-  const strategy = (strategyEl?.value === 'stream' ? 'stream' : 'img') as 'img' | 'stream'
+  const strategyRaw = strategyEl?.value
+  const strategy: 'img' | 'stream' | 'range' =
+    strategyRaw === 'stream' ? 'stream' : strategyRaw === 'range' ? 'range' : 'img'
   const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const urls = cycledUrls(n, token)
 
@@ -164,11 +166,13 @@ async function run(): Promise<void> {
     queueWaitMs: distribution(waits),
     throughputProbesPerSec: (n / totalMs) * 1000,
   }
-  // Use the manifest as the warmup probe target — small, cached
-  // through the same origin, almost certainly available on any deploy.
+  // Use the preimage symbol SVG as the warmup probe target — small
+  // (~1KB), same origin, ships with every deploy of this repo. The
+  // old manifest JSON was moved inline into photo-source.ts, so its
+  // URL no longer exists.
   const meta = await captureMetadata(
     'probe-concurrency',
-    new URL('../assets/demos/photos-manifest.json', location.href).href,
+    new URL('../assets/preimage-symbol.svg', location.href).href,
   )
   const params: ProbeParams = { n, concurrency, dimsOnly, strategy }
   lastRun = { meta, params, results: probeResults }
