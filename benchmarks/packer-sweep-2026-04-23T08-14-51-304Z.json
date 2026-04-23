@@ -1,81 +1,81 @@
 {
   "bench": "packer-sweep",
-  "date": "2026-04-23T08:10:45.447Z",
-  "wallMs": 97.100959,
-  "total": 16,
-  "passed": 16,
+  "date": "2026-04-23T08:14:51.304Z",
+  "wallMs": 114.08858000000001,
+  "total": 29,
+  "passed": 29,
   "failed": 0,
   "scaling": [
     {
       "packer": "shortestColumn",
       "n": 100,
       "iterations": 50,
-      "avgMs": 0.05224400000000017,
-      "minMs": 0.00806700000000049,
-      "maxMs": 1.6180650000000014,
+      "avgMs": 0.05487136000000028,
+      "minMs": 0.0067149999999998045,
+      "maxMs": 1.275742000000001,
       "totalHeight": 4483.625633909575
     },
     {
       "packer": "justifiedRows",
       "n": 100,
       "iterations": 50,
-      "avgMs": 0.014194159999999768,
-      "minMs": 0.006567000000000434,
-      "maxMs": 0.076627000000002,
+      "avgMs": 0.010895140000000225,
+      "minMs": 0.005634999999998058,
+      "maxMs": 0.05521999999999849,
       "totalHeight": 6832.826306415078
     },
     {
       "packer": "shortestColumn",
       "n": 1000,
       "iterations": 50,
-      "avgMs": 0.12635008000000006,
-      "minMs": 0.03789199999999937,
-      "maxMs": 1.0655549999999998,
+      "avgMs": 0.1432474,
+      "minMs": 0.04396799999999956,
+      "maxMs": 1.1443429999999992,
       "totalHeight": 43985.2948151751
     },
     {
       "packer": "justifiedRows",
       "n": 1000,
       "iterations": 50,
-      "avgMs": 0.13339010000000023,
-      "minMs": 0.02923799999999943,
-      "maxMs": 2.0462419999999995,
+      "avgMs": 0.11376304000000005,
+      "minMs": 0.02944000000000102,
+      "maxMs": 1.3907209999999992,
       "totalHeight": 69320.5357276691
     },
     {
       "packer": "shortestColumn",
       "n": 10000,
       "iterations": 10,
-      "avgMs": 1.2922979000000006,
-      "minMs": 0.4586660000000009,
-      "maxMs": 2.599014000000004,
+      "avgMs": 1.4366548000000001,
+      "minMs": 0.5214560000000006,
+      "maxMs": 2.4591279999999998,
       "totalHeight": 446313.8704422849
     },
     {
       "packer": "justifiedRows",
       "n": 10000,
       "iterations": 10,
-      "avgMs": 0.8012902000000004,
-      "minMs": 0.30898100000000284,
-      "maxMs": 1.4242440000000016,
+      "avgMs": 0.8505709999999993,
+      "minMs": 0.27445299999999406,
+      "maxMs": 2.3861649999999983,
       "totalHeight": 690368.3059255567
     },
     {
       "packer": "shortestColumn",
       "n": 100000,
       "iterations": 3,
-      "avgMs": 11.088943000000002,
-      "minMs": 8.591233000000003,
-      "maxMs": 14.22951900000001,
+      "avgMs": 15.453275999999994,
+      "minMs": 11.464189999999988,
+      "maxMs": 18.526928999999996,
       "totalHeight": 4457772.250055812
     },
     {
       "packer": "justifiedRows",
       "n": 100000,
       "iterations": 3,
-      "avgMs": 5.811621666666667,
-      "minMs": 3.575431999999992,
-      "maxMs": 7.5201100000000025,
+      "avgMs": 5.946399999999997,
+      "minMs": 2.663474999999991,
+      "maxMs": 7.764817000000008,
       "totalHeight": 6900326.577347797
     }
   ],
@@ -141,6 +141,60 @@
     {
       "ok": true,
       "case": "append-stability/shortest-column"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/empty"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/all"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/above"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/below"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/middle"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/edge-top"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/overscan"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/zero-size"
+    },
+    {
+      "ok": true,
+      "case": "estimate/columns-basic"
+    },
+    {
+      "ok": true,
+      "case": "estimate/columns-min"
+    },
+    {
+      "ok": true,
+      "case": "estimate/columns-single",
+      "notes": "1 tiles"
+    },
+    {
+      "ok": true,
+      "case": "estimate/rows-basic"
+    },
+    {
+      "ok": true,
+      "case": "estimate/rows-min",
+      "notes": "2 tiles"
     },
     {
       "ok": true,

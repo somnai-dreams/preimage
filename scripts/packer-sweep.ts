@@ -24,10 +24,12 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import {
+  estimateFirstScreenCount,
   packJustifiedRows,
   packShortestColumn,
   justifiedRowCursor,
   shortestColumnCursor,
+  visibleIndices,
   type Placement,
 } from '../packages/layout-algebra/src/index.ts'
 
@@ -305,6 +307,136 @@ function checkAppendStability(): void {
   }
 }
 
+// --- visibleIndices coverage ---
+
+function checkVisibleIndices(): void {
+  const placements: Placement[] = [
+    { x: 0, y: 0, width: 200, height: 200 },     // 0-200
+    { x: 0, y: 210, width: 200, height: 200 },   // 210-410
+    { x: 0, y: 420, width: 200, height: 200 },   // 420-620
+    { x: 0, y: 630, width: 200, height: 200 },   // 630-830
+    { x: 0, y: 840, width: 200, height: 200 },   // 840-1040
+  ]
+
+  // Empty input → empty output.
+  const empty = visibleIndices([], { viewTop: 0, viewBottom: 500 })
+  if (empty.length !== 0) fail('visibleIndices/empty', `expected [], got ${JSON.stringify(empty)}`)
+  else pass('visibleIndices/empty')
+
+  // Full viewport covering all placements.
+  const all = visibleIndices(placements, { viewTop: 0, viewBottom: 2000 })
+  if (all.length !== placements.length) fail('visibleIndices/all', `expected 5, got ${all.length}`)
+  else pass('visibleIndices/all')
+
+  // Window above everything.
+  const above = visibleIndices(placements, { viewTop: -1000, viewBottom: -100 })
+  if (above.length !== 0) fail('visibleIndices/above', `expected [], got ${JSON.stringify(above)}`)
+  else pass('visibleIndices/above')
+
+  // Window below everything.
+  const below = visibleIndices(placements, { viewTop: 5000, viewBottom: 6000 })
+  if (below.length !== 0) fail('visibleIndices/below', `expected [], got ${JSON.stringify(below)}`)
+  else pass('visibleIndices/below')
+
+  // Middle window catching indices 1 and 2.
+  const middle = visibleIndices(placements, { viewTop: 300, viewBottom: 500 })
+  if (JSON.stringify(middle) !== '[1,2]') fail('visibleIndices/middle', `got ${JSON.stringify(middle)}`)
+  else pass('visibleIndices/middle')
+
+  // Edge: top of placement exactly at viewBottom — should include.
+  // placement 1 spans 210-410; viewBottom 210 should include it.
+  const edge = visibleIndices(placements, { viewTop: 0, viewBottom: 210 })
+  if (!edge.includes(1)) fail('visibleIndices/edge-top', `missing index 1, got ${JSON.stringify(edge)}`)
+  else pass('visibleIndices/edge-top')
+
+  // Overscan: add 100px each side, should pull in neighbors.
+  const withOverscan = visibleIndices(placements, {
+    viewTop: 300,
+    viewBottom: 500,
+    overscan: 100,
+  })
+  // Effective window: [200, 600]. Placement 0 ends at 200 (includes),
+  // placements 1 (210-410), 2 (420-620) both inside. Placement 3 starts
+  // at 630, outside.
+  const expected = [0, 1, 2]
+  if (JSON.stringify(withOverscan) !== JSON.stringify(expected)) {
+    fail('visibleIndices/overscan', `expected ${JSON.stringify(expected)}, got ${JSON.stringify(withOverscan)}`)
+  } else {
+    pass('visibleIndices/overscan')
+  }
+
+  // Zero-size viewport (viewTop === viewBottom): only placements
+  // intersecting that exact y line.
+  const zero = visibleIndices(placements, { viewTop: 300, viewBottom: 300 })
+  if (!zero.includes(1)) fail('visibleIndices/zero-size', `expected index 1, got ${JSON.stringify(zero)}`)
+  else pass('visibleIndices/zero-size')
+}
+
+// --- estimateFirstScreenCount coverage ---
+
+function checkEstimateFirstScreenCount(): void {
+  // Columns mode: tile height = (panelWidth - gap*(cols-1))/cols
+  // = (1200 - 4*4)/5 = (1200 - 16)/5 = 236.8 px. rowCount =
+  // ceil(720 / (236.8 + 4)) = ceil(2.99) = 3. count = 3*5 = 15.
+  const cols = estimateFirstScreenCount({
+    mode: 'columns',
+    panelWidth: 1200,
+    viewportHeight: 720,
+    gap: 4,
+    columns: 5,
+  })
+  if (cols !== 15) fail('estimate/columns-basic', `expected 15, got ${cols}`)
+  else pass('estimate/columns-basic')
+
+  // Minimum: always at least `columns` (even at viewportHeight=0).
+  const colsMin = estimateFirstScreenCount({
+    mode: 'columns',
+    panelWidth: 800,
+    viewportHeight: 0,
+    gap: 4,
+    columns: 3,
+  })
+  if (colsMin !== 3) fail('estimate/columns-min', `expected 3, got ${colsMin}`)
+  else pass('estimate/columns-min')
+
+  // Tiny viewport, one column wide — at least 1.
+  const single = estimateFirstScreenCount({
+    mode: 'columns',
+    panelWidth: 400,
+    viewportHeight: 10,
+    gap: 0,
+    columns: 1,
+  })
+  if (single < 1) fail('estimate/columns-single', `expected >= 1, got ${single}`)
+  else pass('estimate/columns-single', `${single} tiles`)
+
+  // Rows mode: rowCount = ceil(viewportHeight / (targetRowHeight + gap))
+  // itemsPerRow = max(2, round(panelWidth / targetRowHeight))
+  // panelWidth 1200, targetRowHeight 200: itemsPerRow = round(6) = 6
+  // viewportHeight 720, gap 4: rowCount = ceil(720/204) = 4
+  // total = 24
+  const rows = estimateFirstScreenCount({
+    mode: 'rows',
+    panelWidth: 1200,
+    viewportHeight: 720,
+    gap: 4,
+    targetRowHeight: 200,
+  })
+  if (rows !== 24) fail('estimate/rows-basic', `expected 24, got ${rows}`)
+  else pass('estimate/rows-basic')
+
+  // Rows mode minimum: at least 2 items per row (the hard floor).
+  const rowsMin = estimateFirstScreenCount({
+    mode: 'rows',
+    panelWidth: 100,
+    viewportHeight: 10,
+    gap: 0,
+    targetRowHeight: 200,
+  })
+  if (rowsMin < 2) fail('estimate/rows-min', `expected >= 2, got ${rowsMin}`)
+  else pass('estimate/rows-min', `${rowsMin} tiles`)
+}
+
 // --- Main ---
 
 async function main(): Promise<void> {
@@ -313,6 +445,8 @@ async function main(): Promise<void> {
   checkCursorBatchEquivalence()
   checkPathological()
   checkAppendStability()
+  checkVisibleIndices()
+  checkEstimateFirstScreenCount()
   const scalingRows = checkScaling()
   const wallMs = performance.now() - t0
 
