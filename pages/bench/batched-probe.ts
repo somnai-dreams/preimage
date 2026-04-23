@@ -6,6 +6,7 @@ import {
   distribution,
   fmtBytes,
   saveRun,
+  wireUploadButton,
   type Distribution,
   type RunMetadata,
 } from './common.js'
@@ -15,6 +16,7 @@ const batchSizeInput = document.getElementById('batchSize') as HTMLInputElement
 const batchDelayInput = document.getElementById('batchDelay') as HTMLInputElement
 const runBtn = document.getElementById('run') as HTMLButtonElement
 const saveBtn = document.getElementById('save') as HTMLButtonElement
+const uploadBtn = document.getElementById('upload') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
 const statHost = document.getElementById('stat-host')!
 const jsonHost = document.getElementById('json-host')!
@@ -43,11 +45,13 @@ saveBtn.addEventListener('click', () => {
   if (lastRun === null) return
   saveRun(lastRun.meta, lastRun.params, lastRun.results)
 })
+wireUploadButton(uploadBtn, () => lastRun)
 
 async function run(): Promise<void> {
   runBtn.disabled = true
   runBtn.textContent = 'Running…'
   saveBtn.disabled = true
+  uploadBtn.disabled = true
   metaEl.textContent = ''
   statHost.innerHTML = ''
   jsonHost.innerHTML = ''
@@ -144,6 +148,7 @@ async function run(): Promise<void> {
   runBtn.disabled = false
   runBtn.textContent = 'Run again'
   saveBtn.disabled = false
+  uploadBtn.disabled = false
 }
 
 function renderStats(r: BenchResults, params: BenchParams): void {
