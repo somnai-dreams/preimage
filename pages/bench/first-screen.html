@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage bench · first screen</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../demos/demo-styles.css" />
+  <style>
+    .page { max-width: 1200px; }
+    .bench-controls { display: grid; grid-template-columns: auto 1fr; gap: 10px 14px; align-items: center; padding: 14px 16px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 16px; font-size: 13px; }
+    .bench-controls label { font-size: 12px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+    .bench-controls input { font: inherit; font-size: 13px; padding: 4px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); }
+    .bench-run { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .bench-run .meta { color: var(--text-muted); font-size: 12px; flex: 1; min-width: 200px; font-variant-numeric: tabular-nums; }
+    pre.bench-json { font: 12px/1.5 ui-monospace, 'SF Mono', Consolas, monospace; background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; overflow: auto; color: var(--text); max-height: 400px; }
+
+    table.fs { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+    table.fs th, table.fs td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+    table.fs th { color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; font-weight: 600; }
+    table.fs td:first-child, table.fs th:first-child { text-align: left; }
+    table.fs td.strategy { font-weight: 600; color: var(--accent); }
+    table.fs td.best { font-weight: 600; color: var(--accent); }
+    table.fs tr.running td { color: var(--text-soft); font-style: italic; }
+
+    .stages {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 10px;
+    }
+    .stage-panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      background: var(--surface);
+      min-height: 320px;
+    }
+    .stage-panel h3 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-soft);
+      font-weight: 600;
+    }
+    .stage-panel .tiles {
+      position: relative;
+      background: var(--surface-muted);
+      border-radius: var(--radius-sm);
+      min-height: 260px;
+    }
+    .stage-panel .tile {
+      position: absolute;
+      background: #e4e7eb;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    .stage-panel .tile.pending {
+      animation: tile-shimmer 1.3s ease-in-out infinite;
+    }
+    .stage-panel .tile img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      opacity: 0; transition: opacity 20ms linear;
+    }
+    .stage-panel .tile img.loaded { opacity: 1; }
+    .progress-msg { color: var(--text-muted); font-size: 13px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="../">preimage demos</a>
+    <a href="./">benchmarks</a>
+    <span class="spacer"></span>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page">
+    <header class="page-header">
+      <h1>First-screen strategies</h1>
+      <p>Four ways to paint the first viewport, run back-to-back against the same URLs with fresh cache-busts. Measures time-to-first-skeleton, time-to-all-skeletons, time-to-first-image, time-to-all-images, and bytes transferred. Runs serially so network contention doesn't skew the comparison between strategies.</p>
+    </header>
+
+    <div class="bench-controls">
+      <label>N tiles</label>
+      <input id="nInput" type="number" min="4" max="60" step="1" value="12" />
+
+      <label>Columns</label>
+      <input id="colsInput" type="number" min="2" max="6" step="1" value="3" />
+
+      <label>Network</label>
+      <input id="networkLabel" type="text" placeholder="e.g. home gigabit, phone tether 5g" />
+    </div>
+
+    <div class="bench-run">
+      <button id="run" class="primary">Run all four</button>
+      <button id="save" class="primary" disabled style="background: var(--surface); color: var(--text); border: 1px solid var(--border);">Save as JSON</button>
+      <span id="meta" class="meta"></span>
+    </div>
+
+    <div id="progress" class="progress-msg"></div>
+    <div id="table-host"></div>
+    <div class="stages" id="stages"></div>
+    <div id="json-host"></div>
+  </main>
+
+  <script type="module" src="./first-screen.ts"></script>
+</body>
+</html>
