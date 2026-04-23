@@ -41,20 +41,20 @@ type PendingEntry = {
   key: string
   src: string
   options: PrepareOptions
+  promise: Promise<PreparedImage>
   resolve: (value: PreparedImage) => void
   reject: (err: unknown) => void
-}
-
-type InflightEntry = {
-  promise: Promise<PreparedImage>
 }
 
 export class PrepareQueue {
   readonly concurrency: number
   private readonly pending: PendingEntry[] = []
   private readonly pendingByKey = new Map<string, PendingEntry>()
-  private readonly inflight = new Map<string, InflightEntry>()
-  private readonly shared = new Map<string, Promise<PreparedImage>>()
+  // Key → the outer promise callers hold. Used for dedup: a repeat
+  // enqueue for the same URL while work is running returns this same
+  // promise. Deleted in `start`'s finally so a post-resolution enqueue
+  // kicks off fresh work.
+  private readonly inflight = new Map<string, Promise<PreparedImage>>()
 
   constructor(options: PrepareQueueOptions = {}) {
     const c = options.concurrency ?? 50
@@ -68,15 +68,10 @@ export class PrepareQueue {
   // for the same URL reuses the in-flight work.
   enqueue(src: string, options: PrepareOptions = {}): Promise<PreparedImage> {
     const key = normalizeSrc(src)
-    const existingShared = this.shared.get(key)
-    if (existingShared !== undefined) return existingShared
+    const existingInflight = this.inflight.get(key)
+    if (existingInflight !== undefined) return existingInflight
     const existingPending = this.pendingByKey.get(key)
-    if (existingPending !== undefined) {
-      // Already pending — reuse the promise that was minted when it was
-      // first enqueued. The `shared` map holds that promise.
-      const shared = this.shared.get(key)
-      if (shared !== undefined) return shared
-    }
+    if (existingPending !== undefined) return existingPending.promise
 
     let resolveOuter!: (value: PreparedImage) => void
     let rejectOuter!: (err: unknown) => void
@@ -84,12 +79,12 @@ export class PrepareQueue {
       resolveOuter = resolve
       rejectOuter = reject
     })
-    this.shared.set(key, promise)
 
     const entry: PendingEntry = {
       key,
       src,
       options,
+      promise,
       resolve: resolveOuter,
       reject: rejectOuter,
     }
@@ -119,7 +114,6 @@ export class PrepareQueue {
   clear(): void {
     for (const entry of this.pending) {
       this.pendingByKey.delete(entry.key)
-      this.shared.delete(entry.key)
       entry.reject(new Error('preimage: prepare cancelled — queue cleared.'))
     }
     this.pending.length = 0
@@ -145,9 +139,8 @@ export class PrepareQueue {
   }
 
   private start(entry: PendingEntry): void {
-    const promise = prepare(entry.src, entry.options)
-    this.inflight.set(entry.key, { promise })
-    promise.then(
+    this.inflight.set(entry.key, entry.promise)
+    prepare(entry.src, entry.options).then(
       (value) => {
         entry.resolve(value)
       },
@@ -156,7 +149,6 @@ export class PrepareQueue {
       },
     ).finally(() => {
       this.inflight.delete(entry.key)
-      this.shared.delete(entry.key)
       this.drain()
     })
   }
