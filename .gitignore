@@ -7,3 +7,7 @@ dist-demos/
 .idea/
 *.log
 /.playwright-mcp
+
+# Raw HAR captures — run scripts/distill-har.ts and commit the
+# .distilled.json output instead (typically 1000× smaller).
+*.har
