@@ -78,7 +78,7 @@
 
   <header class="gallery-header">
     <h1>Instant masonry</h1>
-    <p>500 photos, layout committed at page load from a build-time manifest, DOM recycled as you scroll. No probe phase, no Run button, no skeletons flashing in. Just what a production gallery looks like when the client has dims before the first network request fires.</p>
+    <p>500 photos, probed live on page load — no build-time manifest, no Run button, no bench furniture. <code>prepare()</code> measures every URL at concurrency 50 with the auto strategy, skeletons appear as placements resolve, DOM recycles as you scroll. This is what the probe path feels like on a live site with zero prior knowledge of the image corpus.</p>
   </header>
 
   <main class="gallery">
