@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage bench · batched probe</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../demos/demo-styles.css" />
+  <style>
+    .page { max-width: 1200px; }
+
+    .bench-controls { display: grid; grid-template-columns: auto 1fr; gap: 10px 14px; align-items: center; padding: 14px 16px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 16px; font-size: 13px; }
+    .bench-controls label { font-size: 12px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+    .bench-controls input[type=number], .bench-controls input[type=text] { font: inherit; font-size: 13px; padding: 4px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); }
+    .bench-controls .choice-row { display: flex; gap: 14px; font-size: 13px; color: var(--text); letter-spacing: 0; text-transform: none; flex-wrap: wrap; }
+    .bench-run { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .bench-run .meta { color: var(--text-muted); font-size: 12px; flex: 1; min-width: 200px; font-variant-numeric: tabular-nums; }
+
+    pre.bench-json { font: 12px/1.5 ui-monospace, 'SF Mono', Consolas, monospace; background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; overflow: auto; color: var(--text); max-height: 400px; }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .stat-cell { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--surface); }
+    .stat-cell .label { font-size: 11px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat-cell .value { font-size: 16px; color: var(--text); font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .stat-cell .value .unit { font-size: 11px; color: var(--text-muted); margin-left: 3px; }
+    .stat-cell.good .value { color: #167535; }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="../">preimage demos</a>
+    <a href="./">benchmarks</a>
+    <span class="spacer"></span>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page">
+    <header class="page-header">
+      <h1>Batched probe</h1>
+      <p>Swing 2 spike. Coalesces N probe requests into a single <code>POST /preimage/probe</code> against the dev server, one RTT regardless of batch size. Compares directly against <code>strategy: 'auto'</code> (which resolves to <code>range</code> on this origin) over the same N-URL workload. Reports wall time, bytes on wire, per-probe distribution, and batch count.</p>
+      <p style="color: var(--text-muted); font-size: 13px;">This is the phase-1 direct client — no service worker yet. The consumer opts in via <code>configureBatchedProbe({ endpoint })</code> + <code>strategy: 'batched'</code>. Phase 3 would intercept normal image probes transparently via an SW; phase 4 binds the same wire to WebTransport for zero-RTT session reuse.</p>
+    </header>
+
+    <div class="bench-controls">
+      <label>N URLs</label>
+      <input id="nInput" type="number" min="50" max="5000" step="50" value="500" />
+
+      <label>Batch size</label>
+      <input id="batchSize" type="number" min="10" max="1000" step="10" value="100" />
+
+      <label>Batch delay (ms)</label>
+      <input id="batchDelay" type="number" min="0" max="100" step="1" value="8" />
+
+      <label>Strategy</label>
+      <div class="choice-row">
+        <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="strategy" value="batched" checked /> batched</label>
+        <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="strategy" value="auto" /> auto (baseline)</label>
+      </div>
+    </div>
+
+    <div class="bench-run">
+      <button id="run" class="primary">Run</button>
+      <button id="save" class="primary" disabled style="background: var(--surface); color: var(--text); border: 1px solid var(--border);">Save as JSON</button>
+      <button id="upload" class="primary" disabled style="background: var(--surface); color: var(--text); border: 1px solid var(--border);" title="Upload to the shared gist. Requires ?t=<token> on the URL once per device.">Upload</button>
+      <span id="meta" class="meta"></span>
+    </div>
+
+    <div id="stat-host"></div>
+    <div id="json-host"></div>
+  </main>
+
+  <script type="module" src="./batched-probe.ts"></script>
+</body>
+</html>
