@@ -17,6 +17,7 @@ import manifestHtml from './demos/manifest.html'
 import streamHtml from './demos/stream.html'
 import dropzoneHtml from './demos/dropzone.html'
 import chatHtml from './demos/chat.html'
+import instantHtml from './demos/instant.html'
 import benchIndexHtml from './bench/index.html'
 import benchProbeHtml from './bench/probe.html'
 import benchSweepHtml from './bench/sweep.html'
@@ -45,6 +46,7 @@ const server = serve({
     '/stream.html': streamHtml,
     '/dropzone.html': dropzoneHtml,
     '/chat.html': chatHtml,
+    '/instant.html': instantHtml,
     '/bench/': benchIndexHtml,
     '/bench/index.html': benchIndexHtml,
     '/bench/probe.html': benchProbeHtml,

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · instant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./demo-styles.css" />
+  <style>
+    /* A page with no demo furniture — no Run button, no stats panel,
+       no side-by-side comparison. Just the gallery, as it would
+       appear on a production site. */
+    body { margin: 0; background: var(--surface-muted); }
+
+    .gallery-header {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 48px 32px 16px;
+    }
+    .gallery-header h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      color: var(--text);
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .gallery-header p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 13px;
+      max-width: 60ch;
+      line-height: 1.5;
+    }
+
+    .gallery {
+      max-width: 1500px;
+      margin: 24px auto 0;
+      padding: 0 24px 80px;
+    }
+
+    .gallery-canvas {
+      position: relative;
+      width: 100%;
+    }
+
+    .vtile {
+      position: absolute;
+      overflow: hidden;
+      border-radius: 6px;
+      background: #d9dde1;
+      contain: layout paint;
+    }
+    .vtile img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      opacity: 0; transition: opacity 80ms linear;
+    }
+    .vtile img.loaded { opacity: 1; }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="./">preimage demos</a>
+    <a href="./masonry.html">Masonry</a>
+    <a href="./editorial.html">Editorial</a>
+    <a href="./ttfs.html">TTFS</a>
+    <a href="./decode-pool.html">Decode pool</a>
+    <a href="./scale.html">Scale</a>
+    <a href="./virtual.html">Virtual</a>
+    <a href="./manifest.html">Manifest</a>
+    <a href="./stream.html">Stream</a>
+    <a href="./dropzone.html">Drop zone</a>
+    <a href="./chat.html">Chat</a>
+    <a href="./sidecar.html">Sidecar</a>
+    <a href="./instant.html" aria-current="page">Instant</a>
+    <span class="spacer"></span>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <header class="gallery-header">
+    <h1>Instant masonry</h1>
+    <p>500 photos, layout committed at page load from a build-time manifest, DOM recycled as you scroll. No probe phase, no Run button, no skeletons flashing in. Just what a production gallery looks like when the client has dims before the first network request fires.</p>
+  </header>
+
+  <main class="gallery">
+    <div id="canvas" class="gallery-canvas"></div>
+  </main>
+
+  <script type="module" src="./instant.ts"></script>
+</body>
+</html>
