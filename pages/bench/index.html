@@ -60,6 +60,10 @@
           <h3>Virtual-scroll synthetic</h3>
           <p>Packs N tiles, then scripts a constant-velocity scroll from top to bottom while sampling every rAF. Reports frame-time distribution, dropped frames, active tile count, mount/unmount churn. Regressions in <code>createVirtualTilePool</code> surface here: rising frame times, or active-tile-count drift away from the overscan band, both fail this bench loudly.</p>
         </a>
+        <a class="bench-card" href="./loading-pattern.html">
+          <h3>Loading patterns</h3>
+          <p>Runs the same gallery workload under <code>streamed</code>, <code>skeleton-first</code>, <code>manifest-hydrated</code>, and <code>throttled</code>. Times the phase milestones (first-placement, all-placements, first-image, pattern-done) and byte counts so the sequencing trade-offs are directly comparable. Drives the same <code>@somnai-dreams/preimage/loading</code> module the live demos compose with.</p>
+        </a>
       </div>
     </section>
 

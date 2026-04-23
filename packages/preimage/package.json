@@ -51,6 +51,11 @@
       "import": "./dist/virtual.js",
       "default": "./dist/virtual.js"
     },
+    "./loading": {
+      "types": "./dist/loading.d.ts",
+      "import": "./dist/loading.js",
+      "default": "./dist/loading.js"
+    },
     "./package.json": "./package.json"
   },
   "bin": {
