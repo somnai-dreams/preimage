@@ -219,8 +219,18 @@ function probeSvg(bytes: Uint8Array): ProbedDimensions | null {
   }
   if (!found) return null
   const text = new TextDecoder().decode(bytes.subarray(0, head))
-  const widthMatch = text.match(/<svg\b[^>"']*\swidth=["']?([0-9.]+)(?:px)?["']?/i)
-  const heightMatch = text.match(/<svg\b[^>"']*\sheight=["']?([0-9.]+)(?:px)?["']?/i)
+  // Isolate the `<svg ...>` opening tag's attributes so the per-
+  // attribute regexes can freely match quoted values that appear
+  // before the one they care about. The old pattern — greedy
+  // `[^>"']*` inside each regex — failed when a quoted width
+  // attribute sat before height, because it couldn't skip past the
+  // `"` character.
+  const tagMatch = text.match(/<svg\b([^>]*)>/i)
+  if (tagMatch === null) return null
+  const attrs = tagMatch[1]!
+
+  const widthMatch = attrs.match(/\swidth\s*=\s*["']?([0-9.]+)(?:px)?["']?/i)
+  const heightMatch = attrs.match(/\sheight\s*=\s*["']?([0-9.]+)(?:px)?["']?/i)
   if (widthMatch !== null && heightMatch !== null) {
     const w = Number(widthMatch[1])
     const h = Number(heightMatch[1])
@@ -228,8 +238,8 @@ function probeSvg(bytes: Uint8Array): ProbedDimensions | null {
       return { width: w, height: h, format: 'svg', hasAlpha: true, isProgressive: false }
     }
   }
-  const viewBoxMatch = text.match(
-    /<svg\b[^>"']*\sviewBox=["']\s*[-0-9.]+\s+[-0-9.]+\s+([0-9.]+)\s+([0-9.]+)\s*["']/i,
+  const viewBoxMatch = attrs.match(
+    /\sviewBox\s*=\s*["']\s*[-0-9.]+\s+[-0-9.]+\s+([0-9.]+)\s+([0-9.]+)\s*["']/i,
   )
   if (viewBoxMatch !== null) {
     const w = Number(viewBoxMatch[1])
