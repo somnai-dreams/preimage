@@ -1,9 +1,16 @@
 # Changelog
 
+## 0.11.0
+
+- **New `strategy: 'batched'`** on `prepare()`. Coalesces pending probes into a single `POST /preimage/probe` against a preimage-aware origin — one RTT regardless of batch size, one binary request, one binary response. Caller opts in by calling `configureBatchedProbe({ endpoint })` once, then passing `strategy: 'batched'` to `prepare()` or `PrepareQueue.enqueue()`. Falls through to `'range'` if no client is configured or the batch returns a non-ok status, so the caller always gets dims. Explicit-only; doesn't pollute auto's per-origin discovery cache.
+- **New subpath `@somnai-dreams/preimage/batched-probe`** — exports the wire format (`encodeBatchedRequest`, `decodeBatchedResponse`, etc.) so server-side implementers can ship endpoints in Bun, Node, Cloudflare Workers, or anywhere else. `BatchedProbeClient` class exposed directly for advanced callers; `configureBatchedProbe()` is the session-singleton wrapper for simple use.
+- Phase 1 of the Swing 2 proposal (PR #3). Phase 2 would intercept image-probe fetches transparently via a service worker; phase 3 binds the same wire to WebTransport for zero-RTT session reuse across navigations.
+
 ## 0.10.1
 
 - **Fix: SVG dimension parsing when `width` / `height` are not the first attribute.** Both `probeImageBytes` and `measureFromSvgText` used a regex prefix `[^>"']*` that couldn't skip across quoted attribute values. Effect: `<svg xmlns="..." width="240" height="180">` and `<svg width="240" height="180" xmlns="...">` both failed to find `height` because the regex engine couldn't cross the earlier `"` character. Fix isolates the opening `<svg ...>` tag first, then runs per-attribute regexes over just the attribute block. Caught by `scripts/parser-robustness-test.ts`.
 - **Fix: URL-dimension vendor parsers now validate dims when called directly.** `cloudinaryParser`, `shopifyParser`, `picsumParser`, and `queryParamDimensionParser` all returned objects like `{ width: 0, height: 100 }` or `{ width: 500, height: -100 }` when URLs encoded invalid values — the `parseUrlDimensions` dispatcher filtered them via `isValidDims`, but consumers calling exported parsers standalone saw garbage. Each parser now validates before returning. Caught by `scripts/url-pattern-corpus.ts`, a 38-case corpus covering real-world URL shapes per vendor.
+- **Fix: explicit strategy selection no longer poisons `'auto'`'s origin cache.** Previously, picking `'stream'` (or any explicit strategy) wrote the result to the per-origin discovery cache; switching back to `'auto'` would then silently inherit the manual choice instead of rediscovering from scratch. `resolveStrategy` now tracks whether its result came from auto vs explicit; only auto-originated probes record their outcome.
 
 ## 0.10.0
 

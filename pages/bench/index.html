@@ -60,6 +60,10 @@
           <h3>Virtual-scroll synthetic</h3>
           <p>Packs N tiles, then scripts a constant-velocity scroll from top to bottom while sampling every rAF. Reports frame-time distribution, dropped frames, active tile count, mount/unmount churn. Regressions in <code>createVirtualTilePool</code> surface here: rising frame times, or active-tile-count drift away from the overscan band, both fail this bench loudly.</p>
         </a>
+        <a class="bench-card" href="./batched-probe.html">
+          <h3>Batched probe</h3>
+          <p>Swing 2 spike. <code>strategy: 'batched'</code> coalesces N probes into a single <code>POST /preimage/probe</code> against a preimage-aware origin (dev server ships the reference impl). Compares directly against <code>strategy: 'auto'</code> over the same N-URL workload — wall time, bytes on wire, HTTP request count, per-probe latency distribution.</p>
+        </a>
       </div>
     </section>
 

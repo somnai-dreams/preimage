@@ -25,6 +25,10 @@ import {
   type MeasureOptions,
 } from './measurement.js'
 import { MAX_HEADER_BYTES, probeImageBytes, probeImageStream, type ProbedDimensions } from './probe.js'
+import {
+  getActiveBatchedProbeClient,
+  type BatchedProbeRecord,
+} from './batched-probe.js'
 import { parseUrlDimensions } from './url-dimensions.js'
 
 // --- Prepared handle ---
@@ -171,7 +175,7 @@ export type PrepareOptions = MeasureOptions & {
    *  expected), `'img'` otherwise (caller likely wants to reuse
    *  `prepared.element` for render). Blob sources ignore this entirely;
    *  they always byte-probe directly. */
-  strategy?: 'img' | 'stream' | 'range' | 'auto'
+  strategy?: 'img' | 'stream' | 'range' | 'auto' | 'batched'
   /** Number of bytes to request when `strategy: 'range'`. Defaults to
    *  4096 — comfortably past any supported header parser's max. */
   rangeBytes?: number
@@ -281,7 +285,7 @@ export function getElement(prepared: PreparedImage): HTMLImageElement | null {
 
 // --- URL path dispatch ---
 
-type ConcreteStrategy = 'img' | 'stream' | 'range'
+type ConcreteStrategy = 'img' | 'stream' | 'range' | 'batched'
 
 // Per-origin strategy memory. First probe against a new origin tries
 // 'range'; the result records which strategy the server actually
@@ -335,7 +339,9 @@ function resolveStrategy(
   options: PrepareOptions,
 ): { strategy: ConcreteStrategy; fromAuto: boolean } {
   const s = options.strategy
-  if (s === 'img' || s === 'stream' || s === 'range') return { strategy: s, fromAuto: false }
+  if (s === 'img' || s === 'stream' || s === 'range' || s === 'batched') {
+    return { strategy: s, fromAuto: false }
+  }
   if (s !== 'auto' && options.dimsOnly !== true) return { strategy: 'img', fromAuto: false }
   const origin = originOf(src)
   if (origin !== null) {
@@ -361,9 +367,51 @@ async function prepareFromUrl(src: string, options: PrepareOptions): Promise<Pre
   }
 
   const { strategy, fromAuto } = resolveStrategy(src, options)
+  if (strategy === 'batched') return await prepareFromUrlBatched(src, key, options)
   if (strategy === 'range') return await prepareFromUrlRange(src, key, options, fromAuto)
   if (strategy === 'stream') return await prepareFromUrlStream(src, key, options, fromAuto)
   return await prepareFromUrlImg(src, key, options)
+}
+
+// --- URL path: batched probe ---
+//
+// Routes through the module-level BatchedProbeClient configured via
+// `configureBatchedProbe()`. If no client is configured or the batch
+// returns a non-ok status, falls through to the range path so the
+// caller always gets dims.
+
+async function prepareFromUrlBatched(
+  src: string,
+  key: string,
+  options: PrepareOptions,
+): Promise<PreparedImage> {
+  const client = getActiveBatchedProbeClient()
+  if (client === null) {
+    // No batched endpoint configured — fall through. Not a loud
+    // error because this lets callers ship `strategy: 'batched'`
+    // optimistically and have it degrade to `range` on origins that
+    // don't speak the protocol.
+    return await prepareFromUrlRange(src, key, options, false)
+  }
+  let record: BatchedProbeRecord
+  try {
+    record = await client.probe(src)
+  } catch {
+    return await prepareFromUrlRange(src, key, options, false)
+  }
+  if (record.status !== 'ok') {
+    return await prepareFromUrlRange(src, key, options, false)
+  }
+  // Deliberately don't write to originStrategyCache: 'batched' is only
+  // reachable via explicit strategy selection, and explicit selections
+  // shouldn't pollute auto's per-origin discovery.
+  const measurement = recordKnownMeasurement(key, record.width, record.height, {
+    orientation: options.orientation ?? 1,
+    byteLength: record.byteLength,
+    hasAlpha: record.hasAlpha,
+    isProgressive: record.isProgressive,
+  })
+  return wrap(measurement, null, 'network')
 }
 
 // --- URL path: HTTP Range request ---
