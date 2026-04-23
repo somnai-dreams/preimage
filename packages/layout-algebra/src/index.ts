@@ -97,13 +97,12 @@ export function shortestColumnCursor(config: ShortestColumnConfig): PackingCurso
     totalHeight(): number {
       // The last gap is spurious — subtract it so the container
       // sizes to the actual bottom of the last tile in each column.
-      const maxStackHeight = Math.max(...heights)
-      return Math.max(0, maxStackHeight - gap)
+      return Math.max(0, Math.max(...heights) - gap)
     },
     snapshot(): { placements: Placement[]; totalHeight: number } {
       return {
         placements: placements.slice(),
-        totalHeight: Math.max(0, Math.max(...heights) - gap),
+        totalHeight: this.totalHeight(),
       }
     },
     count(): number {
@@ -241,6 +240,8 @@ function placeJustifiedRow(
   justify: boolean,
 ): number {
   const count = end - start
+  // `count - 1` gaps between `count` tiles (gaps are interior-only —
+  // no leading or trailing gap to include).
   const totalGap = gap * Math.max(0, count - 1)
   const widthAtTarget = sumWidthsAtTarget(aspects, start, end, targetH)
   const availWidth = panelWidth - totalGap
