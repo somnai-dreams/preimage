@@ -50,15 +50,42 @@ export type PreparedImage = {
    *  fully-loaded time. Reuse this for rendering to avoid a second
    *  network fetch. */
   readonly element: HTMLImageElement | null
+  /** Where the dimensions came from. Lets callers vary UI on the
+   *  difference between "dims needed a round-trip" (`'network'`) and
+   *  "dims were already in hand" (everything else) — e.g. skip the
+   *  skeleton shimmer on cache/manifest hits, fade in only on network
+   *  resolves. */
+  readonly source: PreparedSource
   /** Full measurement record (natural dims, orientation, analysis,
    *  blobUrl). Use this when you need fields beyond the common
    *  `.width` / `.height` / `.aspectRatio` triple. */
   readonly measurement: ImageMeasurement
 }
 
+/** Provenance of a `PreparedImage`. Every `prepare()` / `prepareSync()`
+ *  resolution tags itself so callers can branch behavior on it without
+ *  tracking state outside the library. */
+export type PreparedSource =
+  /** Library probed the URL just now (img/stream/range path). */
+  | 'network'
+  /** `peekImageMeasurement` returned an existing entry — a prior
+   *  `prepare()` in this session already measured this URL. */
+  | 'cache'
+  /** `parseUrlDimensions` found dims in the URL itself (Cloudinary /
+   *  picsum / Shopify-style size params). */
+  | 'url-pattern'
+  /** `prepareSync(src, w, h)` — caller supplied dims at call time. */
+  | 'declared'
+  /** `preparedFromMeasurement(m, 'manifest')` — caller hydrated the
+   *  measurement cache from a build-time manifest. */
+  | 'manifest'
+  /** `prepare(Blob)` byte-probe or its `<img>` fallback. */
+  | 'blob'
+
 function wrap(
   measurement: ImageMeasurement,
-  element: HTMLImageElement | null = null,
+  element: HTMLImageElement | null,
+  source: PreparedSource,
 ): PreparedImage {
   return {
     width: measurement.displayWidth,
@@ -66,15 +93,25 @@ function wrap(
     aspectRatio: measurement.aspectRatio,
     src: measurement.src,
     element,
+    source,
     measurement,
   }
 }
 
 /** Mint a `PreparedImage` from a measurement obtained through a
- *  different code path (e.g. an adjacent module's probe). Exposed for
- *  library integrators; most callers should use `prepare()` instead. */
-export function preparedFromMeasurement(measurement: ImageMeasurement): PreparedImage {
-  return wrap(measurement, null)
+ *  different code path (e.g. an adjacent module's probe, or a manifest
+ *  the caller hydrated via `recordKnownMeasurement`). Exposed for
+ *  library integrators; most callers should use `prepare()` instead.
+ *
+ *  `source` tags the provenance; defaults to `'cache'` since by the
+ *  time this function runs the measurement is already in the cache.
+ *  Callers hydrating from a build-time manifest should pass
+ *  `'manifest'` so downstream rendering code can branch on it. */
+export function preparedFromMeasurement(
+  measurement: ImageMeasurement,
+  source: PreparedSource = 'cache',
+): PreparedImage {
+  return wrap(measurement, null, source)
 }
 
 // --- Public types ---
@@ -160,7 +197,7 @@ export function prepareSync(
   height: number,
   options: { orientation?: OrientationCode } = {},
 ): PreparedImage {
-  return wrap(recordKnownMeasurement(src, width, height, options), null)
+  return wrap(recordKnownMeasurement(src, width, height, options), null, 'declared')
 }
 
 /** Fit a `PreparedImage` into a max-width and optional max-height box.
@@ -222,7 +259,7 @@ export function getElement(prepared: PreparedImage): HTMLImageElement | null {
 async function prepareFromUrl(src: string, options: PrepareOptions): Promise<PreparedImage> {
   const key = normalizeSrc(src)
   const cached = peekImageMeasurement(key)
-  if (cached !== null) return wrap(cached, null)
+  if (cached !== null) return wrap(cached, null, 'cache')
 
   // URL-pattern shortcut: Cloudinary, Shopify, picsum, Unsplash etc all
   // encode dimensions in the URL. String-parse → zero network.
@@ -231,7 +268,7 @@ async function prepareFromUrl(src: string, options: PrepareOptions): Promise<Pre
     const measurement = recordKnownMeasurement(key, urlDims.width, urlDims.height, {
       orientation: options.orientation ?? 1,
     })
-    return wrap(measurement, null)
+    return wrap(measurement, null, 'url-pattern')
   }
 
   if (options.strategy === 'range') {
@@ -299,7 +336,7 @@ async function prepareFromUrlRange(
   const measurement = recordKnownMeasurement(key, probed.width, probed.height, {
     orientation: options.orientation ?? 1,
   })
-  return wrap(measurement, null)
+  return wrap(measurement, null, 'network')
 }
 
 // --- URL path: fetch + probeImageStream ---
@@ -380,7 +417,7 @@ async function consumeStreamForDims(
   const measurement = recordKnownMeasurement(key, dims.width, dims.height, {
     orientation: options.orientation ?? 1,
   })
-  return wrap(measurement, null)
+  return wrap(measurement, null, 'network')
 }
 
 // --- URL path: <img> + poll naturalWidth ---
@@ -427,7 +464,7 @@ async function prepareFromUrlImg(
   const measurement = recordKnownMeasurement(key, dims.width, dims.height, {
     orientation: options.orientation ?? 1,
   })
-  return wrap(measurement, options.dimsOnly === true ? null : img)
+  return wrap(measurement, options.dimsOnly === true ? null : img, 'network')
 }
 
 function pollForNaturalSize(
@@ -478,14 +515,14 @@ async function prepareFromBlob(blob: Blob, options: PrepareOptions): Promise<Pre
       orientation: options.orientation ?? 1,
     })
     measurement.blobUrl = url
-    return wrap(measurement, null)
+    return wrap(measurement, null, 'blob')
   }
 
   // Header didn't match any parser — probably AVIF/HEIC/unknown. Fall
   // back to loading the blob URL in an <img> and polling.
   const measurement = await fallbackFromBlobUrl(url, options)
   measurement.blobUrl = url
-  return wrap(measurement, null)
+  return wrap(measurement, null, 'blob')
 }
 
 async function fallbackFromBlobUrl(

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0
+
+- **`PreparedImage.source`** — every `prepare()` / `prepareSync()` handle now carries a `source: PreparedSource` tag: `'network' | 'cache' | 'url-pattern' | 'declared' | 'manifest' | 'blob'`. Lets callers branch UI on provenance without tracking state outside the library — skip the skeleton shimmer on cache/manifest hits, fade in only when `source === 'network'`. `preparedFromMeasurement(m, 'manifest')` is the integrator path: hydrate the measurement cache via `recordKnownMeasurement` at boot, then mint prepared handles tagged as manifest-sourced so the render layer can treat them as dims-known-at-load.
+
 ## 0.9.0
 
 - **New `strategy: 'range'` option on `prepare()`.** Sends `Range: bytes=0-4095` with the fetch and parses the 206 Partial Content response directly — no abort dance, no race between "header parsed" and "server noticed." Most deterministic of the three strategies. Falls back silently to the `'stream'` consume-and-abort path when the server answers with 200 (no Range support). Tuneable via `rangeBytes` (default 4096). Best fit for node/CLI workflows scanning many URLs against a CDN; browser callers rendering via `prepared.element` should stick with `'img'`.

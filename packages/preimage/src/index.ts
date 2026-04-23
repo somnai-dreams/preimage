@@ -13,6 +13,7 @@ export {
   getElement,
   preparedFromMeasurement,
   type PreparedImage,
+  type PreparedSource,
   type PrepareOptions,
 } from './prepare.js'
 
