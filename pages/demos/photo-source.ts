@@ -27,8 +27,13 @@ export const PHOTO_COUNT = PHOTOS.length
 // and under a GitHub Pages project path
 // (https://user.github.io/preimage/masonry.html → ./assets/... →
 // https://user.github.io/preimage/assets/...).
-export function photoUrl(p: Photo, cacheBust: string | null): string {
-  const base = `./assets/demos/photos/${p.file}`
+//
+// `assetsBase` is the relative prefix to the `pages/` root from the
+// caller. Demos at `pages/demos/*.html` use the default `'./'`;
+// pages one level deeper (e.g. `pages/bench/probe.html`) pass
+// `'../'` so `./assets/...` doesn't end up rooted at `/bench/`.
+export function photoUrl(p: Photo, cacheBust: string | null, assetsBase = './'): string {
+  const base = `${assetsBase}assets/demos/photos/${p.file}`
   return cacheBust === null ? base : `${base}?v=${cacheBust}`
 }
 
@@ -50,15 +55,12 @@ export function takePhotos(count: number): Photo[] {
 // per-slot cache-bust token. Each returned URL is unique from the
 // browser's perspective (and from our server's) so HTTP cache can't
 // collapse them, even though the underlying bytes repeat. Used by
-// the scale demo.
-export function cycledUrls(count: number, baseToken: string): string[] {
+// the scale demo. `assetsBase` works the same way as in `photoUrl`.
+export function cycledUrls(count: number, baseToken: string, assetsBase = './'): string[] {
   const out: string[] = []
   for (let i = 0; i < count; i++) {
     const photo = PHOTOS[i % PHOTOS.length]!
-    // Relative — matches photoUrl() so the demos work both under our
-    // dev server and under a GitHub Pages project path
-    // (https://user.github.io/preimage/...).
-    const base = `./assets/demos/photos/${photo.file}`
+    const base = `${assetsBase}assets/demos/photos/${photo.file}`
     out.push(`${base}?v=${baseToken}-${i}`)
   }
   return out
