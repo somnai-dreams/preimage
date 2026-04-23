@@ -1,6 +1,8 @@
 # Swing 3 — Ship VAE latents, not images
 
 > Status: research. Draft PR against `main`. Not merged, probably months of work, non-trivial probability of not panning out. Worth trying.
+>
+> **A 2-3 day phase-0 feasibility spike gates everything below.** See "Reality check" and "Phase 0 — go/no-go gate" sections. Do the spike before committing any of the projected scope.
 
 ## Problem
 
@@ -17,7 +19,7 @@ Separately, images on the wire are fat. A typical photography portfolio JPEG is 
 
 ## Proposal
 
-Encode each image server-side to a **small latent representation** using a VAE (variational autoencoder). Ship the latent (~4 KB) in the manifest. Client decodes the latent via **WebGPU inference** to get a full-resolution, color-accurate, recognisable approximation of the real image. Paint that as first paint. When the real image bytes arrive over the normal path, replace the latent-decoded version with the crisp one — if the latent reconstruction is faithful enough, the user may not consciously notice the swap.
+Encode each image server-side to a **small latent representation** using a VAE (variational autoencoder). Ship the latent (~4-8 KB for a 256×256 thumbnail, ~16 KB for 512×512) in the manifest. Client decodes the latent via **WebGPU inference** to get a color-accurate, recognisable approximation of the real image. Paint that as first paint. When the real image bytes arrive over the normal path, replace the latent-decoded version with the crisp one — if the latent reconstruction is faithful enough, the user may not consciously notice the swap.
 
 This isn't a blur placeholder that happens to be colorful. **It is a low-rank image compression scheme** whose decoder happens to be a small neural network.
 
@@ -30,9 +32,11 @@ This isn't a blur placeholder that happens to be colorful. **It is a low-rank im
 
 ### Why it works
 
-A typical Stable Diffusion VAE reduces a 512×512×3 image (786 KB) to a 64×64×4 latent tensor (~16 KB). Quantizing the latent tensor from float32 to int8 drops that to ~4 KB. The decoder reverses this: tensor → image. Reconstruction loss is the squared-error between the decoded image and the original. Published SD-VAE reconstructions are faithful enough that most viewers can't distinguish decoded-from-latent vs original at thumbnail sizes, and the errors they do contain are in high-frequency texture — exactly the stuff that's invisible while an image is loading.
+A typical Stable Diffusion VAE (SD-VAE-f8) reduces a 512×512×3 image (786 KB raw) to a 64×64×4 latent tensor. Raw float32 that's 64 KB; quantized to int8 it's **16 KB**. To fit a 4 KB budget you run at 256×256 input → 32×32×4 latent → ~4 KB at int8. That's the tradeoff — tighter byte budget means smaller decoded resolution.
 
-**"First paint" flips from a colored blur to a full-resolution image that's within 2-3 dB PSNR of the real thing.** That's the paradigm shift.
+Published SD-VAE reconstructions at 256×256, int8-quantized: **25-28 dB PSNR, LPIPS ~0.1-0.15**. Soft but recognizable. The errors tend to sit in high-frequency texture and crisp edges (logos, text, line art look melty); smooth photographic content reconstructs well. Scales to larger display sizes with additional softness; 1920px hero images are a stretch without a super-resolution head.
+
+**"First paint" flips from a colored blur to a recognizable photographic image.** That's the paradigm shift — when it works. For text-heavy or UI-heavy content it doesn't work, and the fallback has to kick in.
 
 ## How the pieces fit
 
@@ -95,15 +99,49 @@ img.onload = () => {
 
 Clean composition with Swing 1: the `.prei` container could carry latent bytes in its reserved block, making latent + image + dims a single fetch.
 
-## Adoption path
+## Reality check
 
-1. **Phase 0** — literature review + model choice. Pick SD-VAE-f8 (from Stable Diffusion 1.5/2.1) as baseline. Benchmark reconstruction quality at 256×256 output on a 100-image test corpus.
-2. **Phase 1** — offline prototype. Node script: encode 100 images to latents, decode on a single-page WebGPU demo. Measure: latent bytes, decode latency, PSNR vs original, subjective "would I notice the swap" on N observers.
-3. **Phase 2** — integration. `preimage-latent` CLI, `@somnai-dreams/preimage/latent` client module. Demo page showing gallery-of-latents vs gallery-of-thumbhashes vs gallery-of-skeletons, side by side.
-4. **Phase 3** — mobile GPU feasibility. Measure decode latency on mid-range phones (Pixel 6, iPhone 13). Quality knob: is the decoder too heavy on mobile? Drop to a smaller custom VAE if so.
-5. **Phase 4** — custom-trained small VAE. Train a 4-channel VAE with a compression loss optimizing for 4 KB budget. Publish weights, ship with the library. This is the ambitious version.
+The original version of this proposal oversold. Calibrated numbers:
 
-Phase 1 is the gate: if decode latency at 256×256 is >50 ms on a typical laptop GPU, abandon. If quality is worse than a base64-JPEG LQIP at the same byte budget, abandon. If either hurdle is cleared, push to phase 2.
+| Claim | Reality |
+|---|---|
+| "~4 KB per latent" | 4 KB at 256×256 input, **16 KB at 512×512**. Tighter budget = smaller decoded resolution. |
+| "<5 ms WebGPU decode" | **20-100 ms** on a mid-range laptop GPU, **50-150 ms on mobile GPUs**. First decode adds WebGPU warmup. |
+| "75× smaller than JPEG" | True vs a 400 KB hero JPEG. Only **10-20× smaller** vs the responsive 40-100 KB thumbnail a real site ships. |
+| "20 MB model cached across all sites" | Cross-origin cache partitioning in modern browsers means **every origin pays its own 25 MB first-load**. Not amortized. |
+| "Full-resolution first paint" | 256×256 is thumbnail-fit. Hero images need tile-decode or a super-resolution head. |
+| "Recognisable as the real image" | Yes for photographic content. **Falls apart on text, logos, UI, line art** (VAE makes them melty). Fallback required. |
+| "Weeks to months of work" | Phases 0-2 on pretrained SD-VAE: **2-3 person-months**. Phase 4b from-scratch training: **6-12 months**. |
+
+The hard gate is subjective quality. A latent→real swap that users find jarring kills the premise — you've spent months to ship something worse than a skeleton. Nobody has shipped this in production for general web images; it's research territory, not "apply known technique."
+
+WebGPU coverage is another real constraint. Safari <17.4 and older Android have no WebGPU, so the library needs a thumbhash fallback anyway, which partially defeats the point.
+
+## Phase 0 — go/no-go gate
+
+Before any of the phased scope below, spend **2-3 days** answering one question: *is off-the-shelf SD-VAE at browser-decode speeds producing imagery that's better than thumbhash at the same byte budget, on a real gallery corpus?*
+
+**Spike deliverable:**
+- Pull SD-VAE-f8 weights (public, MIT-licensed, Hugging Face).
+- Export the decoder to ONNX, wire it through `onnxruntime-web` or a hand-written WebGPU shader — whichever lands faster.
+- Encode 20 photos from `pages/assets/demos/photos` at 256×256 to int8 latents via an offline Python script.
+- Render a single-page demo: latent-decoded version side-by-side with thumbhash at equal byte budget, side-by-side with the real image.
+- Measure decode latency on one desktop browser + one mobile browser with WebGPU available.
+
+**Gate criteria (all three must pass to proceed):**
+
+1. **Subjective A/B.** Show the demo to 5+ people (ideally a mix of technical and non-technical). More than half must rate the latent-decoded version as "better placeholder" than thumbhash. If it's a coin-flip or worse, kill it.
+2. **Decode latency.** Desktop: <100 ms single-image, <400 ms for a batch of 8. Mobile: <500 ms single-image (looser bound; mobile is the weak link). If it's multiples worse, kill it.
+3. **Content coverage.** Test corpus must include at least one text-heavy image, one logo/UI, and one product photo. If the latent reconstruction visibly corrupts non-photo content more than a skeleton would, document which content types need the thumbhash fallback and whether that fallback rate makes the feature worth shipping at all.
+
+**If any gate fails, update this PR with the measurements and close it.** A bad gate result is a successful spike — the cost of learning is 2-3 days, not 2-3 months.
+
+## Adoption path (gated on Phase 0 passing)
+
+1. **Phase 1 — ship with SD-VAE off-the-shelf.** No ML work. Node-side encoder via ONNX runtime + WebGPU decoder + `@somnai-dreams/preimage/latent` subpath + manifest extension + thumbhash fallback for non-WebGPU browsers and non-photographic content. Demo page with A/B harness. **2-3 person-months.**
+2. **Phase 2 — mobile hardening.** Measure decode latency on Pixel 6, iPhone 13, mid-range Android. Batch-decode in a worker, prioritize visible tiles, lazy-decode below the fold. Drop the 25 MB model to an int4-quantized 12 MB version if mobile decode is too slow. **+3-4 weeks.**
+3. **Phase 4a — distilled small VAE (the realistic custom-model path).** Use SD-VAE as a frozen teacher; train a student decoder 3-10× smaller on ~100k images. Student preserves quality within ~1-2 dB PSNR with much faster decode. **+1-2 months engineering, ~$5k compute.** Most projects stop here.
+4. **Phase 4b — from-scratch rate-distortion-optimized VAE.** Only justified if phase 4a can't hit the quality or size targets for a specific use case. ~6-12 months with 1 ML engineer, **$25-300k in compute** across 5-20 training runs. This is the research lab version.
 
 ## Open questions
 
@@ -117,34 +155,39 @@ Phase 1 is the gate: if decode latency at 256×256 is >50 ms on a typical laptop
 - **Decode order in a grid.** 5000 tiles can't all decode simultaneously. Batch N tiles per shader dispatch; decode lazily based on viewport visibility. Same logic as virtual scroll; the latent decode IS the first paint, so it should prioritize visible tiles first.
 - **Compose with animation.** Still frames only for v1. Animated images (GIF, animated WebP) would need temporal extension.
 
-## Expected impact
+## Expected impact (if Phase 0 passes)
 
-- **First paint** goes from "colored blur" to "recognizable image at 2-3 dB below original." For galleries, this is a massive perceptual win; the page feels instant-and-correct rather than instant-and-empty.
-- **Bytes on the wire**: per-image latent is 4 KB vs a typical 300 KB JPEG (75× less). If the real image is never needed (thumbnail-only gallery), latents become the sole delivery, and the site is 75× lighter.
-- **Decode compute**: shifts from zero (browser native JPEG decode) to ~5 ms per image via WebGPU. Good on desktop, TBD on mobile.
-- **New capabilities fall out for free**:
-  - Super-resolution: run the decoder at 2x, 4x resolution for crisp zoom. No source bytes needed.
-  - Aspect re-cropping: sample the latent differently for 16:9 vs 1:1 without re-fetching.
-  - Style interpolation: `lerp(latentA, latentB, 0.5)` gives a blended image. Design system transitions become natural.
-  - Content-aware compression: latent preserves semantic content even under aggressive quantization.
+- **First paint** goes from "colored blur" to "recognizable photographic image at 25-28 dB PSNR." For photo-heavy galleries, perceptual win is real. For mixed content (text, UI, diagrams), less so — those fall back to thumbhash.
+- **Bytes on the wire**: 4 KB latent at 256×256 vs a typical 40-100 KB responsive thumbnail → **10-20× smaller**. Against a 400 KB hero JPEG it's ~75× smaller, but real sites don't ship hero-sized images for thumbnail slots anyway.
+- **Decode compute**: 20-100 ms per image on desktop via WebGPU, 50-150 ms on mobile. Requires lazy/batched decode for galleries above ~50 tiles.
+- **Model download**: 25 MB one-time per origin (cache-partitioned). Measurable cost on first visit; free thereafter for that origin.
+- **New capabilities fall out for free** (speculative until Phase 2):
+  - Super-resolution: decode at 2×, 4× for crisp zoom without re-fetching.
+  - Aspect re-cropping: sample the latent differently for 16:9 vs 1:1.
+  - Style interpolation: `lerp(latentA, latentB, 0.5)` gives a blended image. Design system transitions.
+  - Content-aware compression: latent preserves semantic content under aggressive quantization.
 
 ## Size estimate
 
-- Encoder CLI + Node VAE inference: ~400 LoC + model weights.
-- WebGPU decoder + shader: ~800 LoC (shader authoring dominates).
-- Manifest shape extension + SDK integration: ~100 LoC.
-- Demo + benchmarks + A/B harness: ~300 LoC.
-- Research notebooks (offline, not in-tree): ~1k LoC Python.
+- **Phase 0 spike** (2-3 days, throwaway code): ~200 LoC Python + ~300 LoC single-page WebGPU demo. Not merged.
+- **Phase 1** (2-3 person-months if Phase 0 passes):
+  - Encoder CLI + Node ONNX runtime inference: ~400 LoC + model weights download step.
+  - WebGPU decoder + shader: ~800 LoC (shader authoring dominates).
+  - `@somnai-dreams/preimage/latent` subpath + manifest extension + thumbhash fallback glue: ~200 LoC.
+  - Demo + benchmarks + subjective A/B harness: ~300 LoC.
+- **Phase 2 mobile hardening**: +300 LoC (worker-based batch decode, visibility prioritization).
+- **Phase 4a distillation**: ~500 LoC training code (Python, separate repo) + ~$5k compute.
+- **Phase 4b from-scratch**: ~2k LoC training code (Python) + 6-12 months + $25-300k compute.
 
-**Core library: ~1600 LoC. Plus model engineering (weeks to months) for the custom-VAE path.**
+**Phases 0-2 in-tree: ~2000 LoC.** Phase 4a adds a separate training repo. Phase 4b is a research project.
 
 ## Out of scope for this PR
 
-- Training a custom VAE. Use off-the-shelf SD-VAE for phases 1-3.
+- Training a custom VAE from scratch (Phase 4b). Use pretrained SD-VAE for Phases 0-2, distill for Phase 4a.
 - Video / animation.
-- Non-WebGPU fallback (safari pre-17.4 has no WebGPU). Define the API to fall back to thumbhash on those browsers.
-- Mobile optimization beyond a feasibility check.
-- Accessibility audit of "perceived image before load" as a pattern.
+- Mobile optimization beyond Phase 2's feasibility check + lazy decode.
+- Accessibility audit of "perceived image before load" as a UX pattern.
+- Thumbhash fallback implementation details (deferred; may live in a separate PR).
 
 ## Why this is the "paradigm shift" swing
 
