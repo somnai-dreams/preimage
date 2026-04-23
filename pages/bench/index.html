@@ -56,20 +56,16 @@
           <h3>First-screen strategies</h3>
           <p>Four approaches to painting a first viewport, run back-to-back against fresh cache-busts: naive <code>&lt;img&gt;</code>, <code>prepare()</code> with <code>img</code> strategy, <code>prepare()</code> with <code>stream</code>, and manifest-hydrated (no probe at all). Reports time-to-first-skeleton, all-skeletons, first-image, all-images, and bytes.</p>
         </a>
+        <a class="bench-card" href="./virtual-scroll.html">
+          <h3>Virtual-scroll synthetic</h3>
+          <p>Packs N tiles, then scripts a constant-velocity scroll from top to bottom while sampling every rAF. Reports frame-time distribution, dropped frames, active tile count, mount/unmount churn. Regressions in <code>createVirtualTilePool</code> surface here: rising frame times, or active-tile-count drift away from the overscan band, both fail this bench loudly.</p>
+        </a>
       </div>
     </section>
 
     <section class="bench-section">
       <h2>Planned</h2>
       <div class="bench-list">
-        <a class="bench-card todo" href="#">
-          <h3>First-screen strategies</h3>
-          <p>Compare naive &lt;img&gt;, prepare+dimsOnly, manifest-hydrated prepare, and probeImageStream for time-to-skeleton-placed and time-to-images-loaded on the first viewport, while allowing mid-run scroll.</p>
-        </a>
-        <a class="bench-card todo" href="#">
-          <h3>Virtual scroll under load</h3>
-          <p>Scripted scroll at configurable velocity through 10k tiles, measure dropped frames, active tile count, mount/unmount rate, in-flight fetches.</p>
-        </a>
         <a class="bench-card todo" href="#">
           <h3>Manifest build speed</h3>
           <p>Time the <code>preimage-manifest</code> CLI on directories of varying size. Node-side via a Bun script, separate from this browser-facing page.</p>
