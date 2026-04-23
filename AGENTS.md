@@ -1,6 +1,10 @@
 # AGENTS
 
-Sibling repo to [`@chenglou/pretext`](https://github.com/chenglou/pretext) and [`@chenglou/vibescript`](https://github.com/chenglou/vibescript). Same ecosystem, different concern: pretext owns text layout, vibescript owns UI conventions, preimage owns images. Read vibescript's AGENTS + `docs/` before working here — we follow its rules.
+Sibling repo to [`@chenglou/pretext`](https://github.com/chenglou/pretext), [`@chenglou/vibescript`](https://github.com/chenglou/vibescript) and [`@chenglou/freerange`](https://github.com/chenglou/freerange). 
+
+These repos may be found at `../best practices/' if running locally.
+
+Same ecosystem, different concern: pretext owns text layout, vibescript owns UI conventions, preimage owns images, freerange owns verification. Read vibescript's AGENTS + `docs/` before working here — we follow its rules. Read the pretext and freerange READMEs.
 
 `bun install` if you're in a fresh worktree.
 `bun run check` for typecheck (we don't run tests — good TypeScript doesn't need them).
