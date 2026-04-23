@@ -24,7 +24,7 @@ import {
   type ImageMeasurement,
   type MeasureOptions,
 } from './measurement.js'
-import { MAX_HEADER_BYTES, probeImageBytes, probeImageStream } from './probe.js'
+import { MAX_HEADER_BYTES, probeImageBytes, probeImageStream, type ProbedDimensions } from './probe.js'
 import { parseUrlDimensions } from './url-dimensions.js'
 
 // --- Prepared handle ---
@@ -56,6 +56,20 @@ export type PreparedImage = {
    *  skeleton shimmer on cache/manifest hits, fade in only on network
    *  resolves. */
   readonly source: PreparedSource
+  /** File size in bytes. Lets callers cap what they'll fetch at full
+   *  res, pick between a thumbnail and original, or show a download
+   *  progress bar. `null` when the source didn't expose it — notably
+   *  the `'img'` URL strategy, cache hits that were originally recorded
+   *  without it, and `prepareSync` / manifest-hydrated entries. */
+  readonly byteLength: number | null
+  /** True if the format header indicates a native alpha channel.
+   *  Callers drawing a tinted skeleton background can skip the tint
+   *  when `hasAlpha === false` (image will fully cover it anyway). */
+  readonly hasAlpha: boolean
+  /** True for progressive JPEGs; false for everything else. Progressive
+   *  JPEGs render coarse-to-fine as bytes arrive, so the opacity
+   *  fade-in that hides a popped-in paint is unnecessary. */
+  readonly isProgressive: boolean
   /** Full measurement record (natural dims, orientation, analysis,
    *  blobUrl). Use this when you need fields beyond the common
    *  `.width` / `.height` / `.aspectRatio` triple. */
@@ -94,6 +108,9 @@ function wrap(
     src: measurement.src,
     element,
     source,
+    byteLength: measurement.byteLength,
+    hasAlpha: measurement.hasAlpha,
+    isProgressive: measurement.isProgressive,
     measurement,
   }
 }
@@ -321,7 +338,7 @@ async function prepareFromUrlRange(
     if (response.body === null) {
       throw new Error(`preimage: fetch ${src} returned no body`)
     }
-    return await consumeStreamForDims(src, key, response.body, options)
+    return await consumeStreamForDims(src, key, response.body, options, undefined, parseContentLength(response))
   }
 
   // 206: read the partial body and parse directly. No abort needed —
@@ -333,10 +350,33 @@ async function prepareFromUrlRange(
       `preimage: range probe of ${src} (${bytes.length} bytes) yielded no dimensions`,
     )
   }
+  // 206 responses put the full resource size after the slash in
+  // Content-Range: `bytes 0-4095/12345`. Falls back to null when the
+  // header is missing or malformed.
+  const byteLength = parseContentRangeTotal(response) ?? parseContentLength(response)
   const measurement = recordKnownMeasurement(key, probed.width, probed.height, {
     orientation: options.orientation ?? 1,
+    byteLength,
+    hasAlpha: probed.hasAlpha,
+    isProgressive: probed.isProgressive,
   })
   return wrap(measurement, null, 'network')
+}
+
+function parseContentLength(response: Response): number | null {
+  const raw = response.headers.get('content-length')
+  if (raw === null) return null
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
+
+function parseContentRangeTotal(response: Response): number | null {
+  const raw = response.headers.get('content-range')
+  if (raw === null) return null
+  const match = raw.match(/\/(\d+)\s*$/)
+  if (match === null) return null
+  const n = Number(match[1])
+  return Number.isFinite(n) && n >= 0 ? n : null
 }
 
 // --- URL path: fetch + probeImageStream ---
@@ -376,7 +416,7 @@ async function prepareFromUrlStream(
   if (response.body === null) {
     throw new Error(`preimage: fetch ${src} returned no body`)
   }
-  return await consumeStreamForDims(src, key, response.body, options, controller)
+  return await consumeStreamForDims(src, key, response.body, options, controller, parseContentLength(response))
 }
 
 /** Read a body stream through `probeImageStream`, abort the optional
@@ -387,22 +427,23 @@ async function consumeStreamForDims(
   key: string,
   body: ReadableStream<Uint8Array>,
   options: PrepareOptions,
-  controller?: AbortController,
+  controller: AbortController | undefined,
+  byteLength: number | null,
 ): Promise<PreparedImage> {
   let aborted = false
-  let dims: { width: number; height: number } | null = null
+  let probed: ProbedDimensions | null = null
   try {
     const result = await probeImageStream(body, {
       onDims: (d) => {
-        dims = { width: d.width, height: d.height }
+        probed = d
         if (options.dimsOnly === true && controller !== undefined) {
           aborted = true
           controller.abort()
         }
       },
     })
-    if (dims === null && result.dims !== null) {
-      dims = { width: result.dims.width, height: result.dims.height }
+    if (probed === null && result.dims !== null) {
+      probed = result.dims
     }
   } catch (err) {
     // Intentional cancellation after dims known is expected; any other
@@ -410,12 +451,15 @@ async function consumeStreamForDims(
     if (!aborted) throw err
   }
 
-  if (dims === null) {
+  if (probed === null) {
     throw new Error(`preimage: stream probe of ${src} yielded no dimensions`)
   }
 
-  const measurement = recordKnownMeasurement(key, dims.width, dims.height, {
+  const measurement = recordKnownMeasurement(key, probed.width, probed.height, {
     orientation: options.orientation ?? 1,
+    byteLength,
+    hasAlpha: probed.hasAlpha,
+    isProgressive: probed.isProgressive,
   })
   return wrap(measurement, null, 'network')
 }
@@ -513,6 +557,9 @@ async function prepareFromBlob(blob: Blob, options: PrepareOptions): Promise<Pre
   if (probed !== null) {
     const measurement = recordKnownMeasurement(url, probed.width, probed.height, {
       orientation: options.orientation ?? 1,
+      byteLength: blob.size,
+      hasAlpha: probed.hasAlpha,
+      isProgressive: probed.isProgressive,
     })
     measurement.blobUrl = url
     return wrap(measurement, null, 'blob')
@@ -522,6 +569,7 @@ async function prepareFromBlob(blob: Blob, options: PrepareOptions): Promise<Pre
   // back to loading the blob URL in an <img> and polling.
   const measurement = await fallbackFromBlobUrl(url, options)
   measurement.blobUrl = url
+  measurement.byteLength = blob.size
   return wrap(measurement, null, 'blob')
 }
 

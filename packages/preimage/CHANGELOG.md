@@ -3,6 +3,7 @@
 ## 0.10.0
 
 - **`PreparedImage.source`** — every `prepare()` / `prepareSync()` handle now carries a `source: PreparedSource` tag: `'network' | 'cache' | 'url-pattern' | 'declared' | 'manifest' | 'blob'`. Lets callers branch UI on provenance without tracking state outside the library — skip the skeleton shimmer on cache/manifest hits, fade in only when `source === 'network'`. `preparedFromMeasurement(m, 'manifest')` is the integrator path: hydrate the measurement cache via `recordKnownMeasurement` at boot, then mint prepared handles tagged as manifest-sourced so the render layer can treat them as dims-known-at-load.
+- **`PreparedImage.byteLength`, `.hasAlpha`, `.isProgressive`**. Header parsers now capture alpha-channel presence (PNG color types 4/6, WebP VP8L/VP8X-with-alpha, SVG) and progressive JPEGs (SOF2 marker); the stream/range paths capture file size from `Content-Length` / `Content-Range` respectively; the blob path uses `blob.size`. `'img'` strategy leaves `byteLength` at `null` — no access to response headers. Callers drawing tinted skeletons can skip the tint when `hasAlpha === false` (image fully covers); callers that want a decode-progress affordance can skip the fade-in when `isProgressive === true` (JPEG already renders coarse-to-fine). `byteLength` shows up on `ImageMeasurement` too for callers that thread through the measurement record.
 
 ## 0.9.0
 

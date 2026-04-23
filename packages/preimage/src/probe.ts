@@ -29,6 +29,16 @@ export type ProbedDimensions = {
   width: number
   height: number
   format: ImageFormat
+  /** True if the format header indicates an alpha channel. PNG color
+   *  types 4 (grayscale+α) and 6 (RGBA) and WebP VP8L / VP8X-with-
+   *  alpha-flag set this; JPEG is always false; SVG is treated as true
+   *  (SVGs composite onto the page background). GIF transparency and
+   *  PNG tRNS-chunk-indexed-alpha are reported as false — detecting
+   *  them correctly requires parsing past the header. */
+  hasAlpha: boolean
+  /** True for progressive JPEGs (SOF2 marker), false for baseline
+   *  (SOF0). Meaningless on other formats; reported as false. */
+  isProgressive: boolean
 }
 
 // Minimum byte budget callers should buffer before calling `probeImageBytes`.
@@ -72,15 +82,21 @@ function i32le(b: Uint8Array, o: number): number {
 
 function probePng(bytes: Uint8Array): ProbedDimensions | null {
   if (!matches(bytes, PNG_SIG)) return null
-  if (bytes.length < 24) return null
+  if (bytes.length < 26) return null
   // IHDR chunk lives at byte 8: [length:4][type:4='IHDR'][width:4][height:4]
+  //                             [bitDepth:1][colorType:1][...]
   if (bytes[12] !== 0x49 || bytes[13] !== 0x48 || bytes[14] !== 0x44 || bytes[15] !== 0x52) {
     return null
   }
   const width = u32be(bytes, 16)
   const height = u32be(bytes, 20)
   if (width === 0 || height === 0) return null
-  return { width, height, format: 'png' }
+  // Color types with a native alpha channel: 4 (grayscale+α), 6 (RGBA).
+  // Type 3 (indexed) can carry alpha via a later tRNS chunk; detecting
+  // that would require walking past IHDR, which we don't.
+  const colorType = bytes[25]!
+  const hasAlpha = colorType === 4 || colorType === 6
+  return { width, height, format: 'png', hasAlpha, isProgressive: false }
 }
 
 // --- JPEG ---
@@ -113,7 +129,11 @@ function probeJpeg(bytes: Uint8Array): ProbedDimensions | null {
       const height = u16be(bytes, offset + 3)
       const width = u16be(bytes, offset + 5)
       if (width === 0 || height === 0) return null
-      return { width, height, format: 'jpeg' }
+      // SOF2 (0xC2) = progressive DCT; SOF0/SOF1/others = baseline/
+      // sequential. Progressive JPEGs render mid-decode so callers can
+      // skip the opacity fade-in.
+      const isProgressive = marker === 0xC2
+      return { width, height, format: 'jpeg', hasAlpha: false, isProgressive }
     }
     offset += segLen
   }
@@ -128,7 +148,7 @@ function probeGif(bytes: Uint8Array): ProbedDimensions | null {
   const width = u16le(bytes, 6)
   const height = u16le(bytes, 8)
   if (width === 0 || height === 0) return null
-  return { width, height, format: 'gif' }
+  return { width, height, format: 'gif', hasAlpha: false, isProgressive: false }
 }
 
 // --- BMP ---
@@ -140,7 +160,7 @@ function probeBmp(bytes: Uint8Array): ProbedDimensions | null {
   const heightRaw = i32le(bytes, 22)
   const height = Math.abs(heightRaw) // negative = top-down DIB
   if (width <= 0 || height <= 0) return null
-  return { width, height, format: 'bmp' }
+  return { width, height, format: 'bmp', hasAlpha: false, isProgressive: false }
 }
 
 // --- WebP ---
@@ -156,7 +176,7 @@ function probeWebp(bytes: Uint8Array): ProbedDimensions | null {
     const w = u16le(bytes, 26) & 0x3FFF
     const h = u16le(bytes, 28) & 0x3FFF
     if (w === 0 || h === 0) return null
-    return { width: w, height: h, format: 'webp' }
+    return { width: w, height: h, format: 'webp', hasAlpha: false, isProgressive: false }
   }
   if (chunkType === 'VP8L') {
     // Lossless: 14-bit width-1 / height-1 packed across 4 bytes at offset 21.
@@ -167,14 +187,19 @@ function probeWebp(bytes: Uint8Array): ProbedDimensions | null {
     const width = (((b1 & 0x3F) << 8) | b0) + 1
     const height = (((b3 & 0x0F) << 10) | (b2 << 2) | ((b1 & 0xC0) >> 6)) + 1
     if (width === 0 || height === 0) return null
-    return { width, height, format: 'webp' }
+    // VP8L always carries alpha (spec-wise; the channel may be
+    // all-0xFF but callers can't know without decode).
+    return { width, height, format: 'webp', hasAlpha: true, isProgressive: false }
   }
   if (chunkType === 'VP8X') {
-    // Extended: canvas width-1 at offset 24 (3 bytes LE), height-1 at 27.
+    // Extended: flags byte at offset 20. Bit 4 (0x10) = alpha present.
+    const flags = bytes[20]!
+    const hasAlpha = (flags & 0x10) !== 0
+    // Canvas width-1 at offset 24 (3 bytes LE), height-1 at 27.
     const width = (bytes[24]! | (bytes[25]! << 8) | (bytes[26]! << 16)) + 1
     const height = (bytes[27]! | (bytes[28]! << 8) | (bytes[29]! << 16)) + 1
     if (width === 0 || height === 0) return null
-    return { width, height, format: 'webp' }
+    return { width, height, format: 'webp', hasAlpha, isProgressive: false }
   }
   return null
 }
@@ -200,7 +225,7 @@ function probeSvg(bytes: Uint8Array): ProbedDimensions | null {
     const w = Number(widthMatch[1])
     const h = Number(heightMatch[1])
     if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
-      return { width: w, height: h, format: 'svg' }
+      return { width: w, height: h, format: 'svg', hasAlpha: true, isProgressive: false }
     }
   }
   const viewBoxMatch = text.match(
@@ -210,7 +235,7 @@ function probeSvg(bytes: Uint8Array): ProbedDimensions | null {
     const w = Number(viewBoxMatch[1])
     const h = Number(viewBoxMatch[2])
     if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
-      return { width: w, height: h, format: 'svg' }
+      return { width: w, height: h, format: 'svg', hasAlpha: true, isProgressive: false }
     }
   }
   return null

@@ -27,6 +27,16 @@ export type ImageMeasurement = {
   // bytes. Undefined for URL inputs (the new prepare path uses an
   // <img> element directly; use getElement(prepared) to retrieve it).
   blobUrl?: string
+  /** File size in bytes. Sourced from Content-Length (stream strategy),
+   *  Content-Range total (range strategy's 206), or the Blob's `.size`
+   *  (blob path). `null` when unavailable — notably the `'img'` URL
+   *  strategy, which has no access to response headers. */
+  byteLength: number | null
+  /** True if the format header indicates a native alpha channel.
+   *  See `ProbedDimensions.hasAlpha` for per-format semantics. */
+  hasAlpha: boolean
+  /** True for progressive JPEGs; false for everything else. */
+  isProgressive: boolean
 }
 
 export type MeasureOptions = {
@@ -59,7 +69,13 @@ export function recordKnownMeasurement(
   src: string,
   width: number,
   height: number,
-  options: { orientation?: OrientationCode; decoded?: boolean } = {},
+  options: {
+    orientation?: OrientationCode
+    decoded?: boolean
+    byteLength?: number | null
+    hasAlpha?: boolean
+    isProgressive?: boolean
+  } = {},
 ): ImageMeasurement {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     throw new RangeError(
@@ -79,6 +95,9 @@ export function recordKnownMeasurement(
     orientation,
     decoded: options.decoded ?? false,
     analysis: getCachedAnalysis(src),
+    byteLength: options.byteLength ?? null,
+    hasAlpha: options.hasAlpha ?? false,
+    isProgressive: options.isProgressive ?? false,
   }
   measurementCache.set(key, measurement)
   return measurement
