@@ -45,6 +45,13 @@
       <input id="concSlider" type="range" min="1" max="200" value="50" step="1" />
       <span id="concVal" class="val">50</span>
 
+      <label>Strategy</label>
+      <label style="display: flex; align-items: center; gap: 12px; font-size: 13px; text-transform: none; color: var(--text);">
+        <span style="display: flex; align-items: center; gap: 6px;"><input type="radio" name="strategy" value="img" checked /> img + poll</span>
+        <span style="display: flex; align-items: center; gap: 6px;"><input type="radio" name="strategy" value="stream" /> fetch + stream</span>
+      </label>
+      <span></span>
+
       <label>dimsOnly</label>
       <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; text-transform: none; color: var(--text);">
         <input type="checkbox" id="dimsOnly" checked />

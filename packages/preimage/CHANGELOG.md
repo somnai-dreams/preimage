@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.0
+
+- **New `strategy: 'stream'` option on `prepare()`.** Default stays `'img'` (create `<img>`, poll `naturalWidth`, abort via `src = ''`), which produces a warmed element the caller can reuse. `'stream'` switches to `fetch(url)` + `probeImageStream`, aborts via `AbortController` the instant header bytes parse. Measured with a 500-image / 200-concurrency HAR: the `'img'` path's `setTimeout(0)` polling loop gets event-loop-starved at high concurrency — each probe's detect-and-abort takes 1-2 seconds even though wire-level transfer is <1 KB. `'stream'` skips the browser's image subsystem entirely, so dims land at header-bytes time (microseconds) instead of polling time. No warmed element on this path; callers rendering via `prepared.element` should stick with `'img'`.
+- `PrepareQueue` passes `strategy` through unchanged. Probe bench at `/bench/probe.html` now has a strategy toggle for side-by-side comparison.
+
 ## 0.7.1
 
 - **`PrepareQueue` default concurrency bumped from 20 → 50.** HTTP/2 servers typically advertise `SETTINGS_MAX_CONCURRENT_STREAMS` of 100, so 20 was leaving throughput on the table for 4KB header probes. On HTTP/1.1 origins the browser's 6-slot cap gatekeeps automatically with no penalty; the only meaningful cost is that 44 probes queue in the browser's network layer ahead of any render-side fetches, so callers with a busy render path should still pass a lower value explicitly.

@@ -24,7 +24,7 @@ import {
   type ImageMeasurement,
   type MeasureOptions,
 } from './measurement.js'
-import { MAX_HEADER_BYTES, probeImageBytes } from './probe.js'
+import { MAX_HEADER_BYTES, probeImageBytes, probeImageStream } from './probe.js'
 import { parseUrlDimensions } from './url-dimensions.js'
 
 // --- Prepared handle ---
@@ -91,6 +91,19 @@ export type PrepareOptions = MeasureOptions & {
    *  when planning a layout from many URLs where most won't be rendered
    *  (off-screen tiles, image catalogs, SSR precompute). */
   dimsOnly?: boolean
+  /** Probe strategy for URL sources:
+   *  - `'img'` (default): create an `<img>`, poll `naturalWidth`, abort
+   *    via `src = ''`. Produces a warmed `<img>` the caller can reuse
+   *    for render via `prepared.element`.
+   *  - `'stream'`: `fetch(url)`, feed `response.body` through
+   *    `probeImageStream`, abort via `AbortController` the instant the
+   *    header bytes parse. No warmed element, but dims land at
+   *    header-bytes time instead of poll-loop time — much faster at
+   *    high concurrency (~200 parallel probes), where the `'img'`
+   *    path's `setTimeout(0)` polling gets event-loop-starved.
+   *
+   *  Blob sources ignore this; they always byte-probe directly. */
+  strategy?: 'img' | 'stream'
 }
 
 // --- Public API ---
@@ -195,7 +208,7 @@ export function getElement(prepared: PreparedImage): HTMLImageElement | null {
   return prepared.element
 }
 
-// --- URL path: <img> + poll naturalWidth ---
+// --- URL path dispatch ---
 
 async function prepareFromUrl(src: string, options: PrepareOptions): Promise<PreparedImage> {
   const key = normalizeSrc(src)
@@ -212,6 +225,88 @@ async function prepareFromUrl(src: string, options: PrepareOptions): Promise<Pre
     return wrap(measurement, null)
   }
 
+  if (options.strategy === 'stream') {
+    return await prepareFromUrlStream(src, key, options)
+  }
+  return await prepareFromUrlImg(src, key, options)
+}
+
+// --- URL path: fetch + probeImageStream ---
+//
+// Runs a single fetch, feeds the response body through probeImageStream,
+// aborts via AbortController the moment header bytes parse. Skips the
+// browser's image subsystem entirely — no setTimeout polling, no decode
+// queue, no `<img>` allocation. Massively faster at high concurrency.
+// Downside: no warmed `<img>` to hand back, so callers that want to
+// render via prepared.element must fetch again or hold on to the Blob
+// themselves.
+
+async function prepareFromUrlStream(
+  src: string,
+  key: string,
+  options: PrepareOptions,
+): Promise<PreparedImage> {
+  const controller = new AbortController()
+  if (options.signal !== undefined) {
+    if (options.signal.aborted) {
+      throw options.signal.reason ?? new DOMException('Aborted', 'AbortError')
+    }
+    options.signal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
+
+  const credentials =
+    options.crossOrigin === 'use-credentials'
+      ? 'include'
+      : options.crossOrigin === 'anonymous'
+      ? 'omit'
+      : 'same-origin'
+
+  const response = await fetch(src, { signal: controller.signal, credentials })
+  if (!response.ok) {
+    throw new Error(`preimage: fetch ${src} failed with status ${response.status}`)
+  }
+  if (response.body === null) {
+    throw new Error(`preimage: fetch ${src} returned no body`)
+  }
+
+  let aborted = false
+  let dims: { width: number; height: number } | null = null
+  try {
+    const result = await probeImageStream(response.body, {
+      onDims: (d) => {
+        dims = { width: d.width, height: d.height }
+        if (options.dimsOnly === true) {
+          aborted = true
+          controller.abort()
+        }
+      },
+    })
+    if (dims === null && result.dims !== null) {
+      dims = { width: result.dims.width, height: result.dims.height }
+    }
+  } catch (err) {
+    // Intentional cancellation after dims known is expected; any other
+    // failure bubbles.
+    if (!aborted) throw err
+  }
+
+  if (dims === null) {
+    throw new Error(`preimage: stream probe of ${src} yielded no dimensions`)
+  }
+
+  const measurement = recordKnownMeasurement(key, dims.width, dims.height, {
+    orientation: options.orientation ?? 1,
+  })
+  return wrap(measurement, null)
+}
+
+// --- URL path: <img> + poll naturalWidth ---
+
+async function prepareFromUrlImg(
+  src: string,
+  key: string,
+  options: PrepareOptions,
+): Promise<PreparedImage> {
   if (typeof HTMLImageElement === 'undefined') {
     throw new Error('preimage: prepare(url) requires an HTMLImageElement environment.')
   }

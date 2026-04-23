@@ -1,6 +1,6 @@
 {
   "name": "@somnai-dreams/preimage",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Measured images for pretext: float figures and inline images in pretext-flowed text, without triggering DOM reflow",
   "keywords": [
     "pretext",

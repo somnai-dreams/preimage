@@ -56,6 +56,8 @@ async function run(): Promise<void> {
   const n = Number(nSlider.value)
   const concurrency = Number(concSlider.value)
   const dimsOnly = dimsOnlyEl.checked
+  const strategyEl = document.querySelector<HTMLInputElement>('input[name="strategy"]:checked')
+  const strategy = (strategyEl?.value === 'stream' ? 'stream' : 'img') as 'img' | 'stream'
   const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const urls = cycledUrls(n, token)
 
@@ -98,7 +100,7 @@ async function run(): Promise<void> {
     urls.map((url, i) => {
       tEnqueues[i] = performance.now() - t0
       const tStart = performance.now()
-      return queue.enqueue(url, { dimsOnly }).then(() => {
+      return queue.enqueue(url, { dimsOnly, strategy }).then(() => {
         const total = performance.now() - tStart
         perProbe.push(total)
         // Without per-slot start timestamps we attribute nothing to
@@ -124,7 +126,7 @@ async function run(): Promise<void> {
     throughputProbesPerSec: (n / totalMs) * 1000,
   }
   const meta = captureMetadata('probe-concurrency')
-  const params = { n, concurrency, dimsOnly }
+  const params = { n, concurrency, dimsOnly, strategy }
   lastRun = { meta, params, results: probeResults }
 
   renderResults(probeResults, meta, params)
