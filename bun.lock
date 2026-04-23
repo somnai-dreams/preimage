@@ -11,13 +11,20 @@
         "typescript": "^5.6.0",
       },
     },
+    "packages/glasspane": {
+      "name": "@somnai-dreams/glasspane",
+      "version": "0.0.1",
+      "devDependencies": {
+        "@webgpu/types": "^0.1.69",
+      },
+    },
     "packages/layout-algebra": {
       "name": "@somnai-dreams/layout-algebra",
-      "version": "0.0.1",
+      "version": "0.5.0",
     },
     "packages/preimage": {
       "name": "@somnai-dreams/preimage",
-      "version": "0.1.0",
+      "version": "0.10.0",
       "peerDependencies": {
         "@chenglou/pretext": "^0.0.5",
       },
@@ -26,6 +33,8 @@
   "packages": {
     "@chenglou/pretext": ["@chenglou/pretext@0.0.5", "", {}, "sha512-A8GZN10REdFGsyuiUgLV8jjPDDFMg5GmgxGWV0I3igxBOnzj+jgz2VMmVD7g+SFyoctfeqHFxbNatKSzVRWtRg=="],
 
+    "@somnai-dreams/glasspane": ["@somnai-dreams/glasspane@workspace:packages/glasspane"],
+
     "@somnai-dreams/layout-algebra": ["@somnai-dreams/layout-algebra@workspace:packages/layout-algebra"],
 
     "@somnai-dreams/preimage": ["@somnai-dreams/preimage@workspace:packages/preimage"],
@@ -33,6 +42,8 @@
     "@types/bun": ["@types/bun@1.3.12", "", { "dependencies": { "bun-types": "1.3.12" } }, "sha512-DBv81elK+/VSwXHDlnH3Qduw+KxkTIWi7TXkAeh24zpi5l0B2kUg9Ga3tb4nJaPcOFswflgi/yAvMVBPrxMB+A=="],
 
     "@types/node": ["@types/node@25.6.0", "", { "dependencies": { "undici-types": "~7.19.0" } }, "sha512-+qIYRKdNYJwY3vRCZMdJbPLJAtGjQBudzZzdzwQYkEPQd+PJGixUL5QfvCLDaULoLv+RhT3LDkwEfKaAkgSmNQ=="],
+
+    "@webgpu/types": ["@webgpu/types@0.1.69", "", {}, "sha512-RPmm6kgRbI8e98zSD3RVACvnuktIja5+yLgDAkTmxLr90BEwdTXRQWNLF3ETTTyH/8mKhznZuN5AveXYFEsMGQ=="],
 
     "bun-types": ["bun-types@1.3.12", "", { "dependencies": { "@types/node": "*" } }, "sha512-HqOLj5PoFajAQciOMRiIZGNoKxDJSr6qigAttOX40vJuSp6DN/CxWp9s3C1Xwm4oH7ybueITwiaOcWXoYVoRkA=="],
 

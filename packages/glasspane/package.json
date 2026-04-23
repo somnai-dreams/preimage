@@ -1,0 +1,30 @@
+{
+  "name": "@somnai-dreams/glasspane",
+  "version": "0.0.1",
+  "description": "GPU-resident image rendering for galleries. Phase 0 spike.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/somnai-dreams/preimage.git",
+    "directory": "packages/glasspane"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["CHANGELOG.md", "dist", "src"],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit -p tsconfig.build.json"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@webgpu/types": "^0.1.69"
+  }
+}
