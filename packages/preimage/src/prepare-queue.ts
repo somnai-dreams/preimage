@@ -128,6 +128,51 @@ export class PrepareQueue {
     return true
   }
 
+  // Move a set of URLs to the front of the pending queue in the order
+  // given. Primary caller: a virtualization or gallery flow that has
+  // enqueued everything up front, then computed which K items will
+  // land in the first viewport — `boostMany(firstScreenUrls)` jumps
+  // them ahead of the below-fold backlog in one pass. URLs already
+  // in-flight, absent, or reordered by this same call are handled
+  // idempotently.
+  boostMany(srcs: readonly string[]): void {
+    if (srcs.length === 0) return
+    const keys = new Set(srcs.map(normalizeSrc))
+    // Pull every matching entry out of its current position while
+    // preserving caller-supplied order at the front.
+    const matched = new Map<string, PendingEntry>()
+    for (let i = this.pending.length - 1; i >= 0; i--) {
+      const entry = this.pending[i]!
+      if (keys.has(entry.key)) {
+        matched.set(entry.key, entry)
+        this.pending.splice(i, 1)
+      }
+    }
+    const front: PendingEntry[] = []
+    for (const src of srcs) {
+      const entry = matched.get(normalizeSrc(src))
+      if (entry !== undefined) front.push(entry)
+    }
+    this.pending.unshift(...front)
+  }
+
+  // Move a set of URLs to the back of the pending queue — the inverse
+  // of `boostMany`. Useful when the caller knows specific URLs are
+  // below-fold or low-priority and wants to unblock everything else.
+  deprioritizeMany(srcs: readonly string[]): void {
+    if (srcs.length === 0) return
+    const keys = new Set(srcs.map(normalizeSrc))
+    const moved: PendingEntry[] = []
+    for (let i = this.pending.length - 1; i >= 0; i--) {
+      const entry = this.pending[i]!
+      if (keys.has(entry.key)) {
+        moved.unshift(entry) // preserve original relative order
+        this.pending.splice(i, 1)
+      }
+    }
+    this.pending.push(...moved)
+  }
+
   // Drop everything that hasn't started yet. Requests already in-flight
   // continue to completion — cancelling them would leak partial
   // measurements and require AbortController plumbing that fights the

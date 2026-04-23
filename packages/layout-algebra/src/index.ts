@@ -459,3 +459,50 @@ export function visibleIndices(
   }
   return out
 }
+
+// --- First-screen estimation ---
+
+/** Estimate how many of the leading items will land on the first
+ *  viewport, before any aspect ratios are known. Used to decide which
+ *  URLs to probe / boost first in a `PrepareQueue`.
+ *
+ *  Two layout modes share one entry point. For `columns`, tile height
+ *  is estimated as `panelWidth / columns` (roughly square tiles);
+ *  first-screen row count is `ceil(viewportHeight / tileHeight)`. For
+ *  `rows`, row count is `ceil(viewportHeight / targetRowHeight)` and
+ *  items-per-row is estimated at `round(panelWidth / targetRowHeight)`.
+ *
+ *  Result is a count, not indices — caller slices their URL array:
+ *
+ *  @example
+ *    const k = estimateFirstScreenCount({
+ *      panelWidth: 1200, viewportHeight: 720, gap: 4,
+ *      mode: 'columns', columns: 5,
+ *    })
+ *    queue.boostMany(urls.slice(0, k)) */
+export function estimateFirstScreenCount(
+  params:
+    | {
+        mode: 'columns'
+        panelWidth: number
+        viewportHeight: number
+        gap: number
+        columns: number
+      }
+    | {
+        mode: 'rows'
+        panelWidth: number
+        viewportHeight: number
+        gap: number
+        targetRowHeight: number
+      },
+): number {
+  if (params.mode === 'columns') {
+    const tileHeight = Math.max(1, (params.panelWidth - params.gap * (params.columns - 1)) / params.columns)
+    const rowCount = Math.max(1, Math.ceil(params.viewportHeight / (tileHeight + params.gap)))
+    return rowCount * params.columns
+  }
+  const rowCount = Math.max(1, Math.ceil(params.viewportHeight / (params.targetRowHeight + params.gap)))
+  const itemsPerRow = Math.max(2, Math.round(params.panelWidth / params.targetRowHeight))
+  return rowCount * itemsPerRow
+}

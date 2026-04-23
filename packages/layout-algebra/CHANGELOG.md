@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- **New: `estimateFirstScreenCount({ mode, panelWidth, viewportHeight, gap, ... })`.** Pure-math estimate of how many leading items will land on the first viewport before any aspects are known. `columns` mode assumes roughly-square tiles (`tileHeight ≈ panelWidth / columns`); `rows` mode uses `targetRowHeight` plus `round(panelWidth / targetRowHeight)` items per row. Returns a count, not indices — caller slices their URL array and feeds the slice into `PrepareQueue.boostMany` so those probes jump the queue ahead of the below-fold backlog. Rough by design (no aspects = no exact pack); the whole point is pre-measurement prioritization.
+
 ## 0.4.0
 
 - **Normalized config shapes across every packer.** Every config now reads `{ panelWidth, gap, <algorithm-param>, ... }` — same fields in the same positions. Was inconsistent: `packShortestColumn` took `{ columns, gap, panelWidth }`; `packJustifiedRows` took `{ panelWidth, targetRowHeight, gap, lastRowJustified? }`. Field names unchanged, destructuring order doesn't affect JS runtime, but the type declarations now match so IDE tooltips and LLM completions are predictable.
