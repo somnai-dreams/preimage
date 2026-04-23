@@ -22,18 +22,37 @@ export const PHOTOS: Photo[] = manifest.map((m, i) => ({
 
 export const PHOTO_COUNT = PHOTOS.length
 
-// Relative path so the demos work both under our dev server
-// (http://host:port/masonry.html → ./assets/... → /assets/...)
-// and under a GitHub Pages project path
-// (https://user.github.io/preimage/masonry.html → ./assets/... →
-// https://user.github.io/preimage/assets/...).
+// Directory that contains `assets/`, resolved from the current HTML page.
+// Demos live at `<root>/foo.html`; bench pages live at `<root>/bench/foo
+// .html` — both need `<root>/assets/…` to resolve the same way. Computed
+// from `document.baseURI` rather than `import.meta.url` so the bundler's
+// module flattening doesn't shift the anchor; the HTML path always tracks
+// the page's position in the served tree. Cached because it never changes
+// within a page.
 //
-// `assetsBase` is the relative prefix to the `pages/` root from the
-// caller. Demos at `pages/demos/*.html` use the default `'./'`;
-// pages one level deeper (e.g. `pages/bench/probe.html`) pass
-// `'../'` so `./assets/...` doesn't end up rooted at `/bench/`.
-export function photoUrl(p: Photo, cacheBust: string | null, assetsBase = './'): string {
-  const base = `${assetsBase}assets/demos/photos/${p.file}`
+// If a new nested subdirectory of pages/ is ever added alongside `bench/`,
+// extend the pop-list below.
+let cachedAssetsRoot: string | null = null
+function assetsRoot(): string {
+  if (cachedAssetsRoot !== null) return cachedAssetsRoot
+  const here = new URL(document.baseURI)
+  const segs = here.pathname.split('/')
+  segs.pop() // drop filename
+  if (segs[segs.length - 1] === 'bench') segs.pop()
+  segs.push('') // trailing slash
+  cachedAssetsRoot = `${here.origin}${segs.join('/')}`
+  return cachedAssetsRoot
+}
+
+// Absolute URL for an asset path like `assets/demos/photos/01.png`. Always
+// rooted at the current page's effective directory, so the returned URL
+// survives both the dev server and a GitHub Pages project path.
+export function assetUrl(rel: string): string {
+  return assetsRoot() + rel
+}
+
+export function photoUrl(p: Photo, cacheBust: string | null): string {
+  const base = assetUrl(`assets/demos/photos/${p.file}`)
   return cacheBust === null ? base : `${base}?v=${cacheBust}`
 }
 
@@ -55,13 +74,27 @@ export function takePhotos(count: number): Photo[] {
 // per-slot cache-bust token. Each returned URL is unique from the
 // browser's perspective (and from our server's) so HTTP cache can't
 // collapse them, even though the underlying bytes repeat. Used by
-// the scale demo. `assetsBase` works the same way as in `photoUrl`.
-export function cycledUrls(count: number, baseToken: string, assetsBase = './'): string[] {
+// the scale demo.
+export function cycledUrls(count: number, baseToken: string): string[] {
   const out: string[] = []
   for (let i = 0; i < count; i++) {
     const photo = PHOTOS[i % PHOTOS.length]!
-    const base = `${assetsBase}assets/demos/photos/${photo.file}`
+    const base = assetUrl(`assets/demos/photos/${photo.file}`)
     out.push(`${base}?v=${baseToken}-${i}`)
+  }
+  return out
+}
+
+// Manifest shape as emitted by the `preimage-manifest` CLI: a flat
+// `{ [urlPath]: { width, height } }` map. The manifest demo consumes
+// this to illustrate build-time hydration without committing a second
+// JSON file that could drift from `photos.json`.
+export type ManifestEntries = Record<string, { width: number; height: number }>
+
+export function photosManifest(): ManifestEntries {
+  const out: ManifestEntries = {}
+  for (const p of PHOTOS) {
+    out[`/assets/demos/photos/${p.file}`] = { width: p.width, height: p.height }
   }
   return out
 }

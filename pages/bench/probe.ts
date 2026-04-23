@@ -69,7 +69,7 @@ async function run(): Promise<void> {
   const strategyEl = document.querySelector<HTMLInputElement>('input[name="strategy"]:checked')
   const strategy = (strategyEl?.value === 'stream' ? 'stream' : 'img') as 'img' | 'stream'
   const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  const urls = cycledUrls(n, token, '../')
+  const urls = cycledUrls(n, token)
 
   // Byte accounting via PerformanceObserver over the window of this
   // run. Filter by same-path-and-query so other network traffic

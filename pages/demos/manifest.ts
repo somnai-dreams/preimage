@@ -1,8 +1,8 @@
 import { prepare, clearCache } from '@somnai-dreams/preimage'
 import { recordKnownMeasurement } from '@somnai-dreams/preimage/core'
 import { packShortestColumn } from '@somnai-dreams/layout-algebra'
-import { newCacheBustToken } from './photo-source.js'
-import manifest from '../assets/demos/photos-manifest.json'
+import { newCacheBustToken, photosManifest } from './photo-source.js'
+import { fmtMs, setRowValue, resetStats } from './demo-formatting.js'
 
 const coldGrid = document.getElementById('coldGrid')!
 const hydratedGrid = document.getElementById('hydratedGrid')!
@@ -16,28 +16,6 @@ const manifestSize = document.getElementById('manifestSize')!
 const COLUMNS = 3
 const GAP = 4
 
-// --- Stat helpers ---
-
-function fmtMs(ms: number | null): string {
-  if (ms === null) return '—'
-  if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`
-  if (ms < 10) return `${ms.toFixed(2)}ms`
-  return `${ms.toFixed(1)}ms`
-}
-
-function setRowValue(host: HTMLElement, nth: number, html: string): void {
-  const b = host.querySelector(`.row:nth-child(${nth}) .value b`)
-  if (b !== null) b.innerHTML = html
-}
-
-function resetStats(host: HTMLElement): void {
-  const rows = host.querySelectorAll<HTMLElement>('.row')
-  for (const row of rows) {
-    const b = row.querySelector('.value b')
-    if (b !== null) b.innerHTML = '—'
-  }
-}
-
 // --- Source of truth is the manifest itself ---
 //
 // Every URL the demo uses comes from iterating manifest entries. The
@@ -46,7 +24,8 @@ function resetStats(host: HTMLElement): void {
 // we prepend `.` to turn them into `./assets/...` before fetching,
 // and append `?v=<token>` to defeat HTTP cache between runs.
 
-const manifestEntries = Object.entries(manifest) as Array<[string, { width: number; height: number }]>
+const manifest = photosManifest()
+const manifestEntries = Object.entries(manifest)
 manifestSize.textContent = String(manifestEntries.length)
 manifestPreview.innerHTML = manifestEntries
   .slice(0, 6)

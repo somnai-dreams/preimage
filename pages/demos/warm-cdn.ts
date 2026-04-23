@@ -7,9 +7,9 @@
 // Runs on every demo page via its own <script type="module">. No
 // effect unless a `#warmCdn` button exists in the DOM.
 
-import manifest from '../assets/demos/photos-manifest.json'
+import { PHOTOS, photoUrl } from './photo-source.js'
 
-const urls = Object.keys(manifest).map((key) => `.${key}`)
+const urls = PHOTOS.map((p) => photoUrl(p, null))
 
 const btn = document.getElementById('warmCdn') as HTMLButtonElement | null
 if (btn !== null) {
