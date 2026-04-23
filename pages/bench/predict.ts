@@ -7,10 +7,11 @@ import {
   type PredictionEvaluation,
   type ScrollSample,
 } from '@somnai-dreams/preimage/predict'
-import { captureMetadata, saveRun, type RunMetadata } from './common.js'
+import { captureMetadata, saveRun, wireUploadButton, type RunMetadata } from './common.js'
 
 const runBtn = document.getElementById('run') as HTMLButtonElement
 const saveBtn = document.getElementById('save') as HTMLButtonElement
+const uploadBtn = document.getElementById('upload') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
 const resultsHost = document.getElementById('results-host')!
 const jsonHost = document.getElementById('json-host')!
@@ -56,10 +57,12 @@ saveBtn.addEventListener('click', () => {
   if (lastRun === null) return
   saveRun(lastRun.meta, lastRun.params, lastRun.results)
 })
+wireUploadButton(uploadBtn, () => lastRun)
 
 async function run(): Promise<void> {
   runBtn.disabled = true
   saveBtn.disabled = true
+  uploadBtn.disabled = true
   runBtn.textContent = 'Running…'
   metaEl.textContent = ''
   resultsHost.innerHTML = ''
@@ -197,6 +200,7 @@ async function run(): Promise<void> {
   runBtn.disabled = false
   runBtn.textContent = 'Run again'
   saveBtn.disabled = false
+  uploadBtn.disabled = false
 }
 
 // --- Scroll patterns ---
