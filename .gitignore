@@ -6,3 +6,4 @@ dist-demos/
 .vscode/
 .idea/
 *.log
+/.playwright-mcp
