@@ -32,7 +32,6 @@
     <a href="./stream.html">Stream</a>
     <a href="./dropzone.html">Drop zone</a>
     <a href="./chat.html">Chat</a>
-    <a href="./sidecar.html">Sidecar</a>
     <a href="./instant.html">Instant</a>
     <span class="spacer"></span>
     <a href="./bench/">benchmarks</a>
@@ -89,10 +88,6 @@
         <a class="demo-card" href="./chat.html">
           <h3>Chat — pretext rich-inline</h3>
           <p>A chat bubble with text, avatar icons, stickers, and photo attachments mixed inline. <code>inlineImage</code> turns each image into a pretext <code>RichInlineItem</code> with its measured width reserved as <code>extraWidth</code>. Drag the bubble-width slider — text rebreaks and images shuffle to new positions in one synchronous flow pass.</p>
-        </a>
-        <a class="demo-card" href="./sidecar.html">
-          <h3>Sidecar — <code>Preimage-*</code> headers + <code>.prei</code> files</h3>
-          <p>One wire format, two physical shapes. Cooperating origin sets <code>Preimage-Width</code>/<code>-Height</code> response headers on image GETs; client probes via <code>HEAD</code> with zero body bytes. Or drop a plain-text <code>photo.jpg.prei</code> sidecar next to each image; client fetches that for static origins. Either way — one RTT to dims, no format sniffing, no image-byte wrap.</p>
         </a>
         <a class="demo-card" href="./instant.html">
           <h3>Instant — what it looks like on a real site</h3>
