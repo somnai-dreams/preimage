@@ -1,0 +1,230 @@
+{
+  "bench": "orientation-corpus",
+  "date": "2026-04-23T08:16:20.416Z",
+  "wallMs": 2.332267999999999,
+  "total": 55,
+  "passed": 55,
+  "failed": 0,
+  "results": [
+    {
+      "ok": true,
+      "case": "apply/code-1-preserves"
+    },
+    {
+      "ok": true,
+      "case": "apply/code-2-preserves"
+    },
+    {
+      "ok": true,
+      "case": "apply/code-3-preserves"
+    },
+    {
+      "ok": true,
+      "case": "apply/code-4-preserves"
+    },
+    {
+      "ok": true,
+      "case": "apply/code-5-swaps"
+    },
+    {
+      "ok": true,
+      "case": "apply/code-6-swaps"
+    },
+    {
+      "ok": true,
+      "case": "apply/code-7-swaps"
+    },
+    {
+      "ok": true,
+      "case": "apply/code-8-swaps"
+    },
+    {
+      "ok": true,
+      "case": "valid/1-true"
+    },
+    {
+      "ok": true,
+      "case": "valid/2-true"
+    },
+    {
+      "ok": true,
+      "case": "valid/3-true"
+    },
+    {
+      "ok": true,
+      "case": "valid/4-true"
+    },
+    {
+      "ok": true,
+      "case": "valid/5-true"
+    },
+    {
+      "ok": true,
+      "case": "valid/6-true"
+    },
+    {
+      "ok": true,
+      "case": "valid/7-true"
+    },
+    {
+      "ok": true,
+      "case": "valid/8-true"
+    },
+    {
+      "ok": true,
+      "case": "valid/0-false"
+    },
+    {
+      "ok": true,
+      "case": "valid/9-false"
+    },
+    {
+      "ok": true,
+      "case": "valid/10-false"
+    },
+    {
+      "ok": true,
+      "case": "valid/-1-false"
+    },
+    {
+      "ok": true,
+      "case": "valid/1.5-false"
+    },
+    {
+      "ok": true,
+      "case": "valid/NaN-false"
+    },
+    {
+      "ok": true,
+      "case": "valid/Infinity-false"
+    },
+    {
+      "ok": true,
+      "case": "describe/1"
+    },
+    {
+      "ok": true,
+      "case": "describe/2"
+    },
+    {
+      "ok": true,
+      "case": "describe/3"
+    },
+    {
+      "ok": true,
+      "case": "describe/4"
+    },
+    {
+      "ok": true,
+      "case": "describe/5"
+    },
+    {
+      "ok": true,
+      "case": "describe/6"
+    },
+    {
+      "ok": true,
+      "case": "describe/7"
+    },
+    {
+      "ok": true,
+      "case": "describe/8"
+    },
+    {
+      "ok": true,
+      "case": "read/little/code-1"
+    },
+    {
+      "ok": true,
+      "case": "read/little/code-2"
+    },
+    {
+      "ok": true,
+      "case": "read/little/code-3"
+    },
+    {
+      "ok": true,
+      "case": "read/little/code-4"
+    },
+    {
+      "ok": true,
+      "case": "read/little/code-5"
+    },
+    {
+      "ok": true,
+      "case": "read/little/code-6"
+    },
+    {
+      "ok": true,
+      "case": "read/little/code-7"
+    },
+    {
+      "ok": true,
+      "case": "read/little/code-8"
+    },
+    {
+      "ok": true,
+      "case": "read/big/code-1"
+    },
+    {
+      "ok": true,
+      "case": "read/big/code-2"
+    },
+    {
+      "ok": true,
+      "case": "read/big/code-3"
+    },
+    {
+      "ok": true,
+      "case": "read/big/code-4"
+    },
+    {
+      "ok": true,
+      "case": "read/big/code-5"
+    },
+    {
+      "ok": true,
+      "case": "read/big/code-6"
+    },
+    {
+      "ok": true,
+      "case": "read/big/code-7"
+    },
+    {
+      "ok": true,
+      "case": "read/big/code-8"
+    },
+    {
+      "ok": true,
+      "case": "read/second-ifd-entry"
+    },
+    {
+      "ok": true,
+      "case": "read/no-exif"
+    },
+    {
+      "ok": true,
+      "case": "read/xmp-app1-not-exif"
+    },
+    {
+      "ok": true,
+      "case": "read/not-jpeg"
+    },
+    {
+      "ok": true,
+      "case": "read/empty"
+    },
+    {
+      "ok": true,
+      "case": "read/truncated-after-soi"
+    },
+    {
+      "ok": true,
+      "case": "read/bad-byte-order"
+    },
+    {
+      "ok": true,
+      "case": "read/bogus-orientation-value"
+    }
+  ]
+}
