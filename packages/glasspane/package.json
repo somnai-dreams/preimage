@@ -1,0 +1,13 @@
+{
+  "name": "@somnai-dreams/glasspane",
+  "version": "0.0.0",
+  "private": true,
+  "description": "GPU-resident image rendering for galleries. Design proposal — not implemented.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/somnai-dreams/preimage.git",
+    "directory": "packages/glasspane"
+  },
+  "type": "module",
+  "license": "MIT"
+}
