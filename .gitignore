@@ -11,3 +11,18 @@ dist-demos/
 # Raw HAR captures — run scripts/distill-har.ts and commit the
 # .distilled.json output instead (typically 1000× smaller).
 *.har
+
+# Per-run outputs from offline regression harnesses (pass/fail
+# tests, not trendy benchmarks). The harnesses still save a JSON
+# locally for inspection, but committing every CI run's output
+# just churns the repo. Commit harness outputs by hand when a run
+# is worth archiving.
+benchmarks/fit-analysis-*.json
+benchmarks/manifest-build-*.json
+benchmarks/orientation-corpus-*.json
+benchmarks/parser-robustness-*.json
+benchmarks/parser-fuzz-*.json
+benchmarks/prepare-queue-*.json
+benchmarks/stream-probe-*.json
+benchmarks/url-pattern-corpus-*.json
+benchmarks/packer-sweep-*.json
