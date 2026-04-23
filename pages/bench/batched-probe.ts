@@ -5,6 +5,7 @@ import {
   captureMetadata,
   distribution,
   fmtBytes,
+  saveRun,
   type Distribution,
   type RunMetadata,
 } from './common.js'
@@ -13,6 +14,7 @@ const nInput = document.getElementById('nInput') as HTMLInputElement
 const batchSizeInput = document.getElementById('batchSize') as HTMLInputElement
 const batchDelayInput = document.getElementById('batchDelay') as HTMLInputElement
 const runBtn = document.getElementById('run') as HTMLButtonElement
+const saveBtn = document.getElementById('save') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
 const statHost = document.getElementById('stat-host')!
 const jsonHost = document.getElementById('json-host')!
@@ -37,10 +39,15 @@ type BenchResults = {
 let lastRun: { meta: RunMetadata; params: BenchParams; results: BenchResults } | null = null
 
 runBtn.addEventListener('click', () => { void run() })
+saveBtn.addEventListener('click', () => {
+  if (lastRun === null) return
+  saveRun(lastRun.meta, lastRun.params, lastRun.results)
+})
 
 async function run(): Promise<void> {
   runBtn.disabled = true
   runBtn.textContent = 'Running…'
+  saveBtn.disabled = true
   metaEl.textContent = ''
   statHost.innerHTML = ''
   jsonHost.innerHTML = ''
@@ -136,6 +143,7 @@ async function run(): Promise<void> {
   metaEl.textContent = `${strategy} · n=${n} · ${meta.protocol ?? '?'}${rttBit} · ${new Date(meta.date).toLocaleTimeString()}`
   runBtn.disabled = false
   runBtn.textContent = 'Run again'
+  saveBtn.disabled = false
 }
 
 function renderStats(r: BenchResults, params: BenchParams): void {
