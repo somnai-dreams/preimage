@@ -7,7 +7,7 @@ These repos may be found at `../best practices/' if running locally.
 Same ecosystem, different concern: pretext owns text layout, vibescript owns UI conventions, preimage owns images, freerange owns verification. Read vibescript's AGENTS + `docs/` before working here — we follow its rules. Read the pretext and freerange READMEs.
 
 `bun install` if you're in a fresh worktree.
-`bun run check` for typecheck (we don't run tests — good TypeScript doesn't need them).
+`bun run check` for typecheck. `bun run check:all` runs the offline regression harnesses (scripts under `scripts/*-test.ts`, `*-corpus.ts`, `*-sweep.ts`, `*-fuzz.ts`). No unit tests for trivial code — types cover that — but the harnesses exist because they catch real bugs (SVG attribute order, URL param validation) that types don't. CI runs both on every push + PR via `.github/workflows/check.yml`.
 `bun run start` for the dev server at `http://localhost:3000`. Each demo is `/<name>.html`; benchmarks at `/bench/`.
 `bun run build:demos` emits `dist-demos/` for GitHub Pages; deploy is a push to `main`.
 
