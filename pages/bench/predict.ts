@@ -7,9 +7,10 @@ import {
   type PredictionEvaluation,
   type ScrollSample,
 } from '@somnai-dreams/preimage/predict'
-import { captureMetadata, type RunMetadata } from './common.js'
+import { captureMetadata, saveRun, type RunMetadata } from './common.js'
 
 const runBtn = document.getElementById('run') as HTMLButtonElement
+const saveBtn = document.getElementById('save') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
 const resultsHost = document.getElementById('results-host')!
 const jsonHost = document.getElementById('json-host')!
@@ -41,19 +42,39 @@ type BenchResults = {
   sampleCount: number
   scrolledPx: number
   predictors: PredictorRow[]
+  // True iff the tab was backgrounded at any point during the scripted
+  // scroll. When hidden, rAF freezes and the setInterval sampler drops
+  // to ~1 Hz, so the captured sample trace has an unrealistic gap —
+  // treat the run as advisory only.
+  tabHiddenDuring: boolean
 }
 
 let lastRun: { meta: RunMetadata; params: BenchParams; results: BenchResults } | null = null
 
 runBtn.addEventListener('click', () => { void run() })
+saveBtn.addEventListener('click', () => {
+  if (lastRun === null) return
+  saveRun(lastRun.meta, lastRun.params, lastRun.results)
+})
 
 async function run(): Promise<void> {
   runBtn.disabled = true
+  saveBtn.disabled = true
   runBtn.textContent = 'Running…'
   metaEl.textContent = ''
   resultsHost.innerHTML = ''
   jsonHost.innerHTML = ''
   scrollHost.scrollTop = 0
+
+  // Track tab visibility for the duration of the run. A backgrounded
+  // tab freezes rAF and drops setInterval frequency, which would
+  // silently corrupt the captured ScrollSample trace that the
+  // predictors are evaluated against.
+  let tabHiddenDuring = false
+  const onVisibility = (): void => {
+    if (document.hidden) tabHiddenDuring = true
+  }
+  document.addEventListener('visibilitychange', onVisibility)
 
   const patternEl = document.querySelector<HTMLInputElement>('input[name="pattern"]:checked')
   const pattern = (patternEl?.value ?? 'constant') as ScrollPattern
@@ -149,10 +170,13 @@ async function run(): Promise<void> {
     }
   }
 
+  document.removeEventListener('visibilitychange', onVisibility)
+
   const results: BenchResults = {
     sampleCount: capturedSamples.length,
     scrolledPx: scrollHost.scrollTop,
     predictors: rows,
+    tabHiddenDuring,
   }
 
   const meta = await captureMetadata(
@@ -161,17 +185,18 @@ async function run(): Promise<void> {
   )
   const params: BenchParams = { pattern, peakVelocity, durationMs, tolerancePx }
   lastRun = { meta, params, results }
-  void lastRun
 
-  renderResults(rows, tolerancePx)
+  renderResults(rows, tolerancePx, tabHiddenDuring)
   const pre = document.createElement('pre')
   pre.className = 'bench-json'
   pre.textContent = JSON.stringify({ ...meta, params, results }, null, 2)
   jsonHost.appendChild(pre)
 
-  metaEl.textContent = `${pattern} · ${peakVelocity} px/s · ${durationMs}ms · ${capturedSamples.length} samples`
+  const taintBit = tabHiddenDuring ? ' · tab-backgrounded — tainted' : ''
+  metaEl.textContent = `${pattern} · ${peakVelocity} px/s · ${durationMs}ms · ${capturedSamples.length} samples${taintBit}`
   runBtn.disabled = false
   runBtn.textContent = 'Run again'
+  saveBtn.disabled = false
 }
 
 // --- Scroll patterns ---
@@ -279,7 +304,24 @@ function syntheticObserver(history: readonly ScrollSample[]): Parameters<typeof 
 
 // --- Reporting ---
 
-function renderResults(rows: readonly PredictorRow[], tolerancePx: number): void {
+function renderResults(
+  rows: readonly PredictorRow[],
+  tolerancePx: number,
+  tabHiddenDuring: boolean,
+): void {
+  resultsHost.innerHTML = ''
+  if (tabHiddenDuring) {
+    const warn = document.createElement('div')
+    warn.className = 'warn'
+    warn.style.color = '#c23030'
+    warn.style.border = '1px solid #c23030'
+    warn.style.padding = '10px 12px'
+    warn.style.borderRadius = 'var(--radius-sm)'
+    warn.style.marginBottom = '12px'
+    warn.style.fontSize = '12px'
+    warn.textContent = 'Tab was backgrounded during the run — rAF froze and the sample trace has a gap. Treat results as tainted.'
+    resultsHost.appendChild(warn)
+  }
   const table = document.createElement('table')
   table.className = 'predict-table'
   const thead = document.createElement('thead')
@@ -325,6 +367,5 @@ function renderResults(rows: readonly PredictorRow[], tolerancePx: number): void
     tbody.appendChild(trRow)
   }
   table.appendChild(tbody)
-  resultsHost.innerHTML = ''
   resultsHost.appendChild(table)
 }
