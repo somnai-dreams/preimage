@@ -1,5 +1,6 @@
 import { DecodePool, prepare } from '@somnai-dreams/preimage'
 import { newCacheBustToken, photoUrl, takePhotos, type Photo } from './photo-source.js'
+import { getStrategy } from './nav-concurrency.js'
 
 const metaEl = document.getElementById('meta')!
 const runNaiveBtn = document.getElementById('runNaive') as HTMLButtonElement
@@ -123,6 +124,7 @@ async function runNaive(): Promise<void> {
   const urls = resolvePhotos(cacheBust)
 
   const t0 = performance.now()
+  const strategy = getStrategy()
   const images = urls.map((u) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
@@ -131,7 +133,7 @@ async function runNaive(): Promise<void> {
   })
   const naturalSizes = await Promise.all(
     urls.map(async (u) => {
-      const prepared = await prepare(u)
+      const prepared = await prepare(u, { strategy })
       return { w: prepared.width, h: prepared.height }
     }),
   )

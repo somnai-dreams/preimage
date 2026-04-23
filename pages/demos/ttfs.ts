@@ -1,6 +1,7 @@
 import { prepare } from '@somnai-dreams/preimage'
 import { newCacheBustToken, photoUrl, PHOTOS } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
+import { getStrategy } from './nav-concurrency.js'
 import { fmtMs } from './demo-formatting.js'
 
 const metaEl = document.getElementById('meta')!
@@ -212,7 +213,7 @@ async function runPreimage(): Promise<void> {
   const url = resolveUrl(cacheBust)
 
   const t0 = performance.now()
-  const prepared = await prepare(url)
+  const prepared = await prepare(url, { strategy: getStrategy() })
   const dimsAt = performance.now() - t0
   const frame = sizedFrame(f3, prepared.measurement.naturalWidth, prepared.measurement.naturalHeight)
   const reservedAt = performance.now() - t0

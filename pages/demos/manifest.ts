@@ -2,6 +2,7 @@ import { prepare, clearCache } from '@somnai-dreams/preimage'
 import { recordKnownMeasurement } from '@somnai-dreams/preimage/core'
 import { packShortestColumn } from '@somnai-dreams/layout-algebra'
 import { newCacheBustToken, photosManifest } from './photo-source.js'
+import { getStrategy } from './nav-concurrency.js'
 import { fmtMs, setRowValue, resetStats } from './demo-formatting.js'
 
 const coldGrid = document.getElementById('coldGrid')!
@@ -106,10 +107,11 @@ async function runCold(): Promise<void> {
   const entries = freshEntries(newCacheBustToken())
 
   const t0 = performance.now()
+  const strategy = getStrategy()
   let firstMs: number | null = null
   const prepared = await Promise.all(
     entries.map((e) =>
-      prepare(e.url).then((p) => {
+      prepare(e.url, { strategy }).then((p) => {
         if (firstMs === null) {
           firstMs = performance.now() - t0
           setRowValue(coldStats, 2, `<b>${fmtMs(firstMs)}</b>`)

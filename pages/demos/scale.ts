@@ -2,7 +2,7 @@ import { PrepareQueue } from '@somnai-dreams/preimage'
 import { shortestColumnCursor } from '@somnai-dreams/layout-algebra'
 import { cycledUrls } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
-import { getConcurrency } from './nav-concurrency.js'
+import { getConcurrency, getStrategy } from './nav-concurrency.js'
 import { fmtMs, fmtBytes, setRowValue, resetStats } from './demo-formatting.js'
 
 const countSlider = document.getElementById('countSlider') as HTMLInputElement
@@ -217,10 +217,11 @@ async function runMeasured(): Promise<void> {
   // HTTP/2 origins (this site is H2 under GitHub Pages); on HTTP/1.1
   // the browser's 6-slot cap gatekeeps automatically with no penalty.
   const queue = new PrepareQueue({ concurrency: getConcurrency() })
+  const strategy = getStrategy()
 
   await Promise.all(
     urls.map((url) =>
-      queue.enqueue(url, { dimsOnly: true }).then((prepared) => {
+      queue.enqueue(url, { dimsOnly: true, strategy }).then((prepared) => {
         const place = packer.add(prepared.aspectRatio)
         measuredPanel.style.height = `${packer.totalHeight()}px`
 

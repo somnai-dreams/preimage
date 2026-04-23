@@ -9,6 +9,7 @@ import {
 import { flowColumnWithFloats } from '@somnai-dreams/preimage/pretext'
 import { newCacheBustToken, photoUrl, PHOTOS, type Photo } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
+import { getStrategy } from './nav-concurrency.js'
 import { fmtMs, setRowValue, resetStats } from './demo-formatting.js'
 
 const metaEl = document.getElementById('meta')!
@@ -354,8 +355,9 @@ async function runMeasured(): Promise<void> {
   const urls = buildUrls(cacheBust)
 
   const t0 = performance.now()
+  const strategy = getStrategy()
   const [prepared] = await Promise.all([
-    Promise.all(urls.map((u) => prepare(u))),
+    Promise.all(urls.map((u) => prepare(u, { strategy }))),
     document.fonts.ready,
   ])
 

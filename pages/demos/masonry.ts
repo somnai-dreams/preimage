@@ -8,6 +8,7 @@ import {
 } from '@somnai-dreams/layout-algebra'
 import { newCacheBustToken, photoUrl, takePhotos, PHOTO_COUNT } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
+import { getStrategy } from './nav-concurrency.js'
 import { fmtMs, setRowValue, resetStats } from './demo-formatting.js'
 
 const countSlider = document.getElementById('countSlider') as HTMLInputElement
@@ -251,12 +252,13 @@ async function runMeasured(): Promise<void> {
 
 async function runMeasuredBatch(urls: readonly string[], layout: Layout): Promise<void> {
   const t0 = performance.now()
+  const strategy = getStrategy()
   // Track each prepare()'s individual resolve time for the "average
   // dim fetch" stat. Promise.all only gives us the all-done time.
   const dimTimes: number[] = []
   const prepared = await Promise.all(
     urls.map((u) =>
-      prepare(u).then((p) => {
+      prepare(u, { strategy }).then((p) => {
         dimTimes.push(performance.now() - t0)
         return p
       }),
@@ -299,6 +301,7 @@ async function runMeasuredBatch(urls: readonly string[], layout: Layout): Promis
 
 async function runMeasuredProgressive(urls: readonly string[], layout: Layout): Promise<void> {
   const t0 = performance.now()
+  const strategy = getStrategy()
   const panelWidth = measuredPanel.getBoundingClientRect().width
 
   // Pick the cursor. Shortest-column emits a Placement per add();
@@ -343,7 +346,7 @@ async function runMeasuredProgressive(urls: readonly string[], layout: Layout): 
 
   await Promise.all(
     urls.map((url) =>
-      prepare(url).then((p) => {
+      prepare(url, { strategy }).then((p) => {
         dimTimes.push(performance.now() - t0)
         const aspect = p.aspectRatio
         const idx = addOrder++

@@ -2,7 +2,7 @@ import { PrepareQueue } from '@somnai-dreams/preimage'
 import { createVirtualTilePool } from '@somnai-dreams/preimage/virtual'
 import { shortestColumnCursor, type Placement } from '@somnai-dreams/layout-algebra'
 import { cycledUrls } from './photo-source.js'
-import { getConcurrency } from './nav-concurrency.js'
+import { getConcurrency, getStrategy } from './nav-concurrency.js'
 import { fmtMs, fmtBytes, fmtCount, setRowValue, resetStats } from './demo-formatting.js'
 
 const countSlider = document.getElementById('countSlider') as HTMLInputElement
@@ -244,9 +244,10 @@ async function runMeasured(): Promise<void> {
   // bytes and aborts — for 10k tiles at 4KB each that's ~40MB vs.
   // hundreds of MB for full-body fetches.
   const queue = new PrepareQueue({ concurrency: getConcurrency() })
+  const strategy = getStrategy()
 
   const placePromises = urls.map((url) =>
-    queue.enqueue(url, { dimsOnly: true, strategy: 'stream' }).then((prepared) => {
+    queue.enqueue(url, { dimsOnly: true, strategy }).then((prepared) => {
       const aspect = prepared.aspectRatio
       placements.push(packer.add(aspect))
       indexUrl.push(url)
