@@ -34,7 +34,28 @@ import { prepare, type PreparedImage, type PrepareOptions } from './prepare.js'
 import { normalizeSrc } from './analysis.js'
 
 export type PrepareQueueOptions = {
+  /** Cap on in-flight `prepare()` calls. When omitted, the library
+   *  picks a value based on `navigator.connection` hints: 6 for
+   *  data-saver / 2g / 3g (gentle on metered or slow links), 50
+   *  otherwise (HTTP/2 sweet spot). Pass an explicit number to
+   *  override this entirely. */
   concurrency?: number
+}
+
+/** Pick a reasonable concurrency default from the current environment.
+ *  Respects `navigator.connection.saveData` and `effectiveType` so
+ *  metered / slow links don't get blasted with 50 parallel probes. */
+export function pickAdaptiveConcurrency(): number {
+  if (typeof navigator === 'undefined') return 50
+  const conn = (navigator as unknown as {
+    connection?: { saveData?: boolean; effectiveType?: string }
+  }).connection
+  if (conn === undefined) return 50
+  if (conn.saveData === true) return 6
+  if (conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g' || conn.effectiveType === '3g') {
+    return 6
+  }
+  return 50
 }
 
 type PendingEntry = {
@@ -57,7 +78,7 @@ export class PrepareQueue {
   private readonly inflight = new Map<string, Promise<PreparedImage>>()
 
   constructor(options: PrepareQueueOptions = {}) {
-    const c = options.concurrency ?? 50
+    const c = options.concurrency ?? pickAdaptiveConcurrency()
     if (!Number.isFinite(c) || c < 1) {
       throw new RangeError(`PrepareQueue: concurrency must be a positive integer, got ${c}.`)
     }

@@ -12,6 +12,8 @@ export {
   getMeasurement,
   getElement,
   preparedFromMeasurement,
+  getOriginStrategy,
+  clearOriginStrategyCache,
   type PreparedImage,
   type PreparedSource,
   type PrepareOptions,
@@ -39,7 +41,7 @@ export {
   type UrlDimensionParser,
 } from './url-dimensions.js'
 
-export { PrepareQueue, type PrepareQueueOptions } from './prepare-queue.js'
+export { PrepareQueue, pickAdaptiveConcurrency, type PrepareQueueOptions } from './prepare-queue.js'
 
 export { DecodePool, type DecodePoolOptions } from './decode-pool.js'
 

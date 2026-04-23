@@ -146,9 +146,9 @@ export type PrepareOptions = MeasureOptions & {
    *  (off-screen tiles, image catalogs, SSR precompute). */
   dimsOnly?: boolean
   /** Probe strategy for URL sources:
-   *  - `'img'` (default): create an `<img>`, poll `naturalWidth`, abort
-   *    via `src = ''`. Produces a warmed `<img>` the caller can reuse
-   *    for render via `prepared.element`.
+   *  - `'img'`: create an `<img>`, poll `naturalWidth`, abort via
+   *    `src = ''`. Produces a warmed `<img>` the caller can reuse for
+   *    render via `prepared.element`.
    *  - `'stream'`: `fetch(url)`, feed `response.body` through
    *    `probeImageStream`, abort via `AbortController` the instant the
    *    header bytes parse. No warmed element, but dims land at
@@ -161,9 +161,17 @@ export type PrepareOptions = MeasureOptions & {
    *    "server noticed my abort." Most deterministic of the three.
    *    Falls back silently to the `'stream'` behavior if the server
    *    answers with 200 (no Range support).
+   *  - `'auto'`: pick per-origin. First probe against a new origin
+   *    tries `'range'`; the library remembers whether the server
+   *    answered 206 (stay on `'range'`) or 200 (switch to `'stream'`
+   *    for this origin). Subsequent probes consult the cache. No
+   *    warmed element.
    *
-   *  Blob sources ignore this; they always byte-probe directly. */
-  strategy?: 'img' | 'stream' | 'range'
+   *  Default: `'auto'` when `dimsOnly === true` (no warmed element is
+   *  expected), `'img'` otherwise (caller likely wants to reuse
+   *  `prepared.element` for render). Blob sources ignore this entirely;
+   *  they always byte-probe directly. */
+  strategy?: 'img' | 'stream' | 'range' | 'auto'
   /** Number of bytes to request when `strategy: 'range'`. Defaults to
    *  4096 — comfortably past any supported header parser's max. */
   rangeBytes?: number
@@ -273,6 +281,59 @@ export function getElement(prepared: PreparedImage): HTMLImageElement | null {
 
 // --- URL path dispatch ---
 
+type ConcreteStrategy = 'img' | 'stream' | 'range'
+
+// Per-origin strategy memory. First probe against a new origin tries
+// 'range'; the result records which strategy the server actually
+// supports, so every subsequent probe for the same origin skips the
+// fallback. Scoped to the module (shared across PrepareQueue instances
+// and direct prepare() callers in the same page).
+const originStrategyCache = new Map<string, ConcreteStrategy>()
+
+function originOf(src: string): string | null {
+  try {
+    const base = typeof location !== 'undefined' ? location.href : undefined
+    return new URL(src, base).origin
+  } catch {
+    return null
+  }
+}
+
+function rememberOriginStrategy(src: string, strategy: ConcreteStrategy): void {
+  const origin = originOf(src)
+  if (origin !== null) originStrategyCache.set(origin, strategy)
+}
+
+/** Read the remembered strategy for an origin, or `null` if nothing
+ *  has been recorded yet. Exposed for diagnostics and caller-side
+ *  pre-warming flows. */
+export function getOriginStrategy(origin: string): ConcreteStrategy | null {
+  return originStrategyCache.get(origin) ?? null
+}
+
+/** Clear the per-origin strategy cache. Useful in tests or when a
+ *  server's Range support changes between deploys. */
+export function clearOriginStrategyCache(): void {
+  originStrategyCache.clear()
+}
+
+/** Resolve an `options.strategy` to a concrete one, applying:
+ *   - explicit `'img' | 'stream' | 'range'` passes through
+ *   - `'auto'` consults the origin cache; first-probe tries `'range'`
+ *   - undefined strategy picks `'auto'` when `dimsOnly === true`
+ *     (no warmed element is expected), `'img'` otherwise */
+function resolveStrategy(src: string, options: PrepareOptions): ConcreteStrategy {
+  const s = options.strategy
+  if (s === 'img' || s === 'stream' || s === 'range') return s
+  if (s !== 'auto' && options.dimsOnly !== true) return 'img'
+  const origin = originOf(src)
+  if (origin !== null) {
+    const cached = originStrategyCache.get(origin)
+    if (cached !== undefined) return cached
+  }
+  return 'range'
+}
+
 async function prepareFromUrl(src: string, options: PrepareOptions): Promise<PreparedImage> {
   const key = normalizeSrc(src)
   const cached = peekImageMeasurement(key)
@@ -288,12 +349,9 @@ async function prepareFromUrl(src: string, options: PrepareOptions): Promise<Pre
     return wrap(measurement, null, 'url-pattern')
   }
 
-  if (options.strategy === 'range') {
-    return await prepareFromUrlRange(src, key, options)
-  }
-  if (options.strategy === 'stream') {
-    return await prepareFromUrlStream(src, key, options)
-  }
+  const strategy = resolveStrategy(src, options)
+  if (strategy === 'range') return await prepareFromUrlRange(src, key, options)
+  if (strategy === 'stream') return await prepareFromUrlStream(src, key, options)
   return await prepareFromUrlImg(src, key, options)
 }
 
@@ -333,11 +391,13 @@ async function prepareFromUrlRange(
   }
 
   // 200 means the server ignored our Range header. Fall back to the
-  // stream path so we still abort once dims are known.
+  // stream path so we still abort once dims are known. Remember this
+  // origin as stream-only so subsequent probes skip the 206-roundtrip.
   if (response.status === 200) {
     if (response.body === null) {
       throw new Error(`preimage: fetch ${src} returned no body`)
     }
+    rememberOriginStrategy(src, 'stream')
     return await consumeStreamForDims(src, key, response.body, options, undefined, parseContentLength(response))
   }
 
@@ -354,6 +414,7 @@ async function prepareFromUrlRange(
   // Content-Range: `bytes 0-4095/12345`. Falls back to null when the
   // header is missing or malformed.
   const byteLength = parseContentRangeTotal(response) ?? parseContentLength(response)
+  rememberOriginStrategy(src, 'range')
   const measurement = recordKnownMeasurement(key, probed.width, probed.height, {
     orientation: options.orientation ?? 1,
     byteLength,
@@ -416,6 +477,7 @@ async function prepareFromUrlStream(
   if (response.body === null) {
     throw new Error(`preimage: fetch ${src} returned no body`)
   }
+  rememberOriginStrategy(src, 'stream')
   return await consumeStreamForDims(src, key, response.body, options, controller, parseContentLength(response))
 }
 
