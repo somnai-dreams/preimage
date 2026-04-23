@@ -5,6 +5,8 @@
 // pass them when constructing their queues or calling prepare() —
 // changes take effect on the next Run, not mid-flight.
 
+import { clearOriginStrategyCache } from '@somnai-dreams/preimage'
+
 const CONCURRENCY_KEY = 'preimage-concurrency'
 const CONCURRENCY_OPTIONS = [6, 20, 50, 100, 200]
 const CONCURRENCY_DEFAULT = 50
@@ -80,7 +82,16 @@ if (nav !== null) {
     'prepare() probe strategy. img polls <img>.naturalWidth; stream reads fetch() body and aborts at header; range requests just the header bytes.',
     STRATEGY_OPTIONS,
     getStrategy(),
-    (v) => localStorage.setItem(STRATEGY_KEY, v),
+    (v) => {
+      localStorage.setItem(STRATEGY_KEY, v)
+      // Wipe the per-origin auto-discovery cache on every change so
+      // auto rediscovers from scratch next run. Belt-and-suspenders
+      // with the library-side fix (explicit strategies no longer write
+      // to the cache) — guarantees a clean state even if the cache
+      // was already populated by a prior auto run the user now wants
+      // to re-probe.
+      clearOriginStrategyCache()
+    },
   )
 
   // Insert before the Warm CDN button if present, else before .gh.

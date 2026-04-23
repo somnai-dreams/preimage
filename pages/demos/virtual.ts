@@ -28,6 +28,15 @@ const GAP = 3
 // investigate before reintroducing direction-aware behavior.
 const OVERSCAN = 600
 
+// Retained across runs so "Run again" can tear down the pool from the
+// prior run before creating a new one. Without this, each run leaks a
+// scroll listener + ResizeObserver on measuredScroll; the stale pool
+// still holds the previous run's placements and on every scroll event
+// re-appends its orphaned recycled elements into measuredPanel at the
+// old placement coordinates. Result: ghost tiles from earlier runs
+// overlaid on top of the current grid.
+let activeMeasuredPool: { destroy: () => void } | null = null
+
 function getCount(): number {
   return Number(countSlider.value)
 }
@@ -150,8 +159,13 @@ function markTileLoaded(el: HTMLElement, img: HTMLImageElement): void {
 async function runMeasured(): Promise<void> {
   runMeasuredBtn.disabled = true
   runMeasuredBtn.textContent = 'Running…'
+  if (activeMeasuredPool !== null) {
+    activeMeasuredPool.destroy()
+    activeMeasuredPool = null
+  }
   measuredPanel.innerHTML = ''
   measuredPanel.style.height = '0px'
+  measuredScroll.scrollTop = 0
   resetStats(measuredStats)
 
   const count = getCount()
@@ -217,6 +231,7 @@ async function runMeasured(): Promise<void> {
       el.className = 'vtile pending'
     },
   })
+  activeMeasuredPool = pool
 
   // rAF-batched render. All the DOM writes that used to fire per
   // probe-resolve now coalesce into one pass per frame. With up to

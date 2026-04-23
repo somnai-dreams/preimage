@@ -321,17 +321,28 @@ export function clearOriginStrategyCache(): void {
  *   - explicit `'img' | 'stream' | 'range'` passes through
  *   - `'auto'` consults the origin cache; first-probe tries `'range'`
  *   - undefined strategy picks `'auto'` when `dimsOnly === true`
- *     (no warmed element is expected), `'img'` otherwise */
-function resolveStrategy(src: string, options: PrepareOptions): ConcreteStrategy {
+ *     (no warmed element is expected), `'img'` otherwise
+ *
+ *  Returns `fromAuto: true` when the strategy came from `'auto'`
+ *  resolution (explicit or cached). Callers use this to gate writes to
+ *  `originStrategyCache`: only auto-originated probes record their
+ *  outcome. Without the gate, explicit selections (e.g. a user picking
+ *  `'stream'` from a demo nav) would overwrite whatever auto had
+ *  discovered, so switching back to `'auto'` would silently inherit
+ *  the manual choice instead of rediscovering. */
+function resolveStrategy(
+  src: string,
+  options: PrepareOptions,
+): { strategy: ConcreteStrategy; fromAuto: boolean } {
   const s = options.strategy
-  if (s === 'img' || s === 'stream' || s === 'range') return s
-  if (s !== 'auto' && options.dimsOnly !== true) return 'img'
+  if (s === 'img' || s === 'stream' || s === 'range') return { strategy: s, fromAuto: false }
+  if (s !== 'auto' && options.dimsOnly !== true) return { strategy: 'img', fromAuto: false }
   const origin = originOf(src)
   if (origin !== null) {
     const cached = originStrategyCache.get(origin)
-    if (cached !== undefined) return cached
+    if (cached !== undefined) return { strategy: cached, fromAuto: true }
   }
-  return 'range'
+  return { strategy: 'range', fromAuto: true }
 }
 
 async function prepareFromUrl(src: string, options: PrepareOptions): Promise<PreparedImage> {
@@ -349,9 +360,9 @@ async function prepareFromUrl(src: string, options: PrepareOptions): Promise<Pre
     return wrap(measurement, null, 'url-pattern')
   }
 
-  const strategy = resolveStrategy(src, options)
-  if (strategy === 'range') return await prepareFromUrlRange(src, key, options)
-  if (strategy === 'stream') return await prepareFromUrlStream(src, key, options)
+  const { strategy, fromAuto } = resolveStrategy(src, options)
+  if (strategy === 'range') return await prepareFromUrlRange(src, key, options, fromAuto)
+  if (strategy === 'stream') return await prepareFromUrlStream(src, key, options, fromAuto)
   return await prepareFromUrlImg(src, key, options)
 }
 
@@ -371,6 +382,7 @@ async function prepareFromUrlRange(
   src: string,
   key: string,
   options: PrepareOptions,
+  fromAuto: boolean,
 ): Promise<PreparedImage> {
   const rangeBytes = options.rangeBytes ?? 4096
   const credentials =
@@ -391,13 +403,16 @@ async function prepareFromUrlRange(
   }
 
   // 200 means the server ignored our Range header. Fall back to the
-  // stream path so we still abort once dims are known. Remember this
-  // origin as stream-only so subsequent probes skip the 206-roundtrip.
+  // stream path so we still abort once dims are known. When we got
+  // here via auto-resolution, remember the origin as stream-only so
+  // subsequent auto probes skip the 206-roundtrip; an explicit
+  // `strategy: 'range'` caller doesn't pollute the auto-discovery
+  // cache (see resolveStrategy docstring for why).
   if (response.status === 200) {
     if (response.body === null) {
       throw new Error(`preimage: fetch ${src} returned no body`)
     }
-    rememberOriginStrategy(src, 'stream')
+    if (fromAuto) rememberOriginStrategy(src, 'stream')
     return await consumeStreamForDims(src, key, response.body, options, undefined, parseContentLength(response))
   }
 
@@ -414,7 +429,7 @@ async function prepareFromUrlRange(
   // Content-Range: `bytes 0-4095/12345`. Falls back to null when the
   // header is missing or malformed.
   const byteLength = parseContentRangeTotal(response) ?? parseContentLength(response)
-  rememberOriginStrategy(src, 'range')
+  if (fromAuto) rememberOriginStrategy(src, 'range')
   const measurement = recordKnownMeasurement(key, probed.width, probed.height, {
     orientation: options.orientation ?? 1,
     byteLength,
@@ -454,6 +469,7 @@ async function prepareFromUrlStream(
   src: string,
   key: string,
   options: PrepareOptions,
+  fromAuto: boolean,
 ): Promise<PreparedImage> {
   const controller = new AbortController()
   if (options.signal !== undefined) {
@@ -477,7 +493,7 @@ async function prepareFromUrlStream(
   if (response.body === null) {
     throw new Error(`preimage: fetch ${src} returned no body`)
   }
-  rememberOriginStrategy(src, 'stream')
+  if (fromAuto) rememberOriginStrategy(src, 'stream')
   return await consumeStreamForDims(src, key, response.body, options, controller, parseContentLength(response))
 }
 
