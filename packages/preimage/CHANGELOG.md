@@ -3,6 +3,7 @@
 ## 0.11.0
 
 - **New subpath `@somnai-dreams/preimage/predict`** — scroll observer + baseline predictors for predictive pre-rendering. `createScrollObserver(container, { sampleRateMs })` samples scroll position at a configurable rate, exposes `current()`, `velocity()`, `smoothedVelocity(windowSize)`, and `acceleration()`. `createStationaryPredictor`, `createLinearPredictor`, and `createMomentumPredictor` (physics-based with exponential drag) take the observer + a horizon and return `{ scrollY, confidence }`. `evaluatePrediction` runs a predictor against a ground-truth trajectory and reports mean/p50/p95/max error + hit-rate within a tolerance band. Phase 0 of a potential ML swing — the bench at `/bench/predict.html` answers "does cheap physics beat fixed overscan?" before committing to model training.
+- **`createLinearPredictor` default `velocityWindow: 2`** (was 4). Selected via `scripts/predict-sweep.ts` which grid-searches the predictor hyperparameters against synthesized scroll patterns (constant / accelerating / decelerating / direction-change / fling at three peak velocities). Window=2 hits **92.4% within ±400px at 500ms horizon** averaged across patterns, vs 37.3% for stationary baseline — a 55-point lift. Larger windows smooth noise but lag behind velocity changes, which dominates at the horizons most callers care about.
 
 ## 0.10.1
 

@@ -190,13 +190,21 @@ export type LinearPredictorOptions = {
 
 /** Extrapolates scroll-Y = current + smoothedVelocity × horizon.
  *  Confidence decays with velocity magnitude above a threshold
- *  (higher velocities = more likely to change direction). */
+ *  (higher velocities = more likely to change direction).
+ *
+ *  Default `velocityWindow: 2`. Chosen from the sweep at
+ *  `scripts/predict-sweep.ts` — a 2-sample window hits 92% within
+ *  ±400px at a 500ms horizon across the five standard scroll
+ *  patterns, versus 37% for the stationary baseline. Longer windows
+ *  smooth noise but lag behind velocity changes; the 2-sample
+ *  window tracks genuine scroll behavior closely enough to
+ *  dominate smoothed variants. */
 export function createLinearPredictor(
   observer: ScrollObserver,
   options: LinearPredictorOptions = {},
 ): Predictor {
   const horizonMs = options.horizonMs ?? 500
-  const velocityWindow = options.velocityWindow ?? 4
+  const velocityWindow = options.velocityWindow ?? 2
   const HIGH_VELOCITY_THRESHOLD = 3000 // px/sec; above here, fling-ish
   return {
     predict() {

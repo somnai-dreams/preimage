@@ -195,10 +195,11 @@ async function runScrollPattern(
           scrollY = Math.min(maxScroll, peakVelocity * (elapsed / 1000))
           break
         case 'accelerating':
-          // Quadratic ramp from 0 to peakVelocity over durationMs:
-          //   v(t) = peakVelocity * (t / durationMs)
-          //   s(t) = ∫v = peakVelocity * t² / (2 * durationMs)
-          scrollY = Math.min(maxScroll, (peakVelocity * elapsed * elapsed) / (2 * durationMs))
+          // v ramps linearly 0 → peakVelocity over durationMs.
+          //   v(t_sec) = peak × (t_sec / (durationMs/1000))
+          // Integrating with elapsed in ms (t_sec = elapsed / 1000):
+          //   s = peak × elapsed² / (2000 × durationMs)
+          scrollY = Math.min(maxScroll, (peakVelocity * elapsed * elapsed) / (2000 * durationMs))
           break
         case 'decelerating':
           // Inverse: full velocity at start, zero at end.
