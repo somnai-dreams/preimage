@@ -1,0 +1,39 @@
+{
+  "bench": "parser-fuzz",
+  "date": "2026-04-23T08:27:33.398Z",
+  "wallMs": 707.6239260000001,
+  "targets": [
+    {
+      "target": "probeImageBytes",
+      "iterations": 10000,
+      "crashes": 0,
+      "nonNull": 906,
+      "invariantViolations": 0,
+      "invariantDetails": []
+    },
+    {
+      "target": "probeImageStream",
+      "iterations": 500,
+      "crashes": 0,
+      "nonNull": 89,
+      "invariantViolations": 0,
+      "invariantDetails": []
+    },
+    {
+      "target": "readExifOrientation",
+      "iterations": 10000,
+      "crashes": 0,
+      "nonNull": 0,
+      "invariantViolations": 0,
+      "invariantDetails": []
+    },
+    {
+      "target": "url-parsers",
+      "iterations": 10000,
+      "crashes": 0,
+      "nonNull": 7499,
+      "invariantViolations": 0,
+      "invariantDetails": []
+    }
+  ]
+}

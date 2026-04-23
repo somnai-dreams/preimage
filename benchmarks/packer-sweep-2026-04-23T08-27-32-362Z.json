@@ -1,0 +1,205 @@
+{
+  "bench": "packer-sweep",
+  "date": "2026-04-23T08:27:32.362Z",
+  "wallMs": 108.49195399999999,
+  "total": 29,
+  "passed": 29,
+  "failed": 0,
+  "scaling": [
+    {
+      "packer": "shortestColumn",
+      "n": 100,
+      "iterations": 50,
+      "avgMs": 0.04722498000000016,
+      "minMs": 0.006902000000000186,
+      "maxMs": 1.4093069999999983,
+      "totalHeight": 4483.625633909575
+    },
+    {
+      "packer": "justifiedRows",
+      "n": 100,
+      "iterations": 50,
+      "avgMs": 0.011450820000000164,
+      "minMs": 0.00592500000000129,
+      "maxMs": 0.06732899999999731,
+      "totalHeight": 6832.826306415078
+    },
+    {
+      "packer": "shortestColumn",
+      "n": 1000,
+      "iterations": 50,
+      "avgMs": 0.15889514000000005,
+      "minMs": 0.04163499999999942,
+      "maxMs": 2.0093770000000006,
+      "totalHeight": 43985.2948151751
+    },
+    {
+      "packer": "justifiedRows",
+      "n": 1000,
+      "iterations": 50,
+      "avgMs": 0.11010162000000051,
+      "minMs": 0.029488000000000625,
+      "maxMs": 0.9106690000000022,
+      "totalHeight": 69320.5357276691
+    },
+    {
+      "packer": "shortestColumn",
+      "n": 10000,
+      "iterations": 10,
+      "avgMs": 1.4203564,
+      "minMs": 0.4342359999999985,
+      "maxMs": 2.8619739999999965,
+      "totalHeight": 446313.8704422849
+    },
+    {
+      "packer": "justifiedRows",
+      "n": 10000,
+      "iterations": 10,
+      "avgMs": 0.7173037999999998,
+      "minMs": 0.261927,
+      "maxMs": 1.744962000000001,
+      "totalHeight": 690368.3059255567
+    },
+    {
+      "packer": "shortestColumn",
+      "n": 100000,
+      "iterations": 3,
+      "avgMs": 15.434388666666669,
+      "minMs": 10.023632000000006,
+      "maxMs": 20.896710999999996,
+      "totalHeight": 4457772.250055812
+    },
+    {
+      "packer": "justifiedRows",
+      "n": 100000,
+      "iterations": 3,
+      "avgMs": 4.791901666666665,
+      "minMs": 4.272365000000008,
+      "maxMs": 5.772849999999991,
+      "totalHeight": 6900326.577347797
+    }
+  ],
+  "results": [
+    {
+      "ok": true,
+      "case": "determinism/shortest-column",
+      "notes": "500 tiles, height 21951px"
+    },
+    {
+      "ok": true,
+      "case": "determinism/justified-rows",
+      "notes": "500 tiles, height 36242px"
+    },
+    {
+      "ok": true,
+      "case": "cursor-batch-equivalence/shortest-column"
+    },
+    {
+      "ok": true,
+      "case": "cursor-batch-equivalence/justified-rows"
+    },
+    {
+      "ok": true,
+      "case": "pathological/sc-empty"
+    },
+    {
+      "ok": true,
+      "case": "pathological/jr-empty"
+    },
+    {
+      "ok": true,
+      "case": "pathological/sc-one"
+    },
+    {
+      "ok": true,
+      "case": "pathological/jr-one"
+    },
+    {
+      "ok": true,
+      "case": "pathological/sc-uniform"
+    },
+    {
+      "ok": true,
+      "case": "pathological/jr-uniform"
+    },
+    {
+      "ok": true,
+      "case": "pathological/sc-extreme"
+    },
+    {
+      "ok": true,
+      "case": "pathological/jr-extreme"
+    },
+    {
+      "ok": true,
+      "case": "pathological/sc-zero-columns"
+    },
+    {
+      "ok": true,
+      "case": "pathological/jr-zero-panelwidth"
+    },
+    {
+      "ok": true,
+      "case": "append-stability/shortest-column"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/empty"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/all"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/above"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/below"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/middle"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/edge-top"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/overscan"
+    },
+    {
+      "ok": true,
+      "case": "visibleIndices/zero-size"
+    },
+    {
+      "ok": true,
+      "case": "estimate/columns-basic"
+    },
+    {
+      "ok": true,
+      "case": "estimate/columns-min"
+    },
+    {
+      "ok": true,
+      "case": "estimate/columns-single",
+      "notes": "1 tiles"
+    },
+    {
+      "ok": true,
+      "case": "estimate/rows-basic"
+    },
+    {
+      "ok": true,
+      "case": "estimate/rows-min",
+      "notes": "2 tiles"
+    },
+    {
+      "ok": true,
+      "case": "scaling-measured",
+      "notes": "8 configs timed"
+    }
+  ]
+}

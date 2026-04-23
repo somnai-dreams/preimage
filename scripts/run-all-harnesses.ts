@@ -23,6 +23,7 @@ const HARNESSES: Array<{ name: string; script: string }> = [
   { name: 'stream-probe', script: 'stream-probe-test.ts' },
   { name: 'prepare-queue', script: 'prepare-queue-test.ts' },
   { name: 'fit-analysis', script: 'fit-analysis-test.ts' },
+  { name: 'parser-fuzz', script: 'parser-fuzz.ts' },
 ]
 
 type HarnessResult = {
