@@ -194,8 +194,8 @@ function probeSvg(bytes: Uint8Array): ProbedDimensions | null {
   }
   if (!found) return null
   const text = new TextDecoder().decode(bytes.subarray(0, head))
-  const widthMatch = text.match(/<svg\b[^>]*\swidth=["']?([0-9.]+)(?:px)?["']?/i)
-  const heightMatch = text.match(/<svg\b[^>]*\sheight=["']?([0-9.]+)(?:px)?["']?/i)
+  const widthMatch = text.match(/<svg\b[^>"']*\swidth=["']?([0-9.]+)(?:px)?["']?/i)
+  const heightMatch = text.match(/<svg\b[^>"']*\sheight=["']?([0-9.]+)(?:px)?["']?/i)
   if (widthMatch !== null && heightMatch !== null) {
     const w = Number(widthMatch[1])
     const h = Number(heightMatch[1])
@@ -204,7 +204,7 @@ function probeSvg(bytes: Uint8Array): ProbedDimensions | null {
     }
   }
   const viewBoxMatch = text.match(
-    /<svg\b[^>]*\sviewBox=["']\s*[-0-9.]+\s+[-0-9.]+\s+([0-9.]+)\s+([0-9.]+)\s*["']/i,
+    /<svg\b[^>"']*\sviewBox=["']\s*[-0-9.]+\s+[-0-9.]+\s+([0-9.]+)\s+([0-9.]+)\s*["']/i,
   )
   if (viewBoxMatch !== null) {
     const w = Number(viewBoxMatch[1])
@@ -248,6 +248,13 @@ export function probeImageBytes(bytes: Uint8Array): ProbedDimensions | null {
 // buffer for retrying the probe. After that threshold we stop
 // retrying but keep buffering for the final Blob. Default 64KB —
 // comfortably past the largest header any supported format needs.
+//
+// `dims` is null when the probe never succeeded: either the stream
+// is a format probeImageBytes doesn't recognize, or the header was
+// malformed, or maxProbeBytes was reached before a header resolved.
+// `onDims` is not fired in that case. Callers that need to render a
+// best-effort <img> even without dims can still use `blob` — the
+// browser's own decoder is more lenient than our header parser.
 
 export type ProbeImageStreamOptions = {
   onDims?: (dims: ProbedDimensions) => void

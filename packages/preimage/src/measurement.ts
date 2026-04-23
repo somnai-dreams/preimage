@@ -90,8 +90,8 @@ export function recordKnownMeasurement(
 // that fetch SVG bytes themselves (e.g. to inline into a shadow DOM)
 // and want to avoid the browser's size-less-SVG fallback.
 export function measureFromSvgText(svgText: string): { width: number; height: number } | null {
-  const widthMatch = svgText.match(/<svg\b[^>]*\swidth=["']?([0-9.]+)(?:px)?["']?/i)
-  const heightMatch = svgText.match(/<svg\b[^>]*\sheight=["']?([0-9.]+)(?:px)?["']?/i)
+  const widthMatch = svgText.match(/<svg\b[^>"']*\swidth=["']?([0-9.]+)(?:px)?["']?/i)
+  const heightMatch = svgText.match(/<svg\b[^>"']*\sheight=["']?([0-9.]+)(?:px)?["']?/i)
   if (widthMatch !== null && heightMatch !== null) {
     const w = Number(widthMatch[1])
     const h = Number(heightMatch[1])
@@ -100,7 +100,7 @@ export function measureFromSvgText(svgText: string): { width: number; height: nu
     }
   }
   const viewBoxMatch = svgText.match(
-    /<svg\b[^>]*\sviewBox=["']\s*[-0-9.]+\s+[-0-9.]+\s+([0-9.]+)\s+([0-9.]+)\s*["']/i,
+    /<svg\b[^>"']*\sviewBox=["']\s*[-0-9.]+\s+[-0-9.]+\s+([0-9.]+)\s+([0-9.]+)\s*["']/i,
   )
   if (viewBoxMatch !== null) {
     const w = Number(viewBoxMatch[1])
