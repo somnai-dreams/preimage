@@ -1,6 +1,6 @@
 {
   "name": "@somnai-dreams/preimage",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Measured images for pretext: float figures and inline images in pretext-flowed text, without triggering DOM reflow",
   "keywords": [
     "pretext",
@@ -51,10 +51,16 @@
       "import": "./dist/virtual.js",
       "default": "./dist/virtual.js"
     },
+    "./container": {
+      "types": "./dist/container.d.ts",
+      "import": "./dist/container.js",
+      "default": "./dist/container.js"
+    },
     "./package.json": "./package.json"
   },
   "bin": {
-    "preimage-manifest": "./dist/manifest-cli.js"
+    "preimage-manifest": "./dist/manifest-cli.js",
+    "preimage-transcode": "./dist/transcode-cli.js"
   },
   "files": [
     "CHANGELOG.md",

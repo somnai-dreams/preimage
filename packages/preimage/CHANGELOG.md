@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0
+
+- **New subpath `@somnai-dreams/preimage/container`** — a 128-byte fixed-layout wrapper for any JPEG/PNG/WebP/AVIF payload. The prefix carries width, height, hasAlpha, isProgressive, payload byteLength, format tag, optional 24-byte thumbhash, optional 8-byte sha256 prefix, and a CRC32 over the metadata. `encodeContainerPrefix(meta)` and `decodeContainerPrefix(bytes)` are pure, DOM-free, and work in any runtime. `buildContainer(meta, payload)` concatenates prefix + payload for the encode side.
+- **New `strategy: 'container'`** on `prepare()`. Fetches `Range: bytes=0-127`, decodes the prefix, records dims + alpha + progressive + byteLength deterministically — no format-parser walk, no abort-race, one TCP flight. Falls through to the `'range'` path on 200 responses or on prefix-decode failure (URL isn't a container), so the caller always gets dims. Origin is remembered as container-supporting for subsequent probes. `'auto'` does not attempt `'container'` automatically (a random 128-byte prefix that happened to match "PREI" could mis-decode); callers opt in explicitly.
+- **New CLI `preimage-transcode`** — wraps image files in the container without re-encoding. `preimage-transcode in.jpg out.prei` writes the 128-byte prefix + byte-identical payload. `--batch in-dir out-dir` walks a directory tree and mirrors the output. `--extract in.prei out.jpg` strips the prefix, producing the original file. Supported payload formats for v1: jpeg, png, webp. GIF/BMP/AVIF/SVG aren't wrapped; AVIF needs an `ispe` walker the current probe stack doesn't yet have.
+
 ## 0.10.0
 
 - **`PreparedImage.source`** — every `prepare()` / `prepareSync()` handle now carries a `source: PreparedSource` tag: `'network' | 'cache' | 'url-pattern' | 'declared' | 'manifest' | 'blob'`. Lets callers branch UI on provenance without tracking state outside the library — skip the skeleton shimmer on cache/manifest hits, fade in only when `source === 'network'`. `preparedFromMeasurement(m, 'manifest')` is the integrator path: hydrate the measurement cache via `recordKnownMeasurement` at boot, then mint prepared handles tagged as manifest-sourced so the render layer can treat them as dims-known-at-load.
