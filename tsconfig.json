@@ -17,6 +17,7 @@
   "include": [
     "packages/preimage/src/**/*.ts",
     "packages/layout-algebra/src/**/*.ts",
-    "pages/**/*.ts"
+    "pages/**/*.ts",
+    "api/**/*.ts"
   ]
 }

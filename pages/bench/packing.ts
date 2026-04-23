@@ -7,6 +7,7 @@ import {
   captureMetadata,
   distribution,
   seededAspects,
+  wireUploadButton,
   type Distribution,
   type RunMetadata,
 } from './common.js'
@@ -19,6 +20,7 @@ const seedSlider = document.getElementById('seedSlider') as HTMLInputElement
 const seedVal = document.getElementById('seedVal')!
 const runBtn = document.getElementById('run') as HTMLButtonElement
 const saveBtn = document.getElementById('save') as HTMLButtonElement
+const uploadBtn = document.getElementById('upload') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
 const results = document.getElementById('results')!
 
@@ -53,11 +55,13 @@ saveBtn.addEventListener('click', () => {
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 })
+wireUploadButton(uploadBtn, () => lastRun)
 
 async function run(): Promise<void> {
   runBtn.disabled = true
   runBtn.textContent = 'Running…'
   saveBtn.disabled = true
+  uploadBtn.disabled = true
   results.innerHTML = ''
 
   const n = Number(nSlider.value)
@@ -118,6 +122,7 @@ async function run(): Promise<void> {
   runBtn.disabled = false
   runBtn.textContent = 'Run again'
   saveBtn.disabled = false
+  uploadBtn.disabled = false
 }
 
 function placementsEqual(a: readonly Placement[], b: readonly Placement[]): boolean {

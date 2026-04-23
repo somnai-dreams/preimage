@@ -170,6 +170,123 @@ export function saveRun<T>(meta: RunMetadata, params: unknown, results: T): void
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
+// --- Upload to shared gist ---
+//
+// POSTs a run JSON to /api/bench-runs which appends it as a new file
+// to a GitHub gist. Lets a mobile device run a bench via a ?t=<token>
+// URL and have the result land where you can diff it against desktop
+// runs in compare.html without emailing JSONs around.
+
+const UPLOAD_TOKEN_STORAGE = 'preimage-bench-upload-token'
+const UPLOAD_ENDPOINT = '/api/bench-runs'
+
+/** Read the upload token. If the URL has `?t=<token>`, persist it to
+ *  localStorage and strip it from the bar (so a shared link doesn't
+ *  keep leaking the token into screenshots / history). */
+export function getUploadToken(): string | null {
+  if (typeof location === 'undefined') return null
+  const url = new URL(location.href)
+  const fromUrl = url.searchParams.get('t')
+  if (fromUrl !== null && fromUrl.length > 0) {
+    localStorage.setItem(UPLOAD_TOKEN_STORAGE, fromUrl)
+    url.searchParams.delete('t')
+    history.replaceState(null, '', url.toString())
+    return fromUrl
+  }
+  return localStorage.getItem(UPLOAD_TOKEN_STORAGE)
+}
+
+/** Clear the stored upload token. Useful after lending a device. */
+export function clearUploadToken(): void {
+  localStorage.removeItem(UPLOAD_TOKEN_STORAGE)
+}
+
+/** POST the run to /api/bench-runs. Returns the filename the server
+ *  wrote, or an error string fit for a UI toast. */
+export async function uploadRun<T>(
+  meta: RunMetadata,
+  params: unknown,
+  results: T,
+): Promise<{ filename: string } | { error: string }> {
+  const token = getUploadToken()
+  if (token === null) {
+    return { error: 'no upload token — append ?t=<token> to the URL' }
+  }
+  const body = JSON.stringify({ meta, params, results })
+  let response: Response
+  try {
+    response = await fetch(UPLOAD_ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-upload-token': token },
+      body,
+    })
+  } catch (err) {
+    return { error: `network error: ${String(err)}` }
+  }
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    return { error: `upload failed (${response.status}): ${text}` }
+  }
+  try {
+    return (await response.json()) as { filename: string }
+  } catch {
+    return { error: 'upload succeeded but response was not JSON' }
+  }
+}
+
+/** Wire an Upload button to POST the latest run via uploadRun().
+ *  Handles the disabled flicker + transient success/error text so the
+ *  bench page doesn't reimplement it five times. `getLastRun` is
+ *  called on click — return null if there's nothing yet and the
+ *  handler is a no-op. */
+export function wireUploadButton<T>(
+  button: HTMLButtonElement,
+  getLastRun: () => { meta: RunMetadata; params: unknown; results: T } | null,
+): void {
+  const originalText = button.textContent ?? 'Upload'
+  button.addEventListener('click', async () => {
+    const run = getLastRun()
+    if (run === null) return
+    const wasDisabled = button.disabled
+    button.disabled = true
+    button.textContent = 'Uploading…'
+    const r = await uploadRun(run.meta, run.params, run.results)
+    const restore = (ms: number): void => {
+      setTimeout(() => {
+        button.textContent = originalText
+        button.title = ''
+        button.disabled = wasDisabled
+      }, ms)
+    }
+    if ('error' in r) {
+      console.error('bench upload failed:', r.error)
+      button.textContent = 'Upload failed'
+      button.title = r.error
+      restore(4000)
+    } else {
+      button.textContent = 'Uploaded ✓'
+      button.title = r.filename
+      restore(3000)
+    }
+  })
+}
+
+export type RemoteRun = { filename: string; rawUrl: string; size: number }
+
+/** List recently-uploaded runs. Empty array on any failure (endpoint
+ *  not configured, network error, upstream gist fetch fail) so
+ *  callers can no-op gracefully. */
+export async function listRemoteRuns(): Promise<RemoteRun[]> {
+  try {
+    const r = await fetch(UPLOAD_ENDPOINT, { cache: 'no-store' })
+    if (!r.ok) return []
+    const j = (await r.json()) as { files?: RemoteRun[] }
+    return j.files ?? []
+  } catch {
+    return []
+  }
+}
+
 /** Render a distribution as a compact human-readable line. */
 export function fmtDistribution(d: Distribution, unit = 'ms'): string {
   const f = (n: number): string => (n < 10 ? n.toFixed(2) : n < 100 ? n.toFixed(1) : n.toFixed(0))

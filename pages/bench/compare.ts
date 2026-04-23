@@ -9,6 +9,8 @@
 // Everything collapses to a flat list of rows, then groups by network
 // label so a "home gigabit" run sits next to a "phone tether" run.
 
+import { listRemoteRuns } from './common.js'
+
 type FlatRow = {
   source: string
   networkLabel: string
@@ -33,6 +35,8 @@ const dropzone = document.getElementById('dropzone') as HTMLLabelElement
 const picker = document.getElementById('picker') as HTMLInputElement
 const loadedEl = document.getElementById('loaded-runs')!
 const comparisonEl = document.getElementById('comparison')!
+const loadRemoteBtn = document.getElementById('loadRemote') as HTMLButtonElement | null
+const remoteStatusEl = document.getElementById('remoteStatus')
 
 const runs: LoadedRun[] = []
 
@@ -54,18 +58,58 @@ async function ingestFiles(files: FileList): Promise<void> {
   for (const file of Array.from(files)) {
     try {
       const text = await file.text()
-      const json = JSON.parse(text)
-      const rows = flatten(json, file.name)
-      if (rows.length === 0) {
-        console.warn(`compare: ${file.name} has no recognized rows, skipping`)
-        continue
-      }
-      runs.push({ filename: file.name, rows })
+      ingestText(text, file.name)
     } catch (err) {
       console.warn(`compare: failed to parse ${file.name}:`, err)
     }
   }
   render()
+}
+
+function ingestText(text: string, filename: string): void {
+  const json = JSON.parse(text)
+  const rows = flatten(json, filename)
+  if (rows.length === 0) {
+    console.warn(`compare: ${filename} has no recognized rows, skipping`)
+    return
+  }
+  // Don't re-add the same filename twice (re-clicking Load Recent).
+  if (runs.some((r) => r.filename === filename)) return
+  runs.push({ filename, rows })
+}
+
+if (loadRemoteBtn !== null) {
+  loadRemoteBtn.addEventListener('click', async () => {
+    loadRemoteBtn.disabled = true
+    if (remoteStatusEl !== null) remoteStatusEl.textContent = 'Fetching…'
+    const files = await listRemoteRuns()
+    if (files.length === 0) {
+      if (remoteStatusEl !== null) {
+        remoteStatusEl.textContent = 'No uploads (or endpoint not configured).'
+      }
+      loadRemoteBtn.disabled = false
+      return
+    }
+    // Fetch the raw JSON for each. Parallel; order in `runs` ends up
+    // arbitrary but `render()` re-groups by network label anyway.
+    let okCount = 0
+    await Promise.all(files.map(async (f) => {
+      try {
+        const r = await fetch(f.rawUrl, { cache: 'no-store' })
+        if (!r.ok) return
+        const text = await r.text()
+        ingestText(text, f.filename)
+        okCount++
+      } catch (err) {
+        console.warn(`compare: failed to fetch ${f.filename}:`, err)
+      }
+    }))
+    render()
+    if (remoteStatusEl !== null) {
+      remoteStatusEl.textContent = `Loaded ${okCount} of ${files.length} remote runs.`
+    }
+    loadRemoteBtn.disabled = false
+  })
 }
 
 function flatten(json: unknown, filename: string): FlatRow[] {

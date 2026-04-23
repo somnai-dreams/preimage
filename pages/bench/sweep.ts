@@ -6,6 +6,7 @@ import {
   fmtBytes,
   getNetworkLabel,
   saveRun,
+  wireUploadButton,
   setNetworkLabel,
   type Distribution,
   type RunMetadata,
@@ -19,6 +20,7 @@ networkLabelEl.value = getNetworkLabel()
 networkLabelEl.addEventListener('input', () => setNetworkLabel(networkLabelEl.value.trim()))
 const runBtn = document.getElementById('run') as HTMLButtonElement
 const saveBtn = document.getElementById('save') as HTMLButtonElement
+const uploadBtn = document.getElementById('upload') as HTMLButtonElement
 const metaEl = document.getElementById('meta')!
 const progressEl = document.getElementById('progress')!
 const tableHost = document.getElementById('table-host')!
@@ -57,6 +59,7 @@ saveBtn.addEventListener('click', () => {
   if (lastRun === null) return
   saveRun(lastRun.meta, lastRun.params, lastRun.results)
 })
+wireUploadButton(uploadBtn, () => lastRun)
 
 async function run(): Promise<void> {
   const n = Number(nInput.value)
@@ -77,6 +80,7 @@ async function run(): Promise<void> {
   runBtn.disabled = true
   runBtn.textContent = 'Running…'
   saveBtn.disabled = true
+  uploadBtn.disabled = true
   metaEl.textContent = ''
   progressEl.textContent = ''
   jsonHost.innerHTML = ''
@@ -114,6 +118,7 @@ async function run(): Promise<void> {
   runBtn.disabled = false
   runBtn.textContent = 'Run again'
   saveBtn.disabled = false
+  uploadBtn.disabled = false
 }
 
 async function runOne(n: number, concurrency: number, strategy: Strategy, dimsOnly: boolean): Promise<SweepRow> {

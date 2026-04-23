@@ -75,6 +75,11 @@
       <div class="hint">Files from <code>benchmarks/</code> in this repo work, or fresh saves from <code>/bench/probe.html</code> or <code>/bench/sweep.html</code>.</div>
     </label>
 
+    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 16px;">
+      <button id="loadRemote" class="primary" style="background: var(--surface); color: var(--text); border: 1px solid var(--border);" title="Fetch runs uploaded via the Upload button on any bench page.">Load recent uploads</button>
+      <span id="remoteStatus" style="color: var(--text-muted); font-size: 12px;"></span>
+    </div>
+
     <h2 class="section">Loaded runs</h2>
     <div id="loaded-runs">
       <div class="empty-msg">No runs loaded yet.</div>
