@@ -1,0 +1,43 @@
+{
+  "bench": "probe-concurrency",
+  "date": "2026-04-23T02:15:35.587Z",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+  "origin": "https://somnai-dreams.github.io",
+  "commit": null,
+  "protocol": "h2",
+  "params": {
+    "n": 500,
+    "concurrency": 200,
+    "dimsOnly": true,
+    "strategy": "stream"
+  },
+  "results": {
+    "totalMs": 18034.10000014305,
+    "bytesTransferred": 150000,
+    "perceivedMs": {
+      "count": 500,
+      "min": 252.40000009536743,
+      "p50": 8769.800000190735,
+      "p95": 16994.200000047684,
+      "max": 18029.10000014305,
+      "mean": 8570.611599992275
+    },
+    "probeMs": {
+      "count": 500,
+      "min": 252.40000009536743,
+      "p50": 6751.200000286102,
+      "p95": 6751.200000286102,
+      "max": 6751.200000286102,
+      "mean": 5497.653600177765
+    },
+    "queueWaitMs": {
+      "count": 500,
+      "min": 0,
+      "p50": 5394.200000047684,
+      "p95": 13618.599999904633,
+      "max": 14653.5,
+      "mean": 5513.7309998764995
+    },
+    "throughputProbesPerSec": 27.72525382447884
+  }
+}
