@@ -179,12 +179,11 @@ export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualT
     const top = scrollTop - topOver - cachedContentOffsetTop
     const bottom = scrollTop + cachedClientHeight + bottomOver - cachedContentOffsetTop
 
-    const wanted = new Set<number>()
-    for (let i = 0; i < placements.length; i++) {
-      const p = placements[i]!
+    const wanted = new Map<number, Placement>()
+    for (const [i, p] of placements.entries()) {
       if (p.y + p.height < top) continue
       if (p.y > bottom) continue
-      wanted.add(i)
+      wanted.set(i, p)
     }
 
     for (const [idx, el] of active) {
@@ -194,11 +193,11 @@ export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualT
       }
     }
 
-    for (const idx of wanted) {
+    for (const [idx, p] of wanted) {
       if (active.has(idx)) continue
       const el = acquire()
       active.set(idx, el)
-      mount(idx, el, placements[idx]!)
+      mount(idx, el, p)
     }
   }
 

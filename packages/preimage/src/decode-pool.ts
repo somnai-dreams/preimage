@@ -84,7 +84,7 @@ export class DecodePool {
     if (inflight !== undefined) return inflight
 
     const promise = this.runBounded(async () => {
-      const bitmap = await this.decode(src, key)
+      const bitmap = await this.decode(src)
       this.store(key, bitmap)
       return bitmap
     })
@@ -151,7 +151,7 @@ export class DecodePool {
     this.cache.set(key, entry)
   }
 
-  private async decode(src: string, key: string): Promise<ImageBitmap> {
+  private async decode(src: string): Promise<ImageBitmap> {
     if (typeof createImageBitmap !== 'function') {
       throw new Error('preimage: DecodePool requires createImageBitmap support.')
     }
@@ -184,7 +184,6 @@ export class DecodePool {
       throw new Error(`preimage: DecodePool fetch failed for ${src} (${response.status}).`)
     }
     const blob = await response.blob()
-    void key
     return this.bitmapOptions !== undefined
       ? await createImageBitmap(blob, this.bitmapOptions)
       : await createImageBitmap(blob)
