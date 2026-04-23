@@ -1,0 +1,60 @@
+{
+  "bench": "manifest-build",
+  "date": "2026-04-23T08:17:48.824Z",
+  "wallMs": 60.36066199999999,
+  "total": 11,
+  "passed": 11,
+  "failed": 0,
+  "perf": {
+    "wallMs": 20.296775999999994,
+    "count": 100
+  },
+  "results": [
+    {
+      "ok": true,
+      "case": "empty-dir"
+    },
+    {
+      "ok": true,
+      "case": "single-file",
+      "notes": "test.png: 100×200"
+    },
+    {
+      "ok": true,
+      "case": "nested"
+    },
+    {
+      "ok": true,
+      "case": "nested/slashes"
+    },
+    {
+      "ok": true,
+      "case": "non-image-ignore"
+    },
+    {
+      "ok": true,
+      "case": "dotfile-ignore"
+    },
+    {
+      "ok": true,
+      "case": "node-modules-ignore"
+    },
+    {
+      "ok": true,
+      "case": "base-prefix"
+    },
+    {
+      "ok": true,
+      "case": "custom-ext"
+    },
+    {
+      "ok": true,
+      "case": "corrupt-skip"
+    },
+    {
+      "ok": true,
+      "case": "perf/large-dir",
+      "notes": "100 files in 20ms"
+    }
+  ]
+}
