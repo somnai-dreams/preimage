@@ -60,6 +60,10 @@
           <h3>Virtual-scroll synthetic</h3>
           <p>Packs N tiles, then scripts a constant-velocity scroll from top to bottom while sampling every rAF. Reports frame-time distribution, dropped frames, active tile count, mount/unmount churn. Regressions in <code>createVirtualTilePool</code> surface here: rising frame times, or active-tile-count drift away from the overscan band, both fail this bench loudly.</p>
         </a>
+        <a class="bench-card" href="./glasspane-spike.html">
+          <h3>glasspane Phase 0 spike</h3>
+          <p>DOM (<code>createVirtualTilePool</code>) vs GPU (<code>createGlasspaneScene</code>, WebGPU-backed). Same tile workload, scripted constant-velocity scroll, reports time-to-first-tile, sustained framerate, dropped frames, peak JS heap. Gate criteria: GPU memory &lt; 50% of DOM on 10k tiles, ≥ 55fps on 2000 tiles, TTF within 100ms of DOM. Needs WebGPU (Chrome/Edge 113+, Safari 17.4+, Firefox behind flag).</p>
+        </a>
       </div>
     </section>
 

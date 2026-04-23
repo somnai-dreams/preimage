@@ -2,6 +2,7 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["@webgpu/types"],
     "resolveJsonModule": true,
     "noEmit": true,
     "allowImportingTsExtensions": false,
@@ -11,12 +12,14 @@
       "@somnai-dreams/preimage/core": ["./packages/preimage/src/core.ts"],
       "@somnai-dreams/preimage/manifest": ["./packages/preimage/src/manifest.ts"],
       "@somnai-dreams/preimage/virtual": ["./packages/preimage/src/virtual.ts"],
-      "@somnai-dreams/layout-algebra": ["./packages/layout-algebra/src/index.ts"]
+      "@somnai-dreams/layout-algebra": ["./packages/layout-algebra/src/index.ts"],
+      "@somnai-dreams/glasspane": ["./packages/glasspane/src/index.ts"]
     }
   },
   "include": [
     "packages/preimage/src/**/*.ts",
     "packages/layout-algebra/src/**/*.ts",
+    "packages/glasspane/src/**/*.ts",
     "pages/**/*.ts",
     "api/**/*.ts"
   ]
