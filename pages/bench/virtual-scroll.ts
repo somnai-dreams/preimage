@@ -50,6 +50,10 @@ type VirtualScrollResults = {
   activeTileCount: Distribution
   totalMounts: number
   totalUnmounts: number
+  // True iff the tab was backgrounded at any point during the scripted
+  // scroll. rAF throttles (or stops) while hidden, so the recorded
+  // intervals are contaminated — treat the run as advisory only.
+  tabHiddenDuring: boolean
 }
 
 let lastRun: {
@@ -167,21 +171,35 @@ async function run(): Promise<void> {
   const tScroll0 = performance.now()
   const frameIntervals: number[] = []
   const activeCounts: number[] = []
-  let lastFrameTs = tScroll0
+  // Tracking object so the visibilitychange listener can mutate
+  // lastFrameTs (reset on return-from-hidden) and tainted (set on hide)
+  // without a closure rebind.
+  const scrollState = { lastFrameTs: tScroll0, tainted: false }
+  const onVisibility = (): void => {
+    if (document.hidden) {
+      scrollState.tainted = true
+    } else {
+      // Next rAF measures `now - lastFrameTs`; reset so the
+      // post-return interval doesn't include the hidden gap.
+      scrollState.lastFrameTs = performance.now()
+    }
+  }
+  document.addEventListener('visibilitychange', onVisibility)
 
   await new Promise<void>((resolve) => {
     function step(now: number): void {
       const elapsed = now - tScroll0
       const progress = Math.min(1, elapsed / scrollDurationMs)
       scrollBox.scrollTop = progress * targetScroll
-      frameIntervals.push(now - lastFrameTs)
+      frameIntervals.push(now - scrollState.lastFrameTs)
       activeCounts.push(pool.activeCount)
-      lastFrameTs = now
+      scrollState.lastFrameTs = now
       if (progress < 1) requestAnimationFrame(step)
       else resolve()
     }
     requestAnimationFrame(step)
   })
+  document.removeEventListener('visibilitychange', onVisibility)
   const scrollWallMs = performance.now() - tScroll0
 
   const intervalDist = distribution(frameIntervals.slice(1)) // drop first frame (contains setup-to-first-rAF gap)
@@ -197,6 +215,7 @@ async function run(): Promise<void> {
     activeTileCount: distribution(activeCounts),
     totalMounts: mounts,
     totalUnmounts: unmounts,
+    tabHiddenDuring: scrollState.tainted,
   }
 
   const meta = await captureMetadata(
@@ -224,9 +243,9 @@ async function run(): Promise<void> {
 function renderStats(r: VirtualScrollResults): void {
   const grid = document.createElement('div')
   grid.className = 'stat-grid'
-  const add = (label: string, value: string, unit = ''): void => {
+  const add = (label: string, value: string, unit = '', tone: 'bad' | '' = ''): void => {
     const cell = document.createElement('div')
-    cell.className = 'stat-cell'
+    cell.className = 'stat-cell' + (tone !== '' ? ` ${tone}` : '')
     const l = document.createElement('div')
     l.className = 'label'
     l.textContent = label
@@ -248,6 +267,9 @@ function renderStats(r: VirtualScrollResults): void {
   add('Active tiles max', r.activeTileCount.max.toFixed(0))
   add('Mounts', String(r.totalMounts))
   add('Unmounts', String(r.totalUnmounts))
+  if (r.tabHiddenDuring) {
+    add('Tab backgrounded', 'yes — run tainted', '', 'bad')
+  }
   statHost.innerHTML = ''
   statHost.appendChild(grid)
 }
