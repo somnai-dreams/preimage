@@ -1,0 +1,1935 @@
+{
+  "date": "2026-04-23T13:54:58.771Z",
+  "corpus": "/Users/max/Documents/Dev/preimage/benchmarks/probe-byte-threshold-modern2.json",
+  "results": [
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.monochrome.avif",
+      "fileBytes": 69856,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.monochrome.avif",
+      "fileBytes": 71882,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.monochrome.odd-width.avif",
+      "fileBytes": 69321,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.odd-width.avif",
+      "fileBytes": 80552,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.odd-height.avif",
+      "fileBytes": 78504,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.odd-width.avif",
+      "fileBytes": 78348,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.odd-height.avif",
+      "fileBytes": 80540,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.odd-width.odd-height.avif",
+      "fileBytes": 79515,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.monochrome.odd-width.odd-height.avif",
+      "fileBytes": 66487,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.avif",
+      "fileBytes": 80743,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.avif",
+      "fileBytes": 83040,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.monochrome.odd-width.odd-height.avif",
+      "fileBytes": 68303,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.monochrome.odd-height.avif",
+      "fileBytes": 69373,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.monochrome.odd-height.avif",
+      "fileBytes": 67570,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.monochrome.odd-width.avif",
+      "fileBytes": 67417,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.10bpc.yuv444.avif",
+      "fileBytes": 97436,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.10bpc.yuv444.odd-height.avif",
+      "fileBytes": 93201,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.10bpc.yuv444.odd-width.odd-height.avif",
+      "fileBytes": 91311,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.odd-width.odd-height.avif",
+      "fileBytes": 77645,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.monochrome.avif",
+      "fileBytes": 71878,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.10bpc.yuv444.odd-width.avif",
+      "fileBytes": 93382,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.avif",
+      "fileBytes": 89097,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.monochrome.odd-height.avif",
+      "fileBytes": 69369,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.8bpc.yuv444.odd-width.avif",
+      "fileBytes": 91492,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.8bpc.yuv444.avif",
+      "fileBytes": 95375,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.odd-width.avif",
+      "fileBytes": 86327,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.8bpc.yuv444.odd-height.avif",
+      "fileBytes": 91421,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.avif",
+      "fileBytes": 84078,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.monochrome.odd-width.avif",
+      "fileBytes": 69317,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.monochrome.odd-width.odd-height.avif",
+      "fileBytes": 68299,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.odd-height.avif",
+      "fileBytes": 86052,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.monochrome.odd-height.avif",
+      "fileBytes": 70251,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.odd-width.odd-height.avif",
+      "fileBytes": 85008,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.monochrome.odd-width.avif",
+      "fileBytes": 70199,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.odd-height.avif",
+      "fileBytes": 81694,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.odd-width.odd-height.avif",
+      "fileBytes": 80631,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.monochrome.avif",
+      "fileBytes": 73014,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.monochrome.odd-height.avif",
+      "fileBytes": 70251,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.avif",
+      "fileBytes": 90198,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.monochrome.odd-width.avif",
+      "fileBytes": 70199,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.monochrome.odd-width.odd-height.avif",
+      "fileBytes": 69124,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.odd-width.avif",
+      "fileBytes": 81695,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.odd-width.odd-height.avif",
+      "fileBytes": 85910,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.8bpc.yuv444.odd-width.odd-height.avif",
+      "fileBytes": 89658,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.monochrome.odd-width.odd-height.avif",
+      "fileBytes": 69124,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.odd-height.avif",
+      "fileBytes": 86996,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.monochrome.avif",
+      "fileBytes": 73014,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.odd-width.avif",
+      "fileBytes": 87525,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.avif",
+      "fileBytes": 98800,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.monochrome.odd-height.avif",
+      "fileBytes": 70251,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.monochrome.odd-width.odd-height.avif",
+      "fileBytes": 69124,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.monochrome.odd-width.avif",
+      "fileBytes": 70199,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.monochrome.avif",
+      "fileBytes": 73014,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.avif",
+      "fileBytes": 86782,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.odd-width.odd-height.avif",
+      "fileBytes": 92506,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.monochrome.avif",
+      "fileBytes": 69852,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.monochrome.odd-height.avif",
+      "fileBytes": 67566,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.monochrome.odd-width.avif",
+      "fileBytes": 67413,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.odd-height.avif",
+      "fileBytes": 94557,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.odd-height.avif",
+      "fileBytes": 83919,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1204,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.odd-width.avif",
+      "fileBytes": 84128,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.odd-width.avif",
+      "fileBytes": 94341,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.odd-width.odd-height.avif",
+      "fileBytes": 82819,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.monochrome.odd-width.odd-height.avif",
+      "fileBytes": 66483,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1203,
+        "height": 799
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile0.8bpc.yuv420.avif",
+      "fileBytes": 259104,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 3082,
+        "height": 2048
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile2.8bpc.yuv422.avif",
+      "fileBytes": 282146,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 3082,
+        "height": 2048
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.crop.avif",
+      "fileBytes": 85486,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 722,
+        "height": 1024
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile0.8bpc.yuv420.monochrome.avif",
+      "fileBytes": 220755,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 3082,
+        "height": 2048
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile2.10bpc.yuv422.monochrome.avif",
+      "fileBytes": 269190,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 3078,
+        "height": 2048
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.avif",
+      "fileBytes": 85445,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 722,
+        "height": 1024
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile2.8bpc.yuv422.monochrome.avif",
+      "fileBytes": 220751,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 3082,
+        "height": 2048
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.mirror-horizontal.avif",
+      "fileBytes": 84996,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 722,
+        "height": 1024
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile2.12bpc.yuv422.avif",
+      "fileBytes": 380045,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 3078,
+        "height": 2048
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.mirror-vertical.avif",
+      "fileBytes": 84632,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 722,
+        "height": 1024
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.mirror-vertical.rotate270.crop.avif",
+      "fileBytes": 85570,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1024,
+        "height": 722
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.rotate270.avif",
+      "fileBytes": 84886,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1024,
+        "height": 722
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile0.10bpc.yuv420.avif",
+      "fileBytes": 328366,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 3078,
+        "height": 2048
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile2.12bpc.yuv422.monochrome.avif",
+      "fileBytes": 277716,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 3078,
+        "height": 2048
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.rotate90.avif",
+      "fileBytes": 84837,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1024,
+        "height": 722
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.10bpc.yuv420.alpha-full.avif",
+      "fileBytes": 49032,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.10bpc.yuv420.alpha-full.monochrome.avif",
+      "fileBytes": 46838,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.10bpc.yuv420.alpha-limited.avif",
+      "fileBytes": 48394,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.10bpc.yuv420.alpha-limited.monochrome.avif",
+      "fileBytes": 46200,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile2.10bpc.yuv422.avif",
+      "fileBytes": 370041,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 3078,
+        "height": 2048
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.mirror-vertical.rotate270.avif",
+      "fileBytes": 85529,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 1024,
+        "height": 722
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.8bpc.yuv420.alpha-limited.avif",
+      "fileBytes": 35946,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.8bpc.yuv420.alpha-full.avif",
+      "fileBytes": 36191,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.8bpc.yuv420.alpha-limited.monochrome.avif",
+      "fileBytes": 33815,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile1.10bpc.yuv444.alpha-full.avif",
+      "fileBytes": 51332,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile0.10bpc.yuv420.monochrome.avif",
+      "fileBytes": 269194,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 3078,
+        "height": 2048
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile1.8bpc.yuv444.alpha-full.avif",
+      "fileBytes": 38385,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile1.10bpc.yuv444.alpha-limited.avif",
+      "fileBytes": 50694,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.10bpc.yuv422.alpha-full.avif",
+      "fileBytes": 50169,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile1.8bpc.yuv444.alpha-limited.avif",
+      "fileBytes": 38140,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.10bpc.yuv422.alpha-full.monochrome.avif",
+      "fileBytes": 46834,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.10bpc.yuv422.alpha-limited.monochrome.avif",
+      "fileBytes": 46196,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv420.alpha-full.avif",
+      "fileBytes": 64569,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv422.alpha-full.avif",
+      "fileBytes": 65714,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv420.alpha-limited.avif",
+      "fileBytes": 63618,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv420.alpha-limited.monochrome.avif",
+      "fileBytes": 61201,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv422.alpha-limited.avif",
+      "fileBytes": 64763,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv444.alpha-full.avif",
+      "fileBytes": 66795,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.10bpc.yuv422.alpha-limited.avif",
+      "fileBytes": 49531,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv420.alpha-full.monochrome.avif",
+      "fileBytes": 62152,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv444.alpha-full.monochrome.avif",
+      "fileBytes": 62152,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv422.alpha-full.monochrome.avif",
+      "fileBytes": 62152,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv444.alpha-limited.avif",
+      "fileBytes": 65844,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.8bpc.yuv420.alpha-full.monochrome.avif",
+      "fileBytes": 34060,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv422.alpha-limited.monochrome.avif",
+      "fileBytes": 61201,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.8bpc.yuv422.alpha-full.avif",
+      "fileBytes": 37161,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.8bpc.yuv422.alpha-full.monochrome.avif",
+      "fileBytes": 34056,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.10bpc.yuv420.alpha-full.avif",
+      "fileBytes": 4217,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.8bpc.yuv422.alpha-limited.monochrome.avif",
+      "fileBytes": 33811,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.10bpc.yuv420.alpha-full.monochrome.avif",
+      "fileBytes": 3978,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv444.alpha-limited.monochrome.avif",
+      "fileBytes": 61201,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.8bpc.yuv420.alpha-full.avif",
+      "fileBytes": 3284,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.10bpc.yuv420.alpha-limited.monochrome.avif",
+      "fileBytes": 3886,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.8bpc.yuv422.alpha-limited.avif",
+      "fileBytes": 36916,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 2048,
+        "height": 2048
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.10bpc.yuv420.alpha-limited.avif",
+      "fileBytes": 4125,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.8bpc.yuv420.alpha-full.monochrome.avif",
+      "fileBytes": 3044,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.8bpc.yuv420.alpha-limited.avif",
+      "fileBytes": 3236,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.8bpc.yuv420.alpha-limited.monochrome.avif",
+      "fileBytes": 2996,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile1.10bpc.yuv444.alpha-full.avif",
+      "fileBytes": 4415,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile1.8bpc.yuv444.alpha-limited.avif",
+      "fileBytes": 3415,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile1.8bpc.yuv444.alpha-full.avif",
+      "fileBytes": 3463,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile1.10bpc.yuv444.alpha-limited.avif",
+      "fileBytes": 4323,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.10bpc.yuv422.alpha-limited.avif",
+      "fileBytes": 4200,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.10bpc.yuv422.alpha-full.monochrome.avif",
+      "fileBytes": 3974,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.10bpc.yuv422.alpha-limited.monochrome.avif",
+      "fileBytes": 3882,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.10bpc.yuv422.alpha-full.avif",
+      "fileBytes": 4292,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv420.alpha-full.avif",
+      "fileBytes": 5202,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv420.alpha-limited.avif",
+      "fileBytes": 5110,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv420.alpha-full.monochrome.avif",
+      "fileBytes": 4945,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv422.alpha-full.avif",
+      "fileBytes": 5270,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv420.alpha-limited.monochrome.avif",
+      "fileBytes": 4853,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv422.alpha-full.monochrome.avif",
+      "fileBytes": 4945,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv422.alpha-limited.avif",
+      "fileBytes": 5178,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv422.alpha-limited.monochrome.avif",
+      "fileBytes": 4853,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv444.alpha-limited.avif",
+      "fileBytes": 5286,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv444.alpha-full.monochrome.avif",
+      "fileBytes": 4945,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.8bpc.yuv422.alpha-full.avif",
+      "fileBytes": 3369,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.8bpc.yuv422.alpha-full.monochrome.avif",
+      "fileBytes": 3040,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv444.alpha-full.avif",
+      "fileBytes": 5378,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv444.alpha-limited.monochrome.avif",
+      "fileBytes": 4853,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.8bpc.yuv422.alpha-limited.monochrome.avif",
+      "fileBytes": 2992,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.8bpc.yuv422.alpha-limited.avif",
+      "fileBytes": 3321,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 128,
+        "height": 128
+      },
+      "items": 2,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/red-at-12-oclock-with-color-profile-10bpc.avif",
+      "fileBytes": 198819,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 800,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/nokiatech/heif/gh-pages/content/images/season_collection_1440x960.heic",
+      "fileBytes": 792835,
+      "brand": "mif1",
+      "primaryItemId": 1003,
+      "primaryIspe": {
+        "width": 1440,
+        "height": 960
+      },
+      "items": 8,
+      "thumbnails": [
+        {
+          "thumbnailItemId": 1006,
+          "primaryItemId": 1003,
+          "itemType": "hvc1",
+          "offset": 246098,
+          "length": 2819,
+          "ispe": {
+            "width": 240,
+            "height": 160
+          }
+        },
+        {
+          "thumbnailItemId": 1012,
+          "primaryItemId": 1009,
+          "itemType": "hvc1",
+          "offset": 299002,
+          "length": 1080,
+          "ispe": {
+            "width": 240,
+            "height": 160
+          }
+        },
+        {
+          "thumbnailItemId": 1018,
+          "primaryItemId": 1015,
+          "itemType": "hvc1",
+          "offset": 496863,
+          "length": 2836,
+          "ispe": {
+            "width": 240,
+            "height": 160
+          }
+        },
+        {
+          "thumbnailItemId": 1024,
+          "primaryItemId": 1021,
+          "itemType": "hvc1",
+          "offset": 789127,
+          "length": 3708,
+          "ispe": {
+            "width": 240,
+            "height": 160
+          }
+        }
+      ]
+    },
+    {
+      "url": "https://raw.githubusercontent.com/nokiatech/heif/gh-pages/content/images/old_bridge_1440x960.heic",
+      "fileBytes": 134911,
+      "brand": "mif1",
+      "primaryItemId": 1002,
+      "primaryIspe": {
+        "width": 1440,
+        "height": 960
+      },
+      "items": 2,
+      "thumbnails": [
+        {
+          "thumbnailItemId": 1005,
+          "primaryItemId": 1002,
+          "itemType": "hvc1",
+          "offset": 132516,
+          "length": 2395,
+          "ispe": {
+            "width": 240,
+            "height": 160
+          }
+        }
+      ]
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/red-at-12-oclock-with-color-profile-8bpc.avif",
+      "fileBytes": 106983,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 800,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/red-at-12-oclock-with-color-profile-lossy.avif",
+      "fileBytes": 2840,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 800,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/nokiatech/heif/gh-pages/content/images/autumn_1440x960.heic",
+      "fileBytes": 293608,
+      "brand": "mif1",
+      "primaryItemId": 1002,
+      "primaryIspe": {
+        "width": 1440,
+        "height": 960
+      },
+      "items": 2,
+      "thumbnails": [
+        {
+          "thumbnailItemId": 1005,
+          "primaryItemId": 1002,
+          "itemType": "hvc1",
+          "offset": 289950,
+          "length": 3658,
+          "ispe": {
+            "width": 240,
+            "height": 160
+          }
+        }
+      ]
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/red-at-12-oclock-with-color-profile-12bpc.avif",
+      "fileBytes": 315064,
+      "brand": "avif",
+      "primaryItemId": 1,
+      "primaryIspe": {
+        "width": 800,
+        "height": 800
+      },
+      "items": 1,
+      "thumbnails": []
+    },
+    {
+      "url": "https://raw.githubusercontent.com/nokiatech/heif/gh-pages/content/images/winter_1440x960.heic",
+      "fileBytes": 248006,
+      "brand": "mif1",
+      "primaryItemId": 1002,
+      "primaryIspe": {
+        "width": 1440,
+        "height": 960
+      },
+      "items": 2,
+      "thumbnails": [
+        {
+          "thumbnailItemId": 1005,
+          "primaryItemId": 1002,
+          "itemType": "hvc1",
+          "offset": 245227,
+          "length": 2779,
+          "ispe": {
+            "width": 240,
+            "height": 160
+          }
+        }
+      ]
+    }
+  ]
+}

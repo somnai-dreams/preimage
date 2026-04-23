@@ -15,7 +15,7 @@
 // `recordKnownMeasurement` is the lower-level version that writes
 // directly into the shared measurement cache.
 
-import { normalizeSrc } from './analysis.js'
+import { detectImageFormat, normalizeSrc, type ImageFormat } from './analysis.js'
 import { fitRect, type FittedRect, type ObjectFit } from './fit.js'
 import { type OrientationCode } from './orientation.js'
 import {
@@ -172,9 +172,68 @@ export type PrepareOptions = MeasureOptions & {
    *  `prepared.element` for render). Blob sources ignore this entirely;
    *  they always byte-probe directly. */
   strategy?: 'img' | 'stream' | 'range' | 'auto'
-  /** Number of bytes to request when `strategy: 'range'`. Defaults to
-   *  4096 — comfortably past any supported header parser's max. */
+  /** Number of bytes to request when `strategy: 'range'`. Applies when
+   *  `rangeBytesByFormat` has no matching entry for the detected format
+   *  (and when the format can't be detected from the URL).
+   *
+   *  Default: derived from the per-format table (see `rangeBytesByFormat`).
+   *  Pass this to override with a single universal size. */
   rangeBytes?: number
+  /** Per-format byte budget for the initial Range request. Keys are
+   *  `ImageFormat` values (`'jpeg' | 'png' | ...`); values are bytes.
+   *
+   *  Defaults (from a 7500-URL corpus sweep; see
+   *  `benchmarks/probe-byte-threshold-full.json`):
+   *    png  256    gif   256    webp 256    bmp   256
+   *    avif 768    heic  768    svg  2048   jpeg  4096
+   *    unknown 4096
+   *
+   *  JPEG needs the widest budget because EXIF and ICC-profile segments
+   *  push the SOF marker past the typical small-header range; its p95
+   *  in the corpus is 6KB. Every other raster format lands under 1KB.
+   *  SVG needs more headroom because the `<svg>` root tag can trail
+   *  comments, XML declarations, and wide attribute lists.
+   *
+   *  Pass a partial map to override specific formats; undefined entries
+   *  fall back to the default table above. */
+  rangeBytesByFormat?: Partial<Record<ImageFormat, number>>
+  /** Second-chance Range request size when the first probe fails to
+   *  parse dimensions. A re-range is issued *only* when the initial
+   *  response was 206 and bytes came back short of what the parser
+   *  needed; 200-fallback paths consume the full body directly.
+   *
+   *  Default: 24576 (24KB) — covers the 99.9th-percentile JPEG in the
+   *  corpus plus some ICC-profile outliers. Set to 0 to disable. */
+  rangeRetryBytes?: number
+}
+
+/** Default range-byte budget per format (see `rangeBytesByFormat`). Derived
+ *  from corpus measurements; exposed for benches and diagnostics. */
+export const DEFAULT_RANGE_BYTES_BY_FORMAT: Readonly<Record<ImageFormat, number>> = Object.freeze({
+  png: 256,
+  jpeg: 4096,
+  webp: 256,
+  gif: 256,
+  bmp: 256,
+  avif: 768,
+  heic: 768,
+  svg: 2048,
+  ico: 256,
+  apng: 256,
+  unknown: 4096,
+})
+
+const DEFAULT_RANGE_RETRY_BYTES = 24576
+
+function rangeBytesFor(src: string, options: PrepareOptions): number {
+  const format = detectImageFormat(src)
+  const perFormat = options.rangeBytesByFormat
+  if (perFormat !== undefined) {
+    const override = perFormat[format]
+    if (override !== undefined) return override
+  }
+  if (options.rangeBytes !== undefined) return options.rangeBytes
+  return DEFAULT_RANGE_BYTES_BY_FORMAT[format]
 }
 
 // --- Public API ---
@@ -384,7 +443,7 @@ async function prepareFromUrlRange(
   options: PrepareOptions,
   fromAuto: boolean,
 ): Promise<PreparedImage> {
-  const rangeBytes = options.rangeBytes ?? 4096
+  const initialRangeBytes = rangeBytesFor(src, options)
   const credentials =
     options.crossOrigin === 'use-credentials'
       ? 'include'
@@ -392,12 +451,16 @@ async function prepareFromUrlRange(
       ? 'omit'
       : 'same-origin'
 
-  const fetchInit: RequestInit = {
-    headers: { Range: `bytes=0-${rangeBytes - 1}` },
-    credentials,
+  const doRangeFetch = async (bytesRequested: number): Promise<Response> => {
+    const init: RequestInit = {
+      headers: { Range: `bytes=0-${bytesRequested - 1}` },
+      credentials,
+    }
+    if (options.signal !== undefined) init.signal = options.signal
+    return await fetch(src, init)
   }
-  if (options.signal !== undefined) fetchInit.signal = options.signal
-  const response = await fetch(src, fetchInit)
+
+  const response = await doRangeFetch(initialRangeBytes)
   if (!response.ok && response.status !== 206) {
     throw new Error(`preimage: fetch ${src} failed with status ${response.status}`)
   }
@@ -418,17 +481,34 @@ async function prepareFromUrlRange(
 
   // 206: read the partial body and parse directly. No abort needed —
   // the response body is already short.
-  const bytes = new Uint8Array(await response.arrayBuffer())
-  const probed = probeImageBytes(bytes)
+  let bytes = new Uint8Array(await response.arrayBuffer())
+  let probed = probeImageBytes(bytes)
+  let byteLength = parseContentRangeTotal(response) ?? parseContentLength(response)
+
+  // Re-range: if the initial budget was too stingy (rare but real for
+  // JPEGs with huge EXIF), make one larger request before giving up.
+  // Only worth trying when the retry window is actually larger than
+  // what we already have and when the full resource itself is larger
+  // still — otherwise we already have the whole file.
+  const retryBytes = options.rangeRetryBytes ?? DEFAULT_RANGE_RETRY_BYTES
+  if (probed === null && retryBytes > bytes.length && (byteLength === null || byteLength > bytes.length)) {
+    const retry = await doRangeFetch(retryBytes)
+    if (retry.status === 206 || retry.ok) {
+      const retryBody = new Uint8Array(await retry.arrayBuffer())
+      const retryProbed = probeImageBytes(retryBody)
+      if (retryProbed !== null) {
+        bytes = retryBody
+        probed = retryProbed
+        byteLength = parseContentRangeTotal(retry) ?? parseContentLength(retry) ?? byteLength
+      }
+    }
+  }
+
   if (probed === null) {
     throw new Error(
       `preimage: range probe of ${src} (${bytes.length} bytes) yielded no dimensions`,
     )
   }
-  // 206 responses put the full resource size after the slash in
-  // Content-Range: `bytes 0-4095/12345`. Falls back to null when the
-  // header is missing or malformed.
-  const byteLength = parseContentRangeTotal(response) ?? parseContentLength(response)
   if (fromAuto) rememberOriginStrategy(src, 'range')
   const measurement = recordKnownMeasurement(key, probed.width, probed.height, {
     orientation: options.orientation ?? 1,

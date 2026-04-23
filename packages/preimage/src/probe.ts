@@ -1,23 +1,22 @@
 // Parse image dimensions from format headers — no decode, no browser
-// HTMLImageElement, no async. Each of PNG / JPEG / WebP / GIF / BMP / SVG
-// encodes width and height in the first few bytes of the file. Parsing
-// those bytes directly returns dimensions in sub-millisecond time, and
-// lets streaming callers stop waiting for the rest of a fetch once they
-// have what they need.
+// HTMLImageElement, no async. Each of PNG / JPEG / WebP / GIF / BMP / SVG /
+// AVIF / HEIC encodes width and height in the first few bytes of the
+// file. Parsing those bytes directly returns dimensions in sub-millisecond
+// time, and lets streaming callers stop waiting for the rest of a fetch
+// once they have what they need.
 //
 // Format coverage:
-//   PNG   — 24 bytes: IHDR chunk (offsets 16-23, width/height big-endian u32)
-//   JPEG  — SOFn marker; typically within first 512 bytes, almost always <2KB
-//   GIF   — 10 bytes: logical screen descriptor (offsets 6-9 little-endian u16)
-//   BMP   — 26 bytes: BITMAPINFOHEADER (offsets 18-25 little-endian, height i32)
-//   WebP  — 30 bytes: VP8 / VP8L / VP8X chunk
-//   SVG   — regex scan of <svg ... width height viewBox> in the first 4KB
+//   PNG         — 24 bytes: IHDR chunk (offsets 16-23, width/height big-endian u32)
+//   JPEG        — SOFn marker; typically within first 512 bytes, almost always <2KB
+//   GIF         — 10 bytes: logical screen descriptor (offsets 6-9 little-endian u16)
+//   BMP         — 26 bytes: BITMAPINFOHEADER (offsets 18-25 little-endian, height i32)
+//   WebP        — 30 bytes: VP8 / VP8L / VP8X chunk
+//   SVG         — regex scan of <svg ... width height viewBox> in the first 4KB
+//   AVIF / HEIC — ISOBMFF `ftyp` sniff + scan for `ispe` (image spatial
+//                 extents) box. Empirically lands in the first <1KB for
+//                 sample corpora we measured; 4KB budget is comfortable.
 //
 // Intentionally NOT covered (v1):
-//   AVIF / HEIC — ISOBMFF containers; `ispe` boxes can sit anywhere in the
-//     first few KB with nested `meta` structures. Callers fall back to
-//     createImageBitmap for these; streaming still helps because bytes are
-//     already buffered in memory when decode starts.
 //   TIFF / ICO / JPEG 2000 — low-demand; add if someone asks.
 //
 // All parsers are pure over a Uint8Array and return null if the input is
@@ -55,6 +54,14 @@ const GIF89_SIG = [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]
 const BMP_SIG = [0x42, 0x4D]
 const RIFF_SIG = [0x52, 0x49, 0x46, 0x46]
 const WEBP_SIG = [0x57, 0x45, 0x42, 0x50]
+const FTYP_SIG = [0x66, 0x74, 0x79, 0x70] // 'ftyp'
+const ISPE_SIG = [0x69, 0x73, 0x70, 0x65] // 'ispe'
+
+// ftyp major_brand sits at bytes 8-11. Compatible brands follow and we
+// don't walk those; a handful of image brands cover ~everything in the
+// wild.
+const AVIF_BRANDS: ReadonlySet<string> = new Set(['avif', 'avis'])
+const HEIC_BRANDS: ReadonlySet<string> = new Set(['heic', 'heix', 'heis', 'hevc', 'hevx', 'mif1', 'msf1'])
 
 function matches(bytes: Uint8Array, sig: readonly number[], offset = 0): boolean {
   if (bytes.length < offset + sig.length) return false
@@ -251,6 +258,64 @@ function probeSvg(bytes: Uint8Array): ProbedDimensions | null {
   return null
 }
 
+// --- AVIF / HEIC (ISOBMFF ispe box) ---
+//
+// AVIF and HEIC are ISOBMFF containers whose first box is `ftyp` at
+// offset 0. We confirm the container via the major_brand at bytes 8-11,
+// then scan the first N bytes for the `ispe` (image spatial extents)
+// box, whose 20-byte layout is:
+//   [size:4 BE = 20][type:4 = 'ispe'][version+flags:4][width:4 BE][height:4 BE]
+// The preceding 4-byte size check filters false-positive byte matches on
+// the 'ispe' tag.
+//
+// We don't walk the full `meta`→`iprp`→`ipco` hierarchy — images with
+// multiple `ispe` entries (thumbnails) return the first one found, which
+// in practice is the primary since thumbnails are stored after the main
+// item's properties. A caller needing surgical primary-item handling
+// should parse the full structure; for layout purposes any ispe yields
+// the right aspect ratio.
+//
+// hasAlpha is reported as `true` conservatively: AVIF/HEIC can carry
+// alpha via an `auxC` auxiliary image item, but detecting that requires
+// walking the full property hierarchy. Reporting `true` means callers
+// keep their skeleton tint — a safe default.
+
+function guessIsobmffFormat(bytes: Uint8Array): 'avif' | 'heic' | null {
+  if (bytes.length < 12) return null
+  if (!matches(bytes, FTYP_SIG, 4)) return null
+  const brand = String.fromCharCode(bytes[8]!, bytes[9]!, bytes[10]!, bytes[11]!)
+  if (AVIF_BRANDS.has(brand)) return 'avif'
+  if (HEIC_BRANDS.has(brand)) return 'heic'
+  return null
+}
+
+function probeIsobmff(bytes: Uint8Array): ProbedDimensions | null {
+  const format = guessIsobmffFormat(bytes)
+  if (format === null) return null
+  // Scan for `ispe` starting after the ftyp box. We start at offset 4
+  // (the tag follows the size field) and require 16 bytes after the
+  // tag for the rest of the box payload.
+  const limit = bytes.length - 16
+  for (let i = 4; i <= limit; i++) {
+    if (
+      bytes[i] === ISPE_SIG[0] &&
+      bytes[i + 1] === ISPE_SIG[1] &&
+      bytes[i + 2] === ISPE_SIG[2] &&
+      bytes[i + 3] === ISPE_SIG[3]
+    ) {
+      if (u32be(bytes, i - 4) !== 20) continue
+      const width = u32be(bytes, i + 8)
+      const height = u32be(bytes, i + 12)
+      // Sanity: reject absurd values that only arise when the size-20
+      // check happens to pass on unrelated data.
+      if (width === 0 || height === 0) continue
+      if (width >= 100_000 || height >= 100_000) continue
+      return { width, height, format, hasAlpha: true, isProgressive: false }
+    }
+  }
+  return null
+}
+
 // --- Public dispatch ---
 
 export function probeImageBytes(bytes: Uint8Array): ProbedDimensions | null {
@@ -260,6 +325,7 @@ export function probeImageBytes(bytes: Uint8Array): ProbedDimensions | null {
     probeGif(bytes) ??
     probeWebp(bytes) ??
     probeBmp(bytes) ??
+    probeIsobmff(bytes) ??
     probeSvg(bytes) ??
     null
   )

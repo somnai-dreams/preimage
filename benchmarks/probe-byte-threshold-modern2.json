@@ -1,0 +1,1740 @@
+{
+  "date": "2026-04-23T13:41:03.713Z",
+  "runtime": "bun 1.3.12",
+  "wallMs": 8210.309874999999,
+  "aborted": false,
+  "abortReason": null,
+  "config": {
+    "sources": [
+      "modern"
+    ],
+    "wikimediaTargets": {
+      "jpeg": 2000,
+      "png": 300,
+      "gif": 200,
+      "webp": 100,
+      "svg": 800
+    },
+    "flickrCount": 500,
+    "iconCount": 150,
+    "parquetDir": "/Users/max/Documents/Dev/datatset",
+    "parquetPerHost": 250,
+    "concurrency": 10,
+    "probeCeilingBytes": 32768,
+    "probeWindows": [
+      128,
+      256,
+      384,
+      512,
+      768,
+      1024,
+      1536,
+      2048,
+      3072,
+      4096,
+      6144,
+      8192,
+      12288,
+      16384,
+      24576,
+      32768
+    ],
+    "timeBudgetSeconds": 180,
+    "fetchTimeoutMs": 15000
+  },
+  "sources": {
+    "wikimedia": {
+      "gathered": 0
+    },
+    "flickr": {
+      "gathered": 0
+    },
+    "iconlib": {
+      "gathered": 0
+    },
+    "parquet": {
+      "gathered": 0
+    },
+    "modern": {
+      "gathered": 154
+    }
+  },
+  "byFormat": {
+    "avif": {
+      "distribution": {
+        "n": 150,
+        "min": 256,
+        "p50": 256,
+        "p90": 384,
+        "p95": 384,
+        "p99": 384,
+        "max": 384,
+        "mean": 316.58666666666664
+      },
+      "histogram": {
+        "128": 0,
+        "256": 79,
+        "384": 71,
+        "512": 0,
+        "768": 0,
+        "1024": 0,
+        "1536": 0,
+        "2048": 0,
+        "3072": 0,
+        "4096": 0,
+        "6144": 0,
+        "8192": 0,
+        "12288": 0,
+        "16384": 0,
+        "24576": 0,
+        "32768": 0
+      },
+      "successes": 150,
+      "failures": 0,
+      "failureReasons": {}
+    },
+    "heic": {
+      "distribution": {
+        "n": 4,
+        "min": 384,
+        "p50": 384,
+        "p90": 768,
+        "p95": 768,
+        "p99": 768,
+        "max": 768,
+        "mean": 480
+      },
+      "histogram": {
+        "128": 0,
+        "256": 0,
+        "384": 3,
+        "512": 0,
+        "768": 1,
+        "1024": 0,
+        "1536": 0,
+        "2048": 0,
+        "3072": 0,
+        "4096": 0,
+        "6144": 0,
+        "8192": 0,
+        "12288": 0,
+        "16384": 0,
+        "24576": 0,
+        "32768": 0
+      },
+      "successes": 4,
+      "failures": 0,
+      "failureReasons": {}
+    }
+  },
+  "byHost": {
+    "link-u/avif-sample-images": {
+      "distribution": {
+        "n": 150,
+        "min": 256,
+        "p50": 256,
+        "p90": 384,
+        "p95": 384,
+        "p99": 384,
+        "max": 384,
+        "mean": 316.58666666666664
+      },
+      "histogram": {
+        "128": 0,
+        "256": 79,
+        "384": 71,
+        "512": 0,
+        "768": 0,
+        "1024": 0,
+        "1536": 0,
+        "2048": 0,
+        "3072": 0,
+        "4096": 0,
+        "6144": 0,
+        "8192": 0,
+        "12288": 0,
+        "16384": 0,
+        "24576": 0,
+        "32768": 0
+      },
+      "successes": 150,
+      "failures": 0,
+      "failureReasons": {}
+    },
+    "raw.githubusercontent.com": {
+      "distribution": {
+        "n": 4,
+        "min": 384,
+        "p50": 384,
+        "p90": 768,
+        "p95": 768,
+        "p99": 768,
+        "max": 768,
+        "mean": 480
+      },
+      "histogram": {
+        "128": 0,
+        "256": 0,
+        "384": 3,
+        "512": 0,
+        "768": 1,
+        "1024": 0,
+        "1536": 0,
+        "2048": 0,
+        "3072": 0,
+        "4096": 0,
+        "6144": 0,
+        "8192": 0,
+        "12288": 0,
+        "16384": 0,
+        "24576": 0,
+        "32768": 0
+      },
+      "successes": 4,
+      "failures": 0,
+      "failureReasons": {}
+    }
+  },
+  "samples": [
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.monochrome.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.monochrome.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.monochrome.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.monochrome.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.monochrome.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.monochrome.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.10bpc.yuv444.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.10bpc.yuv444.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.10bpc.yuv444.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.10bpc.yuv444.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.monochrome.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.8bpc.yuv444.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.8bpc.yuv444.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.8bpc.yuv444.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.monochrome.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.monochrome.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.monochrome.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.10bpc.yuv422.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.monochrome.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.monochrome.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.monochrome.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.monochrome.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile1.8bpc.yuv444.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.monochrome.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv422.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.monochrome.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.monochrome.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.monochrome.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv420.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.monochrome.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.monochrome.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.12bpc.yuv444.odd-width.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv422.monochrome.odd-width.odd-height.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile0.8bpc.yuv420.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile2.8bpc.yuv422.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.crop.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile0.8bpc.yuv420.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile2.10bpc.yuv422.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile2.8bpc.yuv422.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.mirror-horizontal.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile2.12bpc.yuv422.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.mirror-vertical.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.mirror-vertical.rotate270.crop.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.rotate270.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile0.10bpc.yuv420.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile2.12bpc.yuv422.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.rotate90.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.10bpc.yuv420.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.10bpc.yuv420.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.10bpc.yuv420.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.10bpc.yuv420.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile2.10bpc.yuv422.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.mirror-vertical.rotate270.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.8bpc.yuv420.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.8bpc.yuv420.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.8bpc.yuv420.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile1.10bpc.yuv444.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile0.10bpc.yuv420.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile1.8bpc.yuv444.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile1.10bpc.yuv444.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.10bpc.yuv422.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile1.8bpc.yuv444.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.10bpc.yuv422.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.10bpc.yuv422.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv420.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv422.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv420.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv420.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv422.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv444.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.10bpc.yuv422.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv420.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv444.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv422.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv444.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.8bpc.yuv420.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv422.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.8bpc.yuv422.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.8bpc.yuv422.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.10bpc.yuv420.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 4217,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.8bpc.yuv422.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.10bpc.yuv420.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 3978,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.12bpc.yuv444.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.8bpc.yuv420.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 3284,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.10bpc.yuv420.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 3886,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile2.8bpc.yuv422.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.10bpc.yuv420.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 4125,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.8bpc.yuv420.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 3044,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.8bpc.yuv420.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 3236,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.8bpc.yuv420.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 2996,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile1.10bpc.yuv444.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 4415,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile1.8bpc.yuv444.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 3415,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile1.8bpc.yuv444.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 3463,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile1.10bpc.yuv444.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 4323,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.10bpc.yuv422.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 4200,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.10bpc.yuv422.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 3974,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.10bpc.yuv422.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 3882,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.10bpc.yuv422.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 4292,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv420.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 5202,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv420.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 5110,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv420.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 4945,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv422.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 5270,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv420.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 4853,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv422.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 4945,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv422.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 5178,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv422.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 4853,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv444.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 5286,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv444.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 4945,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.8bpc.yuv422.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 3369,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.8bpc.yuv422.alpha-full.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 3040,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv444.alpha-full.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 5378,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.12bpc.yuv444.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 4853,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.8bpc.yuv422.alpha-limited.monochrome.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 2992,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile2.8bpc.yuv422.alpha-limited.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 3321,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/red-at-12-oclock-with-color-profile-10bpc.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/nokiatech/heif/gh-pages/content/images/season_collection_1440x960.heic",
+      "source": "modern",
+      "host": "raw.githubusercontent.com",
+      "expectedFormat": "heic",
+      "detectedFormat": "heic",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 768,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/nokiatech/heif/gh-pages/content/images/old_bridge_1440x960.heic",
+      "source": "modern",
+      "host": "raw.githubusercontent.com",
+      "expectedFormat": "heic",
+      "detectedFormat": "heic",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/red-at-12-oclock-with-color-profile-8bpc.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/red-at-12-oclock-with-color-profile-lossy.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 2840,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/nokiatech/heif/gh-pages/content/images/autumn_1440x960.heic",
+      "source": "modern",
+      "host": "raw.githubusercontent.com",
+      "expectedFormat": "heic",
+      "detectedFormat": "heic",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/red-at-12-oclock-with-color-profile-12bpc.avif",
+      "source": "modern",
+      "host": "link-u/avif-sample-images",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/nokiatech/heif/gh-pages/content/images/winter_1440x960.heic",
+      "source": "modern",
+      "host": "raw.githubusercontent.com",
+      "expectedFormat": "heic",
+      "detectedFormat": "heic",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    }
+  ]
+}

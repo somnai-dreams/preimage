@@ -52,6 +52,10 @@
           <h3>Compare runs</h3>
           <p>Drop in saved bench JSONs; they get grouped by network label and laid out in one table so mobile-5g and home-gigabit runs sit side by side. Best throughput per group is highlighted. Handles all three bench shapes (single probe, browser sweep, node sweep).</p>
         </a>
+        <a class="bench-card" href="./range-sizing.html">
+          <h3>Range sizing × format</h3>
+          <p>Per-format Range-request byte inputs against a corpus of real URLs (wikimedia / flickr / iconlib / AVIF / HEIC). Reports time distribution, CORS and probe failures, and the effect of the library's re-range retry. Defaults reflect <code>DEFAULT_RANGE_BYTES_BY_FORMAT</code> — the table the library ships with.</p>
+        </a>
         <a class="bench-card" href="./first-screen.html">
           <h3>First-screen strategies</h3>
           <p>Four approaches to painting a first viewport, run back-to-back against fresh cache-busts: naive <code>&lt;img&gt;</code>, <code>prepare()</code> with <code>img</code> strategy, <code>prepare()</code> with <code>stream</code>, and manifest-hydrated (no probe at all). Reports time-to-first-skeleton, all-skeletons, first-image, all-images, and bytes.</p>
