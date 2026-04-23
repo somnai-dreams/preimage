@@ -1,0 +1,151 @@
+{
+  "bench": "packer-sweep",
+  "date": "2026-04-23T08:10:45.447Z",
+  "wallMs": 97.100959,
+  "total": 16,
+  "passed": 16,
+  "failed": 0,
+  "scaling": [
+    {
+      "packer": "shortestColumn",
+      "n": 100,
+      "iterations": 50,
+      "avgMs": 0.05224400000000017,
+      "minMs": 0.00806700000000049,
+      "maxMs": 1.6180650000000014,
+      "totalHeight": 4483.625633909575
+    },
+    {
+      "packer": "justifiedRows",
+      "n": 100,
+      "iterations": 50,
+      "avgMs": 0.014194159999999768,
+      "minMs": 0.006567000000000434,
+      "maxMs": 0.076627000000002,
+      "totalHeight": 6832.826306415078
+    },
+    {
+      "packer": "shortestColumn",
+      "n": 1000,
+      "iterations": 50,
+      "avgMs": 0.12635008000000006,
+      "minMs": 0.03789199999999937,
+      "maxMs": 1.0655549999999998,
+      "totalHeight": 43985.2948151751
+    },
+    {
+      "packer": "justifiedRows",
+      "n": 1000,
+      "iterations": 50,
+      "avgMs": 0.13339010000000023,
+      "minMs": 0.02923799999999943,
+      "maxMs": 2.0462419999999995,
+      "totalHeight": 69320.5357276691
+    },
+    {
+      "packer": "shortestColumn",
+      "n": 10000,
+      "iterations": 10,
+      "avgMs": 1.2922979000000006,
+      "minMs": 0.4586660000000009,
+      "maxMs": 2.599014000000004,
+      "totalHeight": 446313.8704422849
+    },
+    {
+      "packer": "justifiedRows",
+      "n": 10000,
+      "iterations": 10,
+      "avgMs": 0.8012902000000004,
+      "minMs": 0.30898100000000284,
+      "maxMs": 1.4242440000000016,
+      "totalHeight": 690368.3059255567
+    },
+    {
+      "packer": "shortestColumn",
+      "n": 100000,
+      "iterations": 3,
+      "avgMs": 11.088943000000002,
+      "minMs": 8.591233000000003,
+      "maxMs": 14.22951900000001,
+      "totalHeight": 4457772.250055812
+    },
+    {
+      "packer": "justifiedRows",
+      "n": 100000,
+      "iterations": 3,
+      "avgMs": 5.811621666666667,
+      "minMs": 3.575431999999992,
+      "maxMs": 7.5201100000000025,
+      "totalHeight": 6900326.577347797
+    }
+  ],
+  "results": [
+    {
+      "ok": true,
+      "case": "determinism/shortest-column",
+      "notes": "500 tiles, height 21951px"
+    },
+    {
+      "ok": true,
+      "case": "determinism/justified-rows",
+      "notes": "500 tiles, height 36242px"
+    },
+    {
+      "ok": true,
+      "case": "cursor-batch-equivalence/shortest-column"
+    },
+    {
+      "ok": true,
+      "case": "cursor-batch-equivalence/justified-rows"
+    },
+    {
+      "ok": true,
+      "case": "pathological/sc-empty"
+    },
+    {
+      "ok": true,
+      "case": "pathological/jr-empty"
+    },
+    {
+      "ok": true,
+      "case": "pathological/sc-one"
+    },
+    {
+      "ok": true,
+      "case": "pathological/jr-one"
+    },
+    {
+      "ok": true,
+      "case": "pathological/sc-uniform"
+    },
+    {
+      "ok": true,
+      "case": "pathological/jr-uniform"
+    },
+    {
+      "ok": true,
+      "case": "pathological/sc-extreme"
+    },
+    {
+      "ok": true,
+      "case": "pathological/jr-extreme"
+    },
+    {
+      "ok": true,
+      "case": "pathological/sc-zero-columns"
+    },
+    {
+      "ok": true,
+      "case": "pathological/jr-zero-panelwidth"
+    },
+    {
+      "ok": true,
+      "case": "append-stability/shortest-column"
+    },
+    {
+      "ok": true,
+      "case": "scaling-measured",
+      "notes": "8 configs timed"
+    }
+  ]
+}
