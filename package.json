@@ -14,6 +14,7 @@
   ],
   "scripts": {
     "check": "tsc",
+    "check:all": "bun scripts/run-all-harnesses.ts",
     "build:package": "bun --cwd packages/preimage run build",
     "build:layout-algebra": "bun --cwd packages/layout-algebra run build",
     "build:all": "bun run build:package && bun run build:layout-algebra",
