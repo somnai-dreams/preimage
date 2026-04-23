@@ -19,6 +19,7 @@ import dropzoneHtml from './demos/dropzone.html'
 import chatHtml from './demos/chat.html'
 import benchIndexHtml from './bench/index.html'
 import benchProbeHtml from './bench/probe.html'
+import benchSweepHtml from './bench/sweep.html'
 import benchPackingHtml from './bench/packing.html'
 
 const port = Number(Bun.env.PORT ?? 3000)
@@ -44,6 +45,7 @@ const server = serve({
     '/bench/': benchIndexHtml,
     '/bench/index.html': benchIndexHtml,
     '/bench/probe.html': benchProbeHtml,
+    '/bench/sweep.html': benchSweepHtml,
     '/bench/packing.html': benchPackingHtml,
     '/assets/*': async (req) => {
       // Strip leading "/" and map into pages/assets/.

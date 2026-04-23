@@ -40,6 +40,10 @@
           <h3>Probe throughput × concurrency</h3>
           <p>Run N image probes at configurable concurrency. Reports per-probe distribution, total wall time, bytes transferred, throughput (probes/sec). Useful for picking a default concurrency for a known server.</p>
         </a>
+        <a class="bench-card" href="./sweep.html">
+          <h3>Probe sweep · full matrix</h3>
+          <p>Every strategy × every concurrency against the same N, one combined JSON. Replaces clicking through the single-config probe bench a dozen times to compare strategies. Best throughput per strategy is highlighted in the table.</p>
+        </a>
         <a class="bench-card" href="./packing.html">
           <h3>Packer speed + determinism</h3>
           <p>Runs <code>packShortestColumn</code> and <code>packJustifiedRows</code> over seeded aspect arrays. Reports per-call distribution across N iterations, then verifies bit-identical output for repeated runs with the same seed.</p>

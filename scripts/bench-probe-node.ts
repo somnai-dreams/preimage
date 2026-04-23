@@ -25,7 +25,7 @@ type Args = {
   base: string
   n: number
   concurrencies: number[]
-  strategy: Strategy
+  strategies: Strategy[]
   rangeBytes: number
   networkLabel: string | null
   out: string | null
@@ -38,7 +38,7 @@ function parseArgs(argv: readonly string[]): Args {
     base: 'http://localhost:3000',
     n: 500,
     concurrencies: [6, 20, 50, 100, 200],
-    strategy: 'stream',
+    strategies: ['stream'],
     rangeBytes: 4096,
     networkLabel: null,
     out: null,
@@ -50,13 +50,16 @@ function parseArgs(argv: readonly string[]): Args {
     if (a === '--base') args.base = argv[++i]!
     else if (a === '--n') args.n = Number(argv[++i])
     else if (a === '--c') args.concurrencies = argv[++i]!.split(',').map((s) => Number(s))
-    else if (a === '--strategy') {
-      const v = argv[++i]
-      if (v !== 'stream' && v !== 'range') {
-        process.stderr.write(`bench-probe-node: --strategy must be 'stream' or 'range', got ${v}\n`)
-        process.exit(2)
+    else if (a === '--strategy' || a === '--strategies') {
+      const raw = argv[++i]!
+      const list = raw.split(',').map((s) => s.trim())
+      for (const s of list) {
+        if (s !== 'stream' && s !== 'range') {
+          process.stderr.write(`bench-probe-node: --strategies entries must be 'stream' or 'range', got ${s}\n`)
+          process.exit(2)
+        }
       }
-      args.strategy = v
+      args.strategies = list as Strategy[]
     } else if (a === '--range-bytes') args.rangeBytes = Number(argv[++i])
     else if (a === '--network-label') args.networkLabel = argv[++i]!
     else if (a === '--out') args.out = argv[++i]!
@@ -67,13 +70,13 @@ function parseArgs(argv: readonly string[]): Args {
         [
           'Usage: bun scripts/bench-probe-node.ts [options]',
           '',
-          '  --base URL              origin to probe against (default localhost:3000)',
-          '  --n N                   number of probes (default 500)',
-          '  --c 6,20,50,100,200     comma-separated concurrency sweep',
-          '  --strategy stream|range probe approach (default stream)',
-          '  --range-bytes N         bytes to request in range mode (default 4096)',
-          '  --network-label LABEL   free-form label like "home gigabit"',
-          '  --out path.json         write JSON to file instead of stdout',
+          '  --base URL                  origin to probe against (default localhost:3000)',
+          '  --n N                       number of probes (default 500)',
+          '  --c 6,20,50,100,200         comma-separated concurrency sweep',
+          '  --strategies stream,range   comma-separated strategy sweep (default stream)',
+          '  --range-bytes N             bytes to request in range mode (default 4096)',
+          '  --network-label LABEL       free-form label like "home gigabit"',
+          '  --out path.json             write JSON to file instead of stdout',
           '',
         ].join('\n'),
       )
@@ -187,7 +190,7 @@ async function warmupRtt(probeUrl: string, count: number): Promise<number | null
   return samples[Math.floor(samples.length / 2)]!
 }
 
-async function runSweep(args: Args, concurrency: number): Promise<{
+async function runSweep(args: Args, concurrency: number, strategy: Strategy): Promise<{
   totalMs: number
   probeMs: ReturnType<typeof distribution>
   bytesTransferred: number
@@ -210,7 +213,7 @@ async function runSweep(args: Args, concurrency: number): Promise<{
     while (idx < urls.length) {
       const i = idx++
       const url = urls[i]!
-      const r = args.strategy === 'range'
+      const r = strategy === 'range'
         ? await probeOneRange(url, args.rangeBytes)
         : await probeOneStream(url)
       if (r === null) {
@@ -248,29 +251,33 @@ async function main(): Promise<void> {
   process.stderr.write(`  median rtt ${warmupRttMs?.toFixed(0) ?? '?'}ms\n`)
 
   const report = {
-    bench: 'probe-concurrency-node',
+    bench: 'probe-sweep-node',
     date: new Date().toISOString(),
     runtime: `${process.release.name ?? 'unknown'} ${process.version}`,
     base: args.base,
     n: args.n,
     concurrencies: args.concurrencies,
-    strategy: args.strategy,
-    rangeBytes: args.strategy === 'range' ? args.rangeBytes : null,
+    strategies: args.strategies,
+    rangeBytes: args.strategies.includes('range') ? args.rangeBytes : null,
     network: {
       label: args.networkLabel,
       warmupRttMs,
     },
-    sweep: [] as Array<{ concurrency: number } & Awaited<ReturnType<typeof runSweep>>>,
+    sweep: [] as Array<
+      { concurrency: number; strategy: Strategy } & Awaited<ReturnType<typeof runSweep>>
+    >,
   }
 
-  for (const c of args.concurrencies) {
-    process.stderr.write(`c=${String(c).padStart(3)} ${args.strategy} …`)
-    const result = await runSweep(args, c)
-    report.sweep.push({ concurrency: c, ...result })
-    const fallbackBit = result.rangeFellBackTo200 > 0 ? `  ⚠ ${result.rangeFellBackTo200} 200-fallbacks` : ''
-    process.stderr.write(
-      `  total=${result.totalMs.toFixed(0)}ms  tp=${result.throughputProbesPerSec.toFixed(0)}/s  probe p50=${result.probeMs.p50.toFixed(0)}ms  p95=${result.probeMs.p95.toFixed(0)}ms  bytes=${(result.bytesTransferred / 1024 / 1024).toFixed(2)}MB  errors=${result.errors}${fallbackBit}\n`,
-    )
+  for (const strategy of args.strategies) {
+    for (const c of args.concurrencies) {
+      process.stderr.write(`c=${String(c).padStart(3)} ${strategy} …`)
+      const result = await runSweep(args, c, strategy)
+      report.sweep.push({ strategy, concurrency: c, ...result })
+      const fallbackBit = result.rangeFellBackTo200 > 0 ? `  ⚠ ${result.rangeFellBackTo200} 200-fallbacks` : ''
+      process.stderr.write(
+        `  total=${result.totalMs.toFixed(0)}ms  tp=${result.throughputProbesPerSec.toFixed(0)}/s  probe p50=${result.probeMs.p50.toFixed(0)}ms  p95=${result.probeMs.p95.toFixed(0)}ms  bytes=${(result.bytesTransferred / 1024 / 1024).toFixed(2)}MB  errors=${result.errors}${fallbackBit}\n`,
+      )
+    }
   }
 
   const json = JSON.stringify(report, null, 2)

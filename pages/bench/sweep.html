@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage bench · sweep</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../demos/demo-styles.css" />
+  <style>
+    .page { max-width: 1100px; }
+    .bench-controls { display: grid; grid-template-columns: auto 1fr; gap: 10px 14px; align-items: center; padding: 14px 16px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 16px; font-size: 13px; }
+    .bench-controls label { font-size: 12px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+    .bench-controls input[type=text], .bench-controls input[type=number] { font: inherit; font-size: 13px; padding: 4px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); }
+    .strategy-group { display: flex; gap: 16px; font-size: 13px; color: var(--text); text-transform: none; letter-spacing: 0; }
+    .strategy-group label { display: flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; }
+    .bench-run { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .bench-run .meta { color: var(--text-muted); font-size: 12px; flex: 1; min-width: 200px; font-variant-numeric: tabular-nums; }
+    pre.bench-json { font: 12px/1.5 ui-monospace, 'SF Mono', Consolas, monospace; background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; overflow: auto; color: var(--text); max-height: 400px; }
+    table.sweep-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+    table.sweep-table th, table.sweep-table td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+    table.sweep-table th { color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; font-size: 11px; font-weight: 600; }
+    table.sweep-table td:first-child, table.sweep-table th:first-child { text-align: left; }
+    table.sweep-table td.strat { color: var(--accent); font-weight: 600; }
+    table.sweep-table tr.running td { color: var(--text-soft); font-style: italic; }
+    table.sweep-table tr.done.best td.tp { color: var(--accent); font-weight: 600; }
+    .progress-msg { color: var(--text-muted); font-size: 13px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="../">preimage demos</a>
+    <a href="./">benchmarks</a>
+    <span class="spacer"></span>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page">
+    <header class="page-header">
+      <h1>Probe sweep · full matrix</h1>
+      <p>Runs every combination of strategy × concurrency against the same N, emits one combined JSON. Replaces clicking through the single-config probe bench 12 times to compare strategies. Results render progressively as each sub-run completes.</p>
+    </header>
+
+    <div class="bench-controls">
+      <label>N</label>
+      <input id="nInput" type="number" min="50" max="5000" step="50" value="500" />
+
+      <label>Concurrencies</label>
+      <input id="concInput" type="text" value="6,20,50,100,200" />
+
+      <label>Strategies</label>
+      <div class="strategy-group">
+        <label><input type="checkbox" name="strategy" value="img" checked /> img + poll</label>
+        <label><input type="checkbox" name="strategy" value="stream" checked /> fetch + stream</label>
+        <label><input type="checkbox" name="strategy" value="range" checked /> Range</label>
+      </div>
+
+      <label>dimsOnly</label>
+      <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; text-transform: none; color: var(--text); letter-spacing: 0;">
+        <input type="checkbox" id="dimsOnly" checked />
+        <span>Abort after dims known</span>
+      </label>
+
+      <label>Network</label>
+      <input id="networkLabel" type="text" placeholder="e.g. home gigabit, phone tether 5g" />
+    </div>
+
+    <div class="bench-run">
+      <button id="run" class="primary">Run sweep</button>
+      <button id="save" class="primary" disabled style="background: var(--surface); color: var(--text); border: 1px solid var(--border);">Save as JSON</button>
+      <span id="meta" class="meta"></span>
+    </div>
+
+    <div id="progress" class="progress-msg"></div>
+    <div id="table-host"></div>
+    <div id="json-host"></div>
+  </main>
+
+  <script type="module" src="./sweep.ts"></script>
+</body>
+</html>
