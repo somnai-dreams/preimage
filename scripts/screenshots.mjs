@@ -27,8 +27,8 @@ const targets = [
     wait: 6000,
   },
   {
-    name: 'masonry',
-    url: `${BASE}/masonry`,
+    name: 'packing',
+    url: `${BASE}/packing.html`,
     viewport: { width: 1280, height: 900 },
     wait: 9000,
   },

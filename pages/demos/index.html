@@ -22,7 +22,7 @@
 <body>
   <nav class="demo-nav">
     <a class="brand" href="./">preimage demos</a>
-    <a href="./masonry.html">Masonry</a>
+    <a href="./packing.html">Packing</a>
     <a href="./editorial.html">Editorial</a>
     <a href="./ttfs.html">TTFS</a>
     <a href="./decode-pool.html">Decode pool</a>
@@ -48,9 +48,9 @@
       <h2>Demos</h2>
       <p class="intro">Each demo has per-panel Run buttons — click one side at a time to feel the click-to-layout delay. Photos are committed locally (~1-3MB PNGs) so cache-busting is honest and there's no CDN redirect chain skewing the numbers.</p>
       <div class="demo-list">
-        <a class="demo-card" href="./masonry.html">
-          <h3>Masonry grid</h3>
-          <p>Up to 90 photos, two grids. Left: stock <code>&lt;img&gt;</code> tags — column grows as each image decodes, every tile below shifts. Right: <code>prepare()</code> measures every image, a shortest-column layout commits in one pass, dominant-color placeholders hold the spot.</p>
+        <a class="demo-card" href="./packing.html">
+          <h3>Packing — shortest columns and justified rows</h3>
+          <p>Runtime-probe one local image set, then pack the same aspect ratios two ways. Shortest columns gives masonry-style balance; justified rows closes Flickr-style strips at a target row height.</p>
         </a>
         <a class="demo-card" href="./editorial.html">
           <h3>Editorial article with floats</h3>

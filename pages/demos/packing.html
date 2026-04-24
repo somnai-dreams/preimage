@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · packing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./demo-styles.css" />
+  <style>
+    .page.wide { max-width: 1400px; }
+
+    .controls-row { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+    .range-control { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-muted); }
+    .range-control input[type=range] { width: 150px; }
+    .range-control .range-val { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; min-width: 4ch; text-align: right; }
+
+    .packing-pair { gap: 20px; }
+
+    .packed { position: relative; min-height: 320px; }
+    .packed .item {
+      position: absolute;
+      overflow: hidden;
+      border-radius: var(--radius-sm);
+      background: #e4e7eb;
+      animation: tile-shimmer 1.3s ease-in-out infinite;
+    }
+    .packed .item.has-image { animation: none; outline: var(--image-outline); outline-offset: -1px; }
+    .packed .item img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      opacity: 0; transition: opacity 20ms linear;
+    }
+    .packed .item img.loaded { opacity: 1; }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="./">preimage demos</a>
+    <a href="./packing.html" aria-current="page">Packing</a>
+    <a href="./editorial.html">Editorial</a>
+    <a href="./ttfs.html">TTFS</a>
+    <a href="./decode-pool.html">Decode pool</a>
+    <a href="./virtual.html">Virtual</a>
+    <a href="./manifest.html">Manifest</a>
+    <a href="./stream.html">Stream</a>
+    <a href="./dropzone.html">Drop zone</a>
+    <a href="./chat.html">Chat</a>
+    <span class="spacer"></span>
+    <button type="button" id="warmCdn" class="warm-btn">Warm CDN</button>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page wide">
+    <header class="page-header">
+      <h1>Packing — shortest columns and justified rows</h1>
+      <p>Same runtime-probed image dimensions, two layout cursors. <code>packShortestColumn</code> keeps a masonry-like column balance; <code>packJustifiedRows</code> closes rows at a target height and scales each completed row to the panel width. Loading and virtualization live in the virtual demo; this page is the packing surface.</p>
+    </header>
+
+    <div class="controls">
+      <div class="controls-row">
+        <div class="range-control">
+          <span>Images</span>
+          <input id="countSlider" type="range" min="6" max="34" value="24" step="1" />
+          <span id="countVal" class="range-val">24</span>
+        </div>
+        <div class="range-control">
+          <span>Columns</span>
+          <input id="columnsSlider" type="range" min="2" max="6" value="3" step="1" />
+          <span id="columnsVal" class="range-val">3</span>
+        </div>
+        <div class="range-control">
+          <span>Row height</span>
+          <input id="rowHeightSlider" type="range" min="140" max="320" value="220" step="10" />
+          <span id="rowHeightVal" class="range-val">220px</span>
+        </div>
+        <span class="controls-label">Cache-bust</span>
+        <div class="segmented" role="radiogroup" aria-label="Cache-bust">
+          <label><input type="radio" name="cache" value="on" checked> On</label>
+          <label><input type="radio" name="cache" value="off"> Off</label>
+        </div>
+        <button id="runPacking" class="primary">Pack</button>
+      </div>
+      <span id="meta" class="meta"></span>
+    </div>
+
+    <div class="panels two packing-pair">
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Shortest column <code>packShortestColumn</code></h2>
+        </div>
+        <div class="panel-stats stat-list" id="shortestStats">
+          <div class="row"><span class="label">Dims ready</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Pack time</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Total height</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Tiles</span><span class="value"><b>&mdash;</b></span></div>
+        </div>
+        <div id="shortest" class="packed"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Justified rows <code>packJustifiedRows</code></h2>
+        </div>
+        <div class="panel-stats stat-list" id="justifiedStats">
+          <div class="row"><span class="label">Dims ready</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Pack time</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Total height</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Tiles</span><span class="value"><b>&mdash;</b></span></div>
+        </div>
+        <div id="justified" class="packed"></div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="./packing.ts"></script>
+  <script type="module" src="./nav-concurrency.ts"></script>
+  <script type="module" src="./warm-cdn.ts"></script>
+</body>
+</html>

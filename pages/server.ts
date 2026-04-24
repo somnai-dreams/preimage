@@ -7,7 +7,7 @@ import { serve } from 'bun'
 import { join } from 'node:path'
 
 import indexHtml from './demos/index.html'
-import masonryHtml from './demos/masonry.html'
+import packingHtml from './demos/packing.html'
 import editorialHtml from './demos/editorial.html'
 import ttfsHtml from './demos/ttfs.html'
 import decodePoolHtml from './demos/decode-pool.html'
@@ -36,7 +36,7 @@ const repoRoot = join(pagesRoot, '..')
 const routes = {
   '/': indexHtml,
   '/index.html': indexHtml,
-  '/masonry.html': masonryHtml,
+  '/packing.html': packingHtml,
   '/editorial.html': editorialHtml,
   '/ttfs.html': ttfsHtml,
   '/decode-pool.html': decodePoolHtml,

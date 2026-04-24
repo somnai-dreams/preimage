@@ -13,7 +13,7 @@ Two pretext adapters and a small set of adjacent utilities:
 - **`prepare`, `layout`, `fitRect`, `getElement`** — the primitives those adapters are built on, usable standalone.
 - **`PrepareQueue`** — application-level concurrency cap with `boost(url)` priority for "this just scrolled into view, jump the queue."
 - **`DecodePool`** — off-main-thread decode cache for canvas timelines and WebGL scenarios where you want `ctx.drawImage(bitmap, …)` to be a single blit, not a decode.
-- **`loadGallery` / `createVirtualTilePool`** — gallery loading and DOM recycling helpers for measured masonry surfaces.
+- **`loadGallery` / `createVirtualTilePool`** — gallery loading and DOM recycling helpers for measured image grids.
 - **`createScrollObserver` / scroll predictors** — cheap predictive pre-rendering baselines for virtualized surfaces.
 - **`buildManifest`** — build-time dimension manifests for PNG, JPEG, GIF, BMP, WebP, SVG, AVIF, HEIC/HEIF, APNG, and ICO.
 
@@ -129,9 +129,9 @@ Internally uses `prepare()` to get dims and the warmed `<img>` element, then `cr
 
 ## Demos
 
-Four side-by-side demos at [the demos page](./pages/demos/). Each panel has its own Run button so you feel the click-to-layout delay for each strategy:
+Browser demos live at [the demos page](./pages/demos/). Most panels have their own Run button so you feel the click-to-layout delay for each strategy:
 
-- **Masonry** — ~30 local PNGs, naive `<img>` grid vs measured shortest-column layout. Naive shifts on every image decode; measured commits the grid in one pass.
+- **Packing** — runtime-probed local PNGs packed through shortest columns and justified rows.
 - **Editorial** — pretext + native `<img>` (re-flows on every figure's `onload`) vs pretext + preimage (flows once with measured dims).
 - **TTFS** — one ~3MB PNG, three strategies: naive, declared `<img width height>`, `prepare()`.
 - **Decode pool** — canvas scrub timeline, decode-per-scrub vs warmed pool.
