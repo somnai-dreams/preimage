@@ -152,9 +152,10 @@ export type PrepareOptions = MeasureOptions & {
    *  - `'stream'`: `fetch(url)`, feed `response.body` through
    *    `probeImageStream`, abort via `AbortController` the instant the
    *    header bytes parse. No warmed element, but dims land at
-   *    header-bytes time instead of poll-loop time — much faster at
-   *    high concurrency (~200 parallel probes), where the `'img'`
-   *    path's `setTimeout(0)` polling gets event-loop-starved.
+   *    header-bytes time instead of poll-loop time — faster at high
+   *    concurrency because parsing kicks off the moment bytes arrive,
+   *    rather than waiting on the browser's image subsystem to decode
+   *    a header before `naturalWidth` flips.
    *  - `'range'`: `fetch(url, { headers: { Range: 'bytes=0-N' } })`.
    *    Server returns 206 Partial Content with just the requested
    *    bytes — no abort dance, no race between "header parsed" and
@@ -205,6 +206,29 @@ export type PrepareOptions = MeasureOptions & {
    *  Default: 24576 (24KB) — covers the 99.9th-percentile JPEG in the
    *  corpus plus some ICC-profile outliers. Set to 0 to disable. */
   rangeRetryBytes?: number
+  /** When `strategy: 'auto'` (or cached from a prior auto-resolved
+   *  probe), retry via `strategy: 'img'` if the initial `fetch()`
+   *  throws — usually CORS, sometimes hard network failure. Browsers
+   *  can't distinguish the two from JS, so both cases fall through
+   *  together; if the origin is genuinely down the `<img>` retry fails
+   *  too and the caller still gets a rejection.
+   *
+   *  `<img>` doesn't need CORS for `naturalWidth` reads (tainting only
+   *  applies to canvas pixel extraction), so this is the only path
+   *  that gets dims out of a CORS-hostile origin. Cost is bandwidth:
+   *  the `<img>` probe pulls a TCP receive window's worth of bytes
+   *  (tens of KB) instead of the 256B–4KB Range would fetch. The
+   *  origin is then cached as `'img'` so subsequent probes skip the
+   *  fetch attempt.
+   *
+   *  Explicit `strategy: 'range'` / `'stream'` / `'img'` never falls
+   *  back — callers who opted in specifically get the exact behavior
+   *  they asked for, with errors surfaced.
+   *
+   *  Default: `false`. Enable for gallery / virtualization flows that
+   *  want dims-before-paint on mixed-origin URL sets and are willing
+   *  to pay the bandwidth on CORS-hostile origins in exchange. */
+  fallbackToImgOnFetchError?: boolean
 }
 
 /** Default range-byte budget per format (see `rangeBytesByFormat`). Derived
@@ -345,8 +369,13 @@ type ConcreteStrategy = 'img' | 'stream' | 'range'
 // Per-origin strategy memory. First probe against a new origin tries
 // 'range'; the result records which strategy the server actually
 // supports, so every subsequent probe for the same origin skips the
-// fallback. Scoped to the module (shared across PrepareQueue instances
-// and direct prepare() callers in the same page).
+// fallback dance. Outcomes:
+//   'range'  → 206 Partial Content, stays on range
+//   'stream' → 200 OK, server ignored the Range header
+//   'img'    → fetch threw (CORS or hard network), and the caller
+//              opted into `fallbackToImgOnFetchError`
+// Scoped to the module (shared across PrepareQueue instances and
+// direct prepare() callers in the same page).
 const originStrategyCache = new Map<string, ConcreteStrategy>()
 
 function originOf(src: string): string | null {
@@ -361,6 +390,17 @@ function originOf(src: string): string | null {
 function rememberOriginStrategy(src: string, strategy: ConcreteStrategy): void {
   const origin = originOf(src)
   if (origin !== null) originStrategyCache.set(origin, strategy)
+}
+
+// Decide whether a thrown error should trigger the img fallback.
+// `fetch()` throws a `TypeError` for CORS and hard network failures;
+// both are opaque to JS (browsers deliberately don't distinguish them,
+// so a misconfigured origin can't probe for whether the target exists).
+// Everything else — AbortError from `options.signal`, HTTP-status
+// errors (which arrive as `response.ok === false`, not throws), parse
+// errors — should not trigger fallback.
+function isFetchNetworkError(err: unknown): boolean {
+  return err instanceof TypeError
 }
 
 /** Read the remembered strategy for an origin, or `null` if nothing
@@ -385,10 +425,11 @@ export function clearOriginStrategyCache(): void {
  *  Returns `fromAuto: true` when the strategy came from `'auto'`
  *  resolution (explicit or cached). Callers use this to gate writes to
  *  `originStrategyCache`: only auto-originated probes record their
- *  outcome. Without the gate, explicit selections (e.g. a user picking
- *  `'stream'` from a demo nav) would overwrite whatever auto had
- *  discovered, so switching back to `'auto'` would silently inherit
- *  the manual choice instead of rediscovering. */
+ *  outcome, including the fetch-error → img fallback. Without the
+ *  gate, explicit selections (e.g. a user picking `'stream'` from a
+ *  demo nav) would overwrite whatever auto had discovered, so
+ *  switching back to `'auto'` would silently inherit the manual
+ *  choice instead of rediscovering. */
 function resolveStrategy(
   src: string,
   options: PrepareOptions,
@@ -460,7 +501,20 @@ async function prepareFromUrlRange(
     return await fetch(src, init)
   }
 
-  const response = await doRangeFetch(initialRangeBytes)
+  let response: Response
+  try {
+    response = await doRangeFetch(initialRangeBytes)
+  } catch (err) {
+    if (
+      fromAuto &&
+      options.fallbackToImgOnFetchError === true &&
+      isFetchNetworkError(err)
+    ) {
+      rememberOriginStrategy(src, 'img')
+      return await prepareFromUrlImg(src, key, options)
+    }
+    throw err
+  }
   if (!response.ok && response.status !== 206) {
     throw new Error(`preimage: fetch ${src} failed with status ${response.status}`)
   }
@@ -566,7 +620,20 @@ async function prepareFromUrlStream(
       ? 'omit'
       : 'same-origin'
 
-  const response = await fetch(src, { signal: controller.signal, credentials })
+  let response: Response
+  try {
+    response = await fetch(src, { signal: controller.signal, credentials })
+  } catch (err) {
+    if (
+      fromAuto &&
+      options.fallbackToImgOnFetchError === true &&
+      isFetchNetworkError(err)
+    ) {
+      rememberOriginStrategy(src, 'img')
+      return await prepareFromUrlImg(src, key, options)
+    }
+    throw err
+  }
   if (!response.ok) {
     throw new Error(`preimage: fetch ${src} failed with status ${response.status}`)
   }
@@ -669,39 +736,78 @@ async function prepareFromUrlImg(
   return wrap(measurement, options.dimsOnly === true ? null : img, 'network')
 }
 
+// Shared `<img>.naturalWidth` poll. One `setTimeout(0)` timer walks every
+// pending image per tick, instead of N timers each rescheduling themselves
+// independently. Matters at high concurrency (virtualized grids probing
+// 200+ URLs at once): the per-image loop spawned one timer per image, and
+// each timer contended for the event loop, pushing dims-known latency up
+// and starving unrelated tasks. One shared timer keeps the tick cost O(N)
+// per frame rather than O(N) timers × O(1) per timer.
+//
+// `setTimeout(0)` over `requestAnimationFrame` because we're not syncing
+// to a paint — we just want to wake as soon as the browser hands JS back
+// after a decode completes. rAF is gated on display vsync (~16ms on
+// 60Hz), which would add a frame of latency for no benefit.
+
+type PollWaiter = {
+  img: HTMLImageElement
+  resolve: (dims: { width: number; height: number }) => void
+  reject: (err: Error) => void
+  done: boolean
+}
+
+const pollWaiters = new Set<PollWaiter>()
+let pollScheduled = false
+
+function schedulePollTick(): void {
+  if (pollScheduled) return
+  pollScheduled = true
+  setTimeout(runPollTick, 0)
+}
+
+function runPollTick(): void {
+  pollScheduled = false
+  for (const waiter of pollWaiters) {
+    if (waiter.done) {
+      pollWaiters.delete(waiter)
+      continue
+    }
+    const img = waiter.img
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      waiter.done = true
+      pollWaiters.delete(waiter)
+      waiter.resolve({ width: img.naturalWidth, height: img.naturalHeight })
+      continue
+    }
+    if (img.complete) {
+      // Load finished but no dims — corrupt image, SVG without
+      // intrinsic size, etc. (The `error` listener normally catches
+      // outright load failures before we get here.)
+      waiter.done = true
+      pollWaiters.delete(waiter)
+      waiter.reject(new Error('preimage: image loaded with no dimensions'))
+    }
+  }
+  if (pollWaiters.size > 0) schedulePollTick()
+}
+
 function pollForNaturalSize(
   img: HTMLImageElement,
 ): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
-    let finished = false
-    const onError = (): void => {
-      if (finished) return
-      finished = true
-      reject(new Error('preimage: image load failed'))
-    }
-    img.addEventListener('error', onError, { once: true })
-
-    const tick = (): void => {
-      if (finished) return
-      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-        finished = true
-        resolve({ width: img.naturalWidth, height: img.naturalHeight })
-        return
-      }
-      if (img.complete) {
-        // Load finished but no dims — corrupt image, SVG without
-        // intrinsic size, etc.
-        finished = true
-        reject(new Error('preimage: image loaded with no dimensions'))
-        return
-      }
-      // setTimeout(0) polling is ~5x faster than requestAnimationFrame
-      // (which is gated on display vsync) and avoids the task-starvation
-      // pitfall of MessageChannel spinning. Empirically ~4-8ms to
-      // dims-known after bytes arrive.
-      setTimeout(tick, 0)
-    }
-    tick()
+    const waiter: PollWaiter = { img, resolve, reject, done: false }
+    img.addEventListener(
+      'error',
+      () => {
+        if (waiter.done) return
+        waiter.done = true
+        pollWaiters.delete(waiter)
+        reject(new Error('preimage: image load failed'))
+      },
+      { once: true },
+    )
+    pollWaiters.add(waiter)
+    schedulePollTick()
   })
 }
 
