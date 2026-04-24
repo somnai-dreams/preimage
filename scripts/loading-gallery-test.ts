@@ -355,6 +355,59 @@ async function caseQueuedPromotesScrolledViewport(): Promise<void> {
   }
 }
 
+async function caseQueuedPromotesPredictedViewport(): Promise<void> {
+  const restore = installFakeDom()
+  try {
+    const scrollContainer = new FakeElement()
+    const contentContainer = new FakeElement()
+    scrollContainer.clientHeight = 40
+    const starts: number[] = []
+    const activeImgs = new Map<number, FakeElement>()
+    const gallery = loadGallery({
+      urls: ['/a.png', '/b.png', '/c.png', '/d.png'],
+      scrollContainer,
+      contentContainer,
+      packer: makeSpacedPacker(),
+      imageLoading: 'queued',
+      aspects: [1, 1, 1, 1],
+      overscan: 400,
+      renderConcurrency: 1,
+      renderSkeleton: () => {},
+      renderImage: (el, idx) => {
+        starts.push(idx)
+        const img = new FakeElement('IMG')
+        const tile = el as unknown as FakeElement
+        tile.appendChild(img)
+        activeImgs.set(idx, img)
+      },
+    })
+    await tick()
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    scrollContainer.scrollTop = 40
+    contentContainer.rectTop = -scrollContainer.scrollTop
+    scrollContainer.dispatch('scroll')
+    await tick()
+    const firstImg = activeImgs.get(0)
+    if (firstImg === undefined) {
+      fail('queued-prediction/started-first', `starts=${JSON.stringify(starts)}`)
+      gallery.destroy()
+      return
+    }
+    firstImg.complete = true
+    firstImg.naturalWidth = 100
+    firstImg.dispatch('load')
+    await tick()
+    if (JSON.stringify(starts.slice(0, 2)) !== JSON.stringify([0, 2])) {
+      fail('queued-prediction/predicted-jumps-ahead', `starts=${JSON.stringify(starts)}`)
+    } else {
+      pass('queued-prediction/predicted-jumps-ahead')
+    }
+    gallery.destroy()
+  } finally {
+    restore()
+  }
+}
+
 async function main(): Promise<void> {
   const t0 = performance.now()
   await caseImageLoadingOrder('immediate')
@@ -364,6 +417,7 @@ async function main(): Promise<void> {
   await caseKnownAspectsSkipProbe()
   await caseDestroySettlesAndIgnoresLateProbe()
   await caseQueuedPromotesScrolledViewport()
+  await caseQueuedPromotesPredictedViewport()
   const wallMs = performance.now() - t0
 
   const total = results.length
