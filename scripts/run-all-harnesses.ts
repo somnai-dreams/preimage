@@ -25,6 +25,7 @@ const HARNESSES: Array<{ name: string; script: string }> = [
   { name: 'prepare-queue', script: 'prepare-queue-test.ts' },
   { name: 'decode-pool', script: 'decode-pool-test.ts' },
   { name: 'loading-gallery', script: 'loading-gallery-test.ts' },
+  { name: 'predict', script: 'predict-test.ts' },
   { name: 'fit-analysis', script: 'fit-analysis-test.ts' },
   { name: 'parser-fuzz', script: 'parser-fuzz.ts' },
 ]

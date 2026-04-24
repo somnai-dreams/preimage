@@ -14,6 +14,7 @@ Two pretext adapters and a small set of adjacent utilities:
 - **`PrepareQueue`** — application-level concurrency cap with `boost(url)` priority for "this just scrolled into view, jump the queue."
 - **`DecodePool`** — off-main-thread decode cache for canvas timelines and WebGL scenarios where you want `ctx.drawImage(bitmap, …)` to be a single blit, not a decode.
 - **`loadGallery` / `createVirtualTilePool`** — gallery loading and DOM recycling helpers for measured masonry surfaces.
+- **`createScrollObserver` / scroll predictors** — cheap predictive pre-rendering baselines for virtualized surfaces.
 - **`buildManifest`** — build-time dimension manifests for PNG, JPEG, GIF, BMP, WebP, SVG, AVIF, HEIC/HEIF, APNG, and ICO.
 
 ## What `prepare()` actually does
@@ -135,7 +136,7 @@ Four side-by-side demos at [the demos page](./pages/demos/). Each panel has its 
 - **TTFS** — one ~3MB PNG, three strategies: naive, declared `<img width height>`, `prepare()`.
 - **Decode pool** — canvas scrub timeline, decode-per-scrub vs warmed pool.
 
-Run them: `bun install && bun start`, then open <http://localhost:3000/>.
+Run them: `bun install && bun run start`, then open the URL printed by the server. It starts at <http://localhost:3000/> and auto-increments when that port is busy.
 
 ## Installation
 
@@ -328,6 +329,10 @@ Reads only `MAX_HEADER_BYTES` (4KB) per file; the full image is never decoded ex
 `@somnai-dreams/preimage/virtual` exports `createVirtualTilePool`, the DOM-recycled tile pool used by the demos. Feed it `Placement[]`; it mounts only visible/overscan tiles and calls `unmount` so renderers can cancel image work.
 
 `@somnai-dreams/preimage/loading` exports `loadGallery`. Pass `aspects` when dimensions are already known; otherwise the helper probes dimensions through `PrepareQueue`. Separately, `imageLoading` controls when mounted tiles start visible image requests: `visible-first` prioritizes the current viewport, `after-layout` waits until the frame layer is complete, `queued` caps visible image fetches, and `immediate` starts image requests as tiles mount. The default is `visible-first`.
+
+### Scroll prediction baselines
+
+`@somnai-dreams/preimage/predict` exports the phase-0 pieces for predictive pre-render experiments: `createScrollObserver(container)`, `createStationaryPredictor()`, `createLinearPredictor()`, `createMomentumPredictor()`, and `evaluatePrediction(predictor, samples, { horizonMs })`. The bench at `/bench/predict.html` runs scripted scroll traces before this touches the virtual pool.
 
 ### Pretext integration (`@somnai-dreams/preimage/pretext`)
 

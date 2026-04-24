@@ -72,7 +72,7 @@
   <main class="page wide">
     <header class="page-header">
       <h1>Virtual — ten thousand tiles, DOM-recycled</h1>
-      <p>Windowing a grid of non-uniform-height tiles is the chicken-and-egg: you need heights to position items, but heights come from loading them. The left panel is the naive attempt — drop N <code>&lt;img&gt;</code> tags into a CSS column layout and let the browser fetch, decode, and reflow all at once. The right panel runs <code>@somnai-dreams/preimage/loading</code> over a DOM-recycled pool, so you can compare visible-first, after-layout, queued, and immediate image scheduling while scrolling. Crank the slider; the scrollbar length is honest from the first frame, no matter the count.</p>
+      <p>Windowing a grid of non-uniform-height tiles is the chicken-and-egg: you need heights to position items, but heights come from loading them. The left panel is the naive attempt — drop N <code>&lt;img&gt;</code> tags into a CSS column layout and let the browser fetch, decode, and reflow all at once. The right panel runs <code>@somnai-dreams/preimage/loading</code> over a DOM-recycled pool, so you can compare runtime dimension probing, optional manifest dimensions, and visible-first, after-layout, queued, or immediate image scheduling while scrolling.</p>
     </header>
 
     <div class="controls">
@@ -88,6 +88,10 @@
           <label><input type="radio" name="loading" value="after-layout"> After layout</label>
           <label><input type="radio" name="loading" value="queued"> Queued</label>
           <label><input type="radio" name="loading" value="immediate"> Immediate</label>
+        </div>
+        <span class="controls-label">Dimensions</span>
+        <div class="segmented" aria-label="Dimension source">
+          <label><input id="manifestDims" type="checkbox"> Manifest</label>
         </div>
       </div>
       <span id="meta" class="meta"></span>

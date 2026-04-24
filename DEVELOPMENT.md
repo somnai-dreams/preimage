@@ -47,6 +47,7 @@ Static deploys work for the demo and bench pages that run entirely in the browse
 | `packages/preimage/src/decode-pool.ts` | off-main-thread bitmap decode cache |
 | `packages/preimage/src/virtual.ts` | DOM-recycled virtual tile pool |
 | `packages/preimage/src/loading.ts` | gallery image scheduling and `Gallery.done` orchestration |
+| `packages/preimage/src/predict.ts` | scroll prediction baselines for virtual pre-render experiments |
 | `packages/preimage/src/manifest.ts` | build-time dimension manifest builder + CLI |
 | `packages/preimage/src/pretext-*.ts` | pretext float and inline integrations |
 | `packages/layout-algebra/src/index.ts` | DOM-free packers, cursors, visibility, first-screen estimates |

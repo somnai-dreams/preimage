@@ -1,4 +1,4 @@
-import { PrepareQueue, recordKnownMeasurement } from '@somnai-dreams/preimage'
+import { clearCache, PrepareQueue, recordKnownMeasurement } from '@somnai-dreams/preimage'
 import {
   loadGallery,
   type GalleryPhase,
@@ -52,6 +52,10 @@ function getImageLoading(): GalleryImageLoading {
       return value
   }
   return 'visible-first'
+}
+
+function getUseManifestDims(): boolean {
+  return (document.getElementById('manifestDims') as HTMLInputElement | null)?.checked === true
 }
 
 function freshToken(): string {
@@ -192,13 +196,17 @@ async function runMeasured(): Promise<void> {
   const count = getCount()
   const token = freshToken()
   const imageLoading = getImageLoading()
+  const useManifestDims = getUseManifestDims()
   const urls = cycledUrls(count, token)
-  const aspects = cycledAspects(count)
-  // The virtual demo owns this local photo manifest, so dimensions are
-  // not something the first visible frame needs to discover. Seed the
-  // cache before resetting DOM; the selected strategy still controls
-  // image fetch sequencing inside those already-sized frames.
-  hydrateCycledMeasurements(urls)
+  const aspects = useManifestDims ? cycledAspects(count) : undefined
+  if (useManifestDims) {
+    hydrateCycledMeasurements(urls)
+  } else {
+    // The demo defaults to measuring dimensions at runtime. Clear any
+    // manifest/cache data from a previous run so "manifest off" stays
+    // honest even after the toggle has been enabled once.
+    clearCache()
+  }
 
   if (activeMeasuredGallery !== null) {
     activeMeasuredGallery.destroy()
@@ -209,7 +217,8 @@ async function runMeasured(): Promise<void> {
   measuredScroll.scrollTop = 0
   resetStats(measuredStats)
 
-  setMeta(`${fmtCount(count)} tiles · measured building · ${imageLoading}`)
+  const dimsLabel = useManifestDims ? 'manifest dims' : 'probed dims'
+  setMeta(`${fmtCount(count)} tiles · measured building · ${imageLoading} · ${dimsLabel}`)
 
   const urlSet = new Set(
     urls.map((u) => new URL(u, location.href).pathname + new URL(u, location.href).search),
@@ -228,7 +237,11 @@ async function runMeasured(): Promise<void> {
   })
   let dimsProbed = 0
   let liveTiles = 0
-  setRowValue(measuredStats, 2, '<b>known</b>')
+  setRowValue(
+    measuredStats,
+    2,
+    useManifestDims ? '<b>manifest</b>' : `<b>0 / ${fmtCount(urls.length)}</b>`,
+  )
 
   function reportLiveTiles(): void {
     setRowValue(measuredStats, 1, `<b>${fmtCount(liveTiles)}</b>`)
@@ -270,7 +283,7 @@ async function runMeasured(): Promise<void> {
       options: { dimsOnly: true, strategy },
       boostFirstScreen: firstK,
     },
-    aspects,
+    ...(aspects !== undefined ? { aspects } : {}),
     renderConcurrency: 8,
     renderSkeleton: (el, _idx, place) => {
       el.className = 'vtile pending'
@@ -324,7 +337,7 @@ async function runMeasured(): Promise<void> {
   await new Promise((r) => setTimeout(r, 500))
   setRowValue(measuredStats, 5, `<b>${fmtBytes(bytesMeter.stop())}</b>`)
 
-  setMeta(`${fmtCount(count)} tiles · measured done · ${imageLoading} · scroll to load more tiles`)
+  setMeta(`${fmtCount(count)} tiles · measured done · ${imageLoading} · ${dimsLabel} · scroll to load more tiles`)
   runMeasuredBtn.disabled = false
   runMeasuredBtn.textContent = 'Run again'
 }

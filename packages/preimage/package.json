@@ -11,7 +11,9 @@
     "float",
     "article-layout",
     "rich-inline",
-    "gallery"
+    "gallery",
+    "virtualization",
+    "scroll-prediction"
   ],
   "license": "MIT",
   "repository": {
@@ -55,6 +57,11 @@
       "types": "./dist/loading.d.ts",
       "import": "./dist/loading.js",
       "default": "./dist/loading.js"
+    },
+    "./predict": {
+      "types": "./dist/predict.d.ts",
+      "import": "./dist/predict.js",
+      "default": "./dist/predict.js"
     },
     "./package.json": "./package.json"
   },
