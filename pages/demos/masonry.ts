@@ -1,4 +1,4 @@
-import { PrepareQueue, prepare, recordKnownMeasurement } from '@somnai-dreams/preimage'
+import { clearCache, PrepareQueue, prepare, recordKnownMeasurement } from '@somnai-dreams/preimage'
 import {
   loadGallery,
   type GalleryPhase,
@@ -64,6 +64,10 @@ function getImageLoading(): GalleryImageLoading {
       return value
   }
   return 'visible-first'
+}
+
+function getUseManifestDims(): boolean {
+  return (document.getElementById('manifestDims') as HTMLInputElement | null)?.checked === true
 }
 
 function getCacheBust(): string | null {
@@ -319,8 +323,14 @@ async function runMeasured(): Promise<void> {
   const cacheBust = getCacheBust()
   const mode = getMode()
   const layout = getLayout()
+  const useManifestDims = getUseManifestDims()
   const urls = buildUrls(count, cacheBust)
-  hydrateKnownMeasurements(urls, count)
+  const aspects = useManifestDims ? buildAspects(count) : undefined
+  if (useManifestDims) {
+    hydrateKnownMeasurements(urls, count)
+  } else {
+    clearCache()
+  }
 
   if (activeMeasuredGallery !== null) {
     activeMeasuredGallery.destroy()
@@ -333,7 +343,7 @@ async function runMeasured(): Promise<void> {
   setMeta(count, cacheBust)
 
   if (layout === 'column') {
-    await runMeasuredLoadingMode(urls, buildAspects(count), getImageLoading())
+    await runMeasuredLoadingMode(urls, aspects, getImageLoading(), useManifestDims)
   } else if (mode === 'batch') {
     await runMeasuredBatch(urls, layout)
   } else {
@@ -346,8 +356,9 @@ async function runMeasured(): Promise<void> {
 
 async function runMeasuredLoadingMode(
   urls: readonly string[],
-  aspects: readonly number[],
+  aspects: readonly number[] | undefined,
   imageLoading: GalleryImageLoading,
+  useManifestDims: boolean,
 ): Promise<void> {
   const t0 = performance.now()
   const dimTimes: number[] = []
@@ -355,7 +366,7 @@ async function runMeasuredLoadingMode(
   const packer: PackerCursor = shortestColumnCursor({ columns: COLUMNS, gap: GAP, panelWidth })
   const queue = new PrepareQueue({ concurrency: getConcurrency() })
   const strategy = getStrategy()
-  setRowValue(measuredStats, 2, '<b>known</b>')
+  setRowValue(measuredStats, 2, useManifestDims ? '<b>manifest</b>' : '<b>&mdash;</b>')
 
   const trackedQueue = {
     enqueue(src: string, options?: Parameters<PrepareQueue['enqueue']>[1]) {
@@ -392,7 +403,7 @@ async function runMeasuredLoadingMode(
       options: { dimsOnly: true, strategy },
       boostFirstScreen: firstK,
     },
-    aspects,
+    ...(aspects !== undefined ? { aspects } : {}),
     renderConcurrency: 8,
     renderSkeleton: renderMeasuredSkeleton,
     renderImage: renderMeasuredImage,
@@ -416,7 +427,7 @@ async function runMeasuredLoadingMode(
     setRowValue(measuredStats, 3, `<b>${fmtMs(performance.now() - t0)}</b>`)
   }
   if (dimTimes.length === 0) {
-    setRowValue(measuredStats, 2, '<b>instant</b>')
+    setRowValue(measuredStats, 2, useManifestDims ? '<b>manifest</b>' : '<b>instant</b>')
   }
 }
 
