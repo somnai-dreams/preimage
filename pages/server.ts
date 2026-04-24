@@ -11,7 +11,6 @@ import masonryHtml from './demos/masonry.html'
 import editorialHtml from './demos/editorial.html'
 import ttfsHtml from './demos/ttfs.html'
 import decodePoolHtml from './demos/decode-pool.html'
-import scaleHtml from './demos/scale.html'
 import virtualHtml from './demos/virtual.html'
 import manifestHtml from './demos/manifest.html'
 import streamHtml from './demos/stream.html'
@@ -41,7 +40,6 @@ const routes = {
   '/editorial.html': editorialHtml,
   '/ttfs.html': ttfsHtml,
   '/decode-pool.html': decodePoolHtml,
-  '/scale.html': scaleHtml,
   '/virtual.html': virtualHtml,
   '/manifest.html': manifestHtml,
   '/stream.html': streamHtml,

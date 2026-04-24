@@ -74,7 +74,7 @@ export function takePhotos(count: number): Photo[] {
 // per-slot cache-bust token. Each returned URL is unique from the
 // browser's perspective (and from our server's) so HTTP cache can't
 // collapse them, even though the underlying bytes repeat. Used by
-// the scale demo.
+// virtual and benchmark demos.
 export function cycledUrls(count: number, baseToken: string): string[] {
   const out: string[] = []
   for (let i = 0; i < count; i++) {

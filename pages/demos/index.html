@@ -26,7 +26,6 @@
     <a href="./editorial.html">Editorial</a>
     <a href="./ttfs.html">TTFS</a>
     <a href="./decode-pool.html">Decode pool</a>
-    <a href="./scale.html">Scale</a>
     <a href="./virtual.html">Virtual</a>
     <a href="./manifest.html">Manifest</a>
     <a href="./stream.html">Stream</a>
@@ -64,10 +63,6 @@
         <a class="demo-card" href="./decode-pool.html">
           <h3>Decode pool for canvas timelines</h3>
           <p>Sixteen ~1-3MB PNG frames scrubbable on a canvas. Left decodes on every scrub on the main thread; right warms a <code>DecodePool</code> up front and each scrub is a single cached-bitmap blit.</p>
-        </a>
-        <a class="demo-card" href="./scale.html">
-          <h3>Scale — hundreds of tiles</h3>
-          <p>Up to 500 cache-busted tiles, naive vs <code>PrepareQueue</code> + <code>dimsOnly</code> + <code>IntersectionObserver</code>. Measured panel takes header bytes for all tiles, lays out the whole grid, then full-fetches only what scrolls into view. Bytes-transferred readout shows what the library saves.</p>
         </a>
         <a class="demo-card" href="./virtual.html">
           <h3>Virtual — ten thousand tiles, DOM-recycled</h3>

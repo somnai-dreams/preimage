@@ -9,6 +9,7 @@
 - **New `disposePreparedImage(prepared)` helper.** `prepare(Blob)` may retain a `measurement.blobUrl` for preview reuse; callers can now release that URL explicitly when replacing or clearing a preview. URL/cache/manifest handles without retained blob resources are no-ops. The dropzone demo uses the helper and revokes its naive object URLs after load/error.
 - **Manifest defaults now match the parser surface.** `buildManifest()` includes AVIF, HEIC/HEIF, APNG, and ICO by default in addition to PNG/JPEG/GIF/BMP/WebP/SVG, and `probeImageBytes` covers ICO headers. The manifest docs now describe the current default coverage instead of the old AVIF/HEIC skip behavior.
 - **`DecodePool.clear()` is generation-safe.** Clearing the pool closes cached bitmaps, drops in-flight dedupe state, and prevents decodes that were already running from repopulating the cache after the clear.
+- **Demo cleanup.** Removed the old scale demo now that the virtual demo covers the same bulk `dimsOnly` and bytes-transfer story with DOM recycling, loading controls, and optional manifest dimensions.
 
 ## 0.11.0
 

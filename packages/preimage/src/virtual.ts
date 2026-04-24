@@ -118,7 +118,7 @@ export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualT
   let lastScrollTop = scrollContainer.scrollTop
   // Cached scroll metrics. refresh() is called synchronously from
   // setPlacements on every placement update (e.g. per prepare()
-  // resolve in a scale demo). Reading scrollTop/clientHeight from the
+  // resolve in a probe-driven gallery). Reading scrollTop/clientHeight from the
   // DOM would force a layout flush on each call — right after the
   // caller likely wrote to contentContainer.style.height — turning
   // the run into N layout thrashes. Instead we read the DOM only when
