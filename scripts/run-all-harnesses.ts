@@ -1,4 +1,4 @@
-// Run every offline regression harness in sequence. Used as the
+// Run every regression harness in sequence. Used as the
 // `bun run check:all` entrypoint so one command answers "is
 // everything still green?" Outputs one line per harness with
 // pass/fail count + wall time; exits non-zero on any failure so
@@ -14,7 +14,7 @@ import { dirname, resolve } from 'node:path'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 
-const HARNESSES: Array<{ name: string; script: string }> = [
+const HARNESSES: Array<{ name: string; script: string; args?: string[] }> = [
   { name: 'parser-robustness', script: 'parser-robustness-test.ts' },
   { name: 'packer-sweep', script: 'packer-sweep.ts' },
   { name: 'url-pattern-corpus', script: 'url-pattern-corpus.ts' },
@@ -25,6 +25,11 @@ const HARNESSES: Array<{ name: string; script: string }> = [
   { name: 'prepare-queue', script: 'prepare-queue-test.ts' },
   { name: 'decode-pool', script: 'decode-pool-test.ts' },
   { name: 'loading-gallery', script: 'loading-gallery-test.ts' },
+  {
+    name: 'remote-loading',
+    script: 'remote-loading-strategy-bench.ts',
+    args: ['--n', '8', '--strategies', 'visible-first,queued', '--scroll-ms', '600', '--timeout-ms', '30000'],
+  },
   { name: 'predict', script: 'predict-test.ts' },
   { name: 'fit-analysis', script: 'fit-analysis-test.ts' },
   { name: 'parser-fuzz', script: 'parser-fuzz.ts' },
@@ -38,10 +43,10 @@ type HarnessResult = {
   stdoutSummary: string
 }
 
-async function runHarness(name: string, scriptPath: string): Promise<HarnessResult> {
+async function runHarness(name: string, scriptPath: string, args: string[] = []): Promise<HarnessResult> {
   const t0 = performance.now()
   return await new Promise((resolveFn) => {
-    const child = spawn('bun', ['run', scriptPath], {
+    const child = spawn('bun', ['run', scriptPath, ...args], {
       cwd: resolve(scriptDir, '..'),
       env: process.env,
     })
@@ -68,8 +73,8 @@ async function runHarness(name: string, scriptPath: string): Promise<HarnessResu
 async function main(): Promise<void> {
   process.stdout.write(`=== Running ${HARNESSES.length} harnesses ===\n\n`)
   const results: HarnessResult[] = []
-  for (const { name, script } of HARNESSES) {
-    const result = await runHarness(name, `scripts/${script}`)
+  for (const { name, script, args } of HARNESSES) {
+    const result = await runHarness(name, `scripts/${script}`, args)
     results.push(result)
     const marker = result.exitCode === 0 ? '✓' : '✗'
     process.stdout.write(

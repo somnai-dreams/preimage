@@ -11,6 +11,7 @@
 - **`DecodePool.clear()` is generation-safe.** Clearing the pool closes cached bitmaps, drops in-flight dedupe state, and prevents decodes that were already running from repopulating the cache after the clear.
 - **Demo cleanup.** Removed the old scale demo now that the virtual demo covers the same bulk `dimsOnly` and bytes-transfer story with DOM recycling, loading controls, and optional manifest dimensions.
 - **Manifest demo keeps placeholders visible.** The hydrated panel still skips dimension probes, but its image slots now keep the same skeleton background while full image bytes arrive instead of rendering transparent gaps.
+- **Remote loading strategy harness.** `bun run bench:remote-loading` drives the real loading orchestrator in Chromium against hosted demo photos with cache-busted URLs, scripted scroll, first-image/done timings, render-concurrency counts, estimated loaded image bytes, and visible pending-tile ratios. `bun run check:all` now includes a small remote `visible-first` versus `queued` pass so loading regressions are caught outside the demo pages.
 
 ## 0.11.0
 

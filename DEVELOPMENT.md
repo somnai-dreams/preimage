@@ -14,12 +14,13 @@ npm install
 
 ```sh
 bun run check           # run tsc type-check (no emit)
-bun run check:all       # run all offline regression harnesses
+bun run check:all       # run all regression harnesses
 bun run build:package   # build packages/preimage/dist/ (ESM + .d.ts)
 bun run build:layout-algebra
 bun run build:all
 bun run build:demos     # static demo + bench output in dist-demos/
 bun start               # run the demo site locally on port 3000
+bun run bench:remote-loading  # browser sweep against hosted demo photos
 ```
 
 ## Preview deploys (Vercel)
@@ -52,6 +53,16 @@ Static deploys work for the demo and bench pages that run entirely in the browse
 | `packages/preimage/src/pretext-*.ts` | pretext float and inline integrations |
 | `packages/layout-algebra/src/index.ts` | DOM-free packers, cursors, visibility, first-screen estimates |
 | `pages/demos/virtual.ts` | reference consumer for async image work + DOM recycling + rAF-batched render |
+
+## Remote loading sweeps
+
+`bun run bench:remote-loading` starts a temporary local page, drives Chromium with Playwright, and loads the hosted demo photos from `https://preimage.dearlarry.co/assets/demos/photos/*.png`. It is not a demo bench: it lives under `scripts/` so it can serve as both a CI regression harness and a local strategy sweep while still exercising real browser image requests.
+
+The default local run compares `visible-first`, `queued`, `after-layout`, and `immediate` with remote cache-busted URLs, scripted scroll, first-image/done timings, max render concurrency, and visible pending-tile ratios. CI runs a smaller `visible-first` versus `queued` pass through `bun run check:all`; tune larger experiments with flags such as:
+
+```sh
+bun run bench:remote-loading -- --runs 3 --n 68 --strategies visible-first,queued
+```
 
 ## Dependencies
 

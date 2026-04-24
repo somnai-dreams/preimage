@@ -24,7 +24,8 @@
     "distill:har": "bun scripts/distill-har.ts",
     "manifest": "bun scripts/rename-and-manifest.ts",
     "screenshots": "bun scripts/screenshots.mjs",
-    "bench:probe-node": "bun scripts/bench-probe-node.ts"
+    "bench:probe-node": "bun scripts/bench-probe-node.ts",
+    "bench:remote-loading": "bun scripts/remote-loading-strategy-bench.ts"
   },
   "devDependencies": {
     "@chenglou/pretext": "^0.0.5",

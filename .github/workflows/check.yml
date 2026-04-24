@@ -21,6 +21,9 @@ jobs:
       - name: TypeScript
         run: bun run check
 
+      - name: Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+
       - name: Regression harnesses
         # PR branches that predate the harness suite don't have the
         # check:all script or scripts/run-all-harnesses.ts. Skip
