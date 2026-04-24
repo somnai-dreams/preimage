@@ -1,6 +1,6 @@
 # AGENTS
 
-Sibling repo to [`@chenglou/pretext`](https://github.com/chenglou/pretext), [`@chenglou/vibescript`](https://github.com/chenglou/vibescript) and [`@chenglou/freerange`](https://github.com/chenglou/freerange). 
+Sibling repo to `[@chenglou/pretext](https://github.com/chenglou/pretext)`, `[@chenglou/vibescript](https://github.com/chenglou/vibescript)` and `[@chenglou/freerange](https://github.com/chenglou/freerange)`. 
 
 These repos may be found at `../best practices/' if running locally.
 

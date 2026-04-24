@@ -1,0 +1,571 @@
+{
+  "date": "2026-04-23T13:39:38.484Z",
+  "runtime": "bun 1.3.12",
+  "wallMs": 2691.973541,
+  "aborted": false,
+  "abortReason": null,
+  "config": {
+    "sources": [
+      "modern"
+    ],
+    "wikimediaTargets": {
+      "jpeg": 2000,
+      "png": 300,
+      "gif": 200,
+      "webp": 100,
+      "svg": 800
+    },
+    "flickrCount": 500,
+    "iconCount": 150,
+    "parquetDir": "/Users/max/Documents/Dev/datatset",
+    "parquetPerHost": 250,
+    "concurrency": 8,
+    "probeCeilingBytes": 32768,
+    "probeWindows": [
+      128,
+      256,
+      384,
+      512,
+      768,
+      1024,
+      1536,
+      2048,
+      3072,
+      4096,
+      6144,
+      8192,
+      12288,
+      16384,
+      24576,
+      32768
+    ],
+    "timeBudgetSeconds": 180,
+    "fetchTimeoutMs": 15000
+  },
+  "sources": {
+    "wikimedia": {
+      "gathered": 0
+    },
+    "flickr": {
+      "gathered": 0
+    },
+    "iconlib": {
+      "gathered": 0
+    },
+    "parquet": {
+      "gathered": 0
+    },
+    "modern": {
+      "gathered": 33
+    }
+  },
+  "byFormat": {
+    "avif": {
+      "distribution": {
+        "n": 8,
+        "min": 256,
+        "p50": 256,
+        "p90": 384,
+        "p95": 384,
+        "p99": 384,
+        "max": 384,
+        "mean": 272
+      },
+      "histogram": {
+        "128": 0,
+        "256": 7,
+        "384": 1,
+        "512": 0,
+        "768": 0,
+        "1024": 0,
+        "1536": 0,
+        "2048": 0,
+        "3072": 0,
+        "4096": 0,
+        "6144": 0,
+        "8192": 0,
+        "12288": 0,
+        "16384": 0,
+        "24576": 0,
+        "32768": 0
+      },
+      "successes": 8,
+      "failures": 17,
+      "failureReasons": {
+        "http 404": 17
+      }
+    },
+    "heic": {
+      "distribution": {
+        "n": 6,
+        "min": 384,
+        "p50": 384,
+        "p90": 768,
+        "p95": 768,
+        "p99": 768,
+        "max": 768,
+        "mean": 512
+      },
+      "histogram": {
+        "128": 0,
+        "256": 0,
+        "384": 4,
+        "512": 0,
+        "768": 2,
+        "1024": 0,
+        "1536": 0,
+        "2048": 0,
+        "3072": 0,
+        "4096": 0,
+        "6144": 0,
+        "8192": 0,
+        "12288": 0,
+        "16384": 0,
+        "24576": 0,
+        "32768": 0
+      },
+      "successes": 6,
+      "failures": 2,
+      "failureReasons": {
+        "http 404": 2
+      }
+    }
+  },
+  "byHost": {
+    "github.com/avif-samples": {
+      "distribution": {
+        "n": 8,
+        "min": 256,
+        "p50": 256,
+        "p90": 384,
+        "p95": 384,
+        "p99": 384,
+        "max": 384,
+        "mean": 272
+      },
+      "histogram": {
+        "128": 0,
+        "256": 7,
+        "384": 1,
+        "512": 0,
+        "768": 0,
+        "1024": 0,
+        "1536": 0,
+        "2048": 0,
+        "3072": 0,
+        "4096": 0,
+        "6144": 0,
+        "8192": 0,
+        "12288": 0,
+        "16384": 0,
+        "24576": 0,
+        "32768": 0
+      },
+      "successes": 8,
+      "failures": 17,
+      "failureReasons": {
+        "http 404": 17
+      }
+    },
+    "raw.githubusercontent.com": {
+      "distribution": {
+        "n": 5,
+        "min": 384,
+        "p50": 384,
+        "p90": 768,
+        "p95": 768,
+        "p99": 768,
+        "max": 768,
+        "mean": 537.6
+      },
+      "histogram": {
+        "128": 0,
+        "256": 0,
+        "384": 3,
+        "512": 0,
+        "768": 2,
+        "1024": 0,
+        "1536": 0,
+        "2048": 0,
+        "3072": 0,
+        "4096": 0,
+        "6144": 0,
+        "8192": 0,
+        "12288": 0,
+        "16384": 0,
+        "24576": 0,
+        "32768": 0
+      },
+      "successes": 5,
+      "failures": 0,
+      "failureReasons": {}
+    },
+    "filesamples.com": {
+      "distribution": {
+        "n": 1,
+        "min": 384,
+        "p50": 384,
+        "p90": 384,
+        "p95": 384,
+        "p99": 384,
+        "max": 384,
+        "mean": 384
+      },
+      "histogram": {
+        "128": 0,
+        "256": 0,
+        "384": 1,
+        "512": 0,
+        "768": 0,
+        "1024": 0,
+        "1536": 0,
+        "2048": 0,
+        "3072": 0,
+        "4096": 0,
+        "6144": 0,
+        "8192": 0,
+        "12288": 0,
+        "16384": 0,
+        "24576": 0,
+        "32768": 0
+      },
+      "successes": 1,
+      "failures": 2,
+      "failureReasons": {
+        "http 404": 2
+      }
+    }
+  },
+  "samples": [
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.rotate-ccw90.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.10bpc.yuv420.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.crop.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.monochrome.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.odd-width.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.12bpc.yuv420.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile2.8bpc.yuv444.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-small.profile0.8bpc.yuv420.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/plum-blossom-large.profile0.8bpc.yuv420.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile0.8bpc.yuv420.no-cdef.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/hato.profile0.10bpc.yuv420.monochrome.no-cdef.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/fox.profile0.8bpc.yuv420.odd-height.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/master/testFiles/Microsoft/Chimera_gridded.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/master/testFiles/Microsoft/Multilayer_and_Namespace.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/master/testFiles/Netflix/avif/cosmos_frame05000_yuv444_10bpc_bt709.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/master/testFiles/Microsoft/Monochrome.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 7436,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/master/testFiles/Netflix/avif/cosmos_frame05000_yuv420_10bpc_bt709.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/link-u/avif-sample-images/master/kimono.mirror-vertical.rotate-ccw270.crop.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/master/testFiles/Apple/edge_case_testing/alpha_ispe/blue_grid_plane_ispe.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/master/testFiles/link-u/kimono.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/nokiatech/heif/gh-pages/content/images/autumn_1440x960.heic",
+      "source": "modern",
+      "host": "raw.githubusercontent.com",
+      "expectedFormat": "heic",
+      "detectedFormat": "heic",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/master/testFiles/link-u/hato.profile0.10bpc.yuv420.monochrome.no-cdef.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/master/testFiles/Apple/edge_case_testing/sofd/white_grid_plane_sofd.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/master/testFiles/link-u/kimono.rotate-ccw90.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/nokiatech/heif/gh-pages/content/images/winter_1440x960.heic",
+      "source": "modern",
+      "host": "raw.githubusercontent.com",
+      "expectedFormat": "heic",
+      "detectedFormat": "heic",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/strukturag/libheif/master/examples/example.heic",
+      "source": "modern",
+      "host": "raw.githubusercontent.com",
+      "expectedFormat": "heic",
+      "detectedFormat": "heic",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 768,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/nokiatech/heif/gh-pages/content/images/season_collection_1440x960.heic",
+      "source": "modern",
+      "host": "raw.githubusercontent.com",
+      "expectedFormat": "heic",
+      "detectedFormat": "heic",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 768,
+      "failureReason": null
+    },
+    {
+      "url": "https://filesamples.com/samples/image/heic/sample1.heic",
+      "source": "modern",
+      "host": "filesamples.com",
+      "expectedFormat": "heic",
+      "detectedFormat": "heic",
+      "fetchedBytes": 293608,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/av1-avif/master/testFiles/Netflix/avif/hdr_cosmos01650_cicp9-16-0_lossless.avif",
+      "source": "modern",
+      "host": "github.com/avif-samples",
+      "expectedFormat": "avif",
+      "detectedFormat": "avif",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 256,
+      "failureReason": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/nokiatech/heif/gh-pages/content/images/old_bridge_1440x960.heic",
+      "source": "modern",
+      "host": "raw.githubusercontent.com",
+      "expectedFormat": "heic",
+      "detectedFormat": "heic",
+      "fetchedBytes": 32768,
+      "bytesNeeded": 384,
+      "failureReason": null
+    },
+    {
+      "url": "https://filesamples.com/samples/image/heic/sample2.heic",
+      "source": "modern",
+      "host": "filesamples.com",
+      "expectedFormat": "heic",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    },
+    {
+      "url": "https://filesamples.com/samples/image/heic/sample3.heic",
+      "source": "modern",
+      "host": "filesamples.com",
+      "expectedFormat": "heic",
+      "detectedFormat": null,
+      "fetchedBytes": 0,
+      "bytesNeeded": null,
+      "failureReason": "http 404"
+    }
+  ]
+}
