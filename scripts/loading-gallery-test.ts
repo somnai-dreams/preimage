@@ -462,6 +462,124 @@ async function caseQueuedPromotesPredictedViewport(): Promise<void> {
   }
 }
 
+async function caseQueuedRaisesCapAfterViewportSettles(): Promise<void> {
+  const restore = installFakeDom()
+  try {
+    const scrollContainer = new FakeElement()
+    const contentContainer = new FakeElement()
+    scrollContainer.clientHeight = 40
+    const starts: number[] = []
+    const activeImgs = new Map<number, FakeElement>()
+    const gallery = loadGallery({
+      urls: ['/a.png', '/b.png', '/c.png', '/d.png', '/e.png', '/f.png', '/g.png', '/h.png'],
+      scrollContainer,
+      contentContainer,
+      packer: makeSpacedPacker(),
+      imageLoading: 'queued',
+      aspects: [1, 1, 1, 1, 1, 1, 1, 1],
+      overscan: 1000,
+      renderSkeleton: () => {},
+      renderImage: (el, idx) => {
+        starts.push(idx)
+        const img = new FakeElement('IMG')
+        const tile = el as unknown as FakeElement
+        tile.appendChild(img)
+        activeImgs.set(idx, img)
+      },
+    })
+    await tick()
+    if (starts.length !== 4) {
+      fail('queued-dynamic-cap/base', `starts=${JSON.stringify(starts)}`)
+      gallery.destroy()
+      return
+    }
+    const firstImg = activeImgs.get(0)
+    if (firstImg === undefined) {
+      fail('queued-dynamic-cap/visible-started', `starts=${JSON.stringify(starts)}`)
+      gallery.destroy()
+      return
+    }
+    firstImg.complete = true
+    firstImg.naturalWidth = 100
+    firstImg.dispatch('load')
+    await tick()
+    if (starts.length !== 7) {
+      fail('queued-dynamic-cap/idle-bump', `starts=${JSON.stringify(starts)}`)
+    } else {
+      pass('queued-dynamic-cap')
+    }
+    gallery.destroy()
+  } finally {
+    restore()
+  }
+}
+
+async function caseQueuedProbePhaseCap(): Promise<void> {
+  const restore = installFakeDom()
+  try {
+    const queue = new ControlledQueue()
+    const scrollContainer = new FakeElement()
+    const contentContainer = new FakeElement()
+    scrollContainer.clientHeight = 40
+    const starts: number[] = []
+    const gallery = loadGallery({
+      urls: ['/a.png', '/b.png', '/c.png', '/d.png', '/e.png', '/f.png'],
+      scrollContainer,
+      contentContainer,
+      packer: makeSpacedPacker(),
+      imageLoading: 'queued',
+      probe: { queue },
+      overscan: 1000,
+      renderSkeleton: () => {},
+      renderImage: (el, idx) => {
+        starts.push(idx)
+        const img = new FakeElement('IMG')
+        const tile = el as unknown as FakeElement
+        tile.appendChild(img)
+      },
+    })
+    await tick()
+    queue.resolve('/a.png', 1)
+    queue.resolve('/b.png', 1)
+    queue.resolve('/c.png', 1)
+    queue.resolve('/d.png', 1)
+    await tick()
+    if (starts.length !== 2) {
+      fail('queued-probe-phase-cap', `starts=${JSON.stringify(starts)}`)
+    } else {
+      pass('queued-probe-phase-cap')
+    }
+    gallery.destroy()
+  } finally {
+    restore()
+  }
+}
+
+function caseRenderConcurrencyValidation(): void {
+  const restore = installFakeDom()
+  try {
+    try {
+      loadGallery({
+        urls: ['/a.png'],
+        scrollContainer: new FakeElement(),
+        contentContainer: new FakeElement(),
+        packer: makePacker(),
+        imageLoading: 'queued',
+        aspects: [1],
+        renderConcurrency: 0,
+        renderSkeleton: () => {},
+        renderImage: () => {},
+      })
+      fail('loading-render-concurrency-validation', 'accepted renderConcurrency=0')
+    } catch (err) {
+      if (err instanceof RangeError) pass('loading-render-concurrency-validation')
+      else fail('loading-render-concurrency-validation', String(err))
+    }
+  } finally {
+    restore()
+  }
+}
+
 async function main(): Promise<void> {
   const t0 = performance.now()
   await caseImageLoadingOrder('immediate')
@@ -475,6 +593,9 @@ async function main(): Promise<void> {
   await caseDestroySettlesAndIgnoresLateProbe()
   await caseQueuedPromotesScrolledViewport()
   await caseQueuedPromotesPredictedViewport()
+  await caseQueuedRaisesCapAfterViewportSettles()
+  await caseQueuedProbePhaseCap()
+  caseRenderConcurrencyValidation()
   const wallMs = performance.now() - t0
 
   const total = results.length

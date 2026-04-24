@@ -29,7 +29,7 @@ type Args = {
   runs: number
   strategies: Strategy[]
   concurrency: number
-  renderConcurrency: number
+  renderConcurrency: number | null
   panelWidth: number
   viewportHeight: number
   scrollMs: number
@@ -47,7 +47,7 @@ type BrowserRunConfig = {
   origin: string
   n: number
   concurrency: number
-  renderConcurrency: number
+  renderConcurrency: number | null
   panelWidth: number
   viewportHeight: number
   scrollMs: number
@@ -96,13 +96,14 @@ const DEFAULT_ORIGIN = 'https://somnai-dreams.github.io/preimage'
 const DEFAULT_STRATEGIES: Strategy[] = ['visible-first', 'queued', 'after-layout', 'immediate']
 
 function parseArgs(argv: string[]): Args {
+  const renderConcurrencyEnv = process.env.PREIMAGE_REMOTE_RENDER_CONCURRENCY
   const args: Args = {
     origin: process.env.PREIMAGE_REMOTE_ORIGIN ?? DEFAULT_ORIGIN,
     n: Number(process.env.PREIMAGE_REMOTE_N ?? 24),
     runs: Number(process.env.PREIMAGE_REMOTE_RUNS ?? 1),
     strategies: DEFAULT_STRATEGIES.slice(),
     concurrency: Number(process.env.PREIMAGE_REMOTE_CONCURRENCY ?? 12),
-    renderConcurrency: Number(process.env.PREIMAGE_REMOTE_RENDER_CONCURRENCY ?? 4),
+    renderConcurrency: renderConcurrencyEnv === undefined ? null : Number(renderConcurrencyEnv),
     panelWidth: Number(process.env.PREIMAGE_REMOTE_PANEL_WIDTH ?? 840),
     viewportHeight: Number(process.env.PREIMAGE_REMOTE_VIEWPORT_HEIGHT ?? 620),
     scrollMs: Number(process.env.PREIMAGE_REMOTE_SCROLL_MS ?? 1400),
@@ -203,7 +204,7 @@ function validateArgs(args: Args): void {
   validatePositiveInteger('n', args.n)
   validatePositiveInteger('runs', args.runs)
   validatePositiveInteger('concurrency', args.concurrency)
-  validatePositiveInteger('renderConcurrency', args.renderConcurrency)
+  if (args.renderConcurrency !== null) validatePositiveInteger('renderConcurrency', args.renderConcurrency)
   validatePositiveNumber('panelWidth', args.panelWidth)
   validatePositiveNumber('viewportHeight', args.viewportHeight)
   validatePositiveNumber('timeoutMs', args.timeoutMs)
@@ -222,7 +223,7 @@ Options:
   --runs COUNT                 Repeats per strategy (default: 1)
   --strategies LIST            Comma list: ${DEFAULT_STRATEGIES.join(',')}
   --concurrency COUNT          PrepareQueue concurrency (default: 12)
-  --render-concurrency COUNT   Visible image render concurrency (default: 4)
+  --render-concurrency COUNT   Visible image render concurrency (default: library default)
   --scroll-ms MS               Scripted scroll duration (default: 1400)
   --scroll-distance PX         Scripted scroll distance (default: 2600)
   --timeout-ms MS              Per-strategy timeout (default: 45000)
@@ -614,7 +615,7 @@ async function runRemoteLoadingBench(config) {
       options: { dimsOnly: true, strategy: 'auto', fallbackToImgOnFetchError: true },
       boostFirstScreen: firstK,
     },
-    renderConcurrency: config.renderConcurrency,
+    ...(config.renderConcurrency === null ? {} : { renderConcurrency: config.renderConcurrency }),
     renderSkeleton(el, idx, place) {
       el.className = 'bench-tile'
       el.dataset.index = String(idx)

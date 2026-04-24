@@ -101,8 +101,9 @@ export type GalleryConfig = {
   // `imageLoading`.
   aspects?: readonly number[]
 
-  // Used by 'visible-first' and 'queued': concurrency of the
-  // render-phase image fetches.
+  // Used by 'visible-first' and 'queued': maximum concurrency of the
+  // render-phase image fetches. Queued starts lower while viewport
+  // images are pending or scroll is active, then may rise to this cap.
   renderConcurrency?: number
 
   /** Called with milestone timestamps relative to `loadGallery` start. */
@@ -436,7 +437,12 @@ function runQueued(
   // Internal render queue with a concurrency cap. We don't reuse
   // PrepareQueue because render work is tile-element owned: a recycled
   // node invalidates the queued job even when the URL matches.
-  const renderCap = config.renderConcurrency ?? DEFAULT_RENDER_CONCURRENCY
+  const maxRenderCap = readRenderConcurrency(
+    config.renderConcurrency,
+    DEFAULT_QUEUED_IDLE_RENDER_CONCURRENCY,
+  )
+  const probeRenderCap = Math.min(DEFAULT_QUEUED_PROBE_RENDER_CONCURRENCY, maxRenderCap)
+  const viewportRenderCap = Math.min(DEFAULT_RENDER_CONCURRENCY, maxRenderCap)
   const renderQueue: PriorityRenderJob[] = []
   const activeRenderJobs = new Set<PriorityRenderJob>()
   const priorityTracker = createVirtualPriorityTracker({
@@ -444,9 +450,12 @@ function runQueued(
     contentContainer: config.contentContainer,
   })
   let renderInflight = 0
+  let layoutComplete = false
+  let lastScrollAt = Number.NEGATIVE_INFINITY
 
   function pumpRender(): void {
     if (state.cancelled) return
+    const renderCap = currentRenderCap()
     while (renderInflight < renderCap && renderQueue.length > 0) {
       const job = renderQueue.shift()!
       if (state.cancelled) {
@@ -489,6 +498,14 @@ function runQueued(
       })
     }
   }
+
+  function currentRenderCap(): number {
+    if (!layoutComplete) return probeRenderCap
+    if (performance.now() - lastScrollAt < QUEUED_SCROLL_ACTIVE_MS) return viewportRenderCap
+    if (hasPendingViewportLoads(config, placements, mountedTiles, imageLoads)) return viewportRenderCap
+    return maxRenderCap
+  }
+
   function enqueueRender(
     idx: number,
     el: HTMLElement,
@@ -574,6 +591,7 @@ function runQueued(
   let viewportBoostPending = false
   function scheduleViewportBoost(): void {
     if (state.cancelled) return
+    lastScrollAt = performance.now()
     priorityTracker.sample(true)
     if (viewportBoostPending) return
     viewportBoostPending = true
@@ -592,6 +610,7 @@ function runQueued(
     if (state.cancelled) return
     placeReadyAspects()
     config.contentContainer.style.height = `${packer.totalHeight()}px`
+    layoutComplete = true
     pool.setPlacements(placements)
     emit('all-placements')
     // After all probes resolve, ensure any still-mounted tiles
@@ -650,7 +669,7 @@ function runVisibleFirst(
   let normalRenderEnabled = false
 
   const firstScreenTarget = Math.min(config.probe?.boostFirstScreen ?? 0, urls.length)
-  const renderCap = config.renderConcurrency ?? DEFAULT_RENDER_CONCURRENCY
+  const renderCap = readRenderConcurrency(config.renderConcurrency, DEFAULT_RENDER_CONCURRENCY)
   const renderQueue: PriorityRenderJob[] = []
   const activeRenderJobs = new Set<PriorityRenderJob>()
   let renderInflight = 0
@@ -885,6 +904,14 @@ function validateAspects(config: GalleryConfig): void {
   }
 }
 
+function readRenderConcurrency(value: number | undefined, fallback: number): number {
+  const cap = value ?? fallback
+  if (!Number.isInteger(cap) || cap < 1) {
+    throw new RangeError(`loadGallery: renderConcurrency must be a positive integer, got ${cap}.`)
+  }
+  return cap
+}
+
 function getQueue(config: GalleryConfig): { queue: PrepareQueueLike; owned: boolean } {
   if (config.probe?.queue !== undefined) return { queue: config.probe.queue, owned: false }
   return { queue: new PrepareQueue(), owned: true }
@@ -976,6 +1003,9 @@ type RenderJob = {
 const RENDER_PRIORITY_VISIBLE = 400_000
 const RENDER_PRIORITY_NORMAL = 0
 const DEFAULT_RENDER_CONCURRENCY = 4
+const DEFAULT_QUEUED_PROBE_RENDER_CONCURRENCY = 2
+const DEFAULT_QUEUED_IDLE_RENDER_CONCURRENCY = 6
+const QUEUED_SCROLL_ACTIVE_MS = 250
 
 type PriorityRenderJob = RenderJob & {
   priority: number
@@ -1028,6 +1058,23 @@ function waitForViewportLoads(
     if (load?.el === el) visibleLoads.push(load.promise)
   }
   return Promise.all(visibleLoads).then(() => {})
+}
+
+function hasPendingViewportLoads(
+  config: GalleryConfig,
+  placements: readonly Placement[],
+  mountedTiles: ReadonlyMap<number, HTMLElement>,
+  imageLoads: ReadonlyMap<number, ImageLoad>,
+): boolean {
+  const viewportRange = getVirtualViewportRange(config.scrollContainer, config.contentContainer)
+  for (const [idx, el] of mountedTiles) {
+    const place = placements[idx]
+    if (place === undefined || !placementIntersectsRange(place, viewportRange)) continue
+    const load = imageLoads.get(idx)
+    if (load?.el === el) return true
+    if (el.querySelector('img') === null) return true
+  }
+  return false
 }
 
 /** Resolve when the first `<img>` under `el` reaches load/error. No-op

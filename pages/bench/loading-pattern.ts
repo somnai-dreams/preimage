@@ -156,7 +156,6 @@ async function run(): Promise<void> {
       boostFirstScreen: firstK,
     },
     ...(aspects !== undefined ? { aspects } : {}),
-    renderConcurrency: 4,
     renderSkeleton: (el, _idx, place) => {
       el.className = 'vtile'
       el.style.left = `${place.x}px`

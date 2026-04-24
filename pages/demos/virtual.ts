@@ -284,7 +284,6 @@ async function runMeasured(): Promise<void> {
       boostFirstScreen: firstK,
     },
     ...(aspects !== undefined ? { aspects } : {}),
-    renderConcurrency: 4,
     renderSkeleton: (el, _idx, place) => {
       el.className = 'vtile pending'
       el.style.left = `${place.x}px`
