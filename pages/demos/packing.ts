@@ -19,7 +19,8 @@ const shortestPanel = document.getElementById('shortest')!
 const justifiedPanel = document.getElementById('justified')!
 const shortestStats = document.getElementById('shortestStats')!
 const justifiedStats = document.getElementById('justifiedStats')!
-const runBtn = document.getElementById('runPacking') as HTMLButtonElement
+const runShortestBtn = document.getElementById('runShortest') as HTMLButtonElement
+const runJustifiedBtn = document.getElementById('runJustified') as HTMLButtonElement
 
 const GAP = 6
 
@@ -27,6 +28,8 @@ type PackedLayout = {
   placements: Placement[]
   totalHeight: number
 }
+
+type LayoutKind = 'shortest' | 'justified'
 
 function getCount(): number {
   return Math.min(Number(countSlider.value), PHOTO_COUNT)
@@ -61,32 +64,28 @@ function fmtPx(n: number): string {
   return `${Math.round(n).toLocaleString()}px`
 }
 
-function clearPanels(): void {
-  for (const panel of [shortestPanel, justifiedPanel]) {
-    panel.innerHTML = ''
-    panel.style.height = '320px'
-  }
-  resetStats(shortestStats)
-  resetStats(justifiedStats)
+function clearPanel(panel: HTMLElement, stats: HTMLElement): void {
+  panel.innerHTML = ''
+  panel.style.height = '320px'
+  resetStats(stats)
 }
 
-function setBothStats(row: number, html: string): void {
-  setRowValue(shortestStats, row, html)
-  setRowValue(justifiedStats, row, html)
-}
-
-async function probeAspects(urls: readonly string[], cacheBust: string | null): Promise<{ aspects: number[]; elapsedMs: number }> {
+async function probeAspects(
+  urls: readonly string[],
+  cacheBust: string | null,
+  stats: HTMLElement,
+): Promise<{ aspects: number[]; elapsedMs: number }> {
   const queue = new PrepareQueue({ concurrency: getConcurrency() })
   const strategy = getStrategy()
   const t0 = performance.now()
   let completed = 0
-  setBothStats(1, `<b>0 / ${urls.length}</b>`)
+  setRowValue(stats, 1, `<b>0 / ${urls.length}</b>`)
 
   const aspects = await Promise.all(
     urls.map((url) =>
       queue.enqueue(url, { dimsOnly: true, strategy }).then((prepared) => {
         completed++
-        setBothStats(1, `<b>${completed} / ${urls.length}</b>`)
+        setRowValue(stats, 1, `<b>${completed} / ${urls.length}</b>`)
         setMeta(urls.length, cacheBust, `probing ${completed} / ${urls.length}`)
         return prepared.aspectRatio
       }),
@@ -141,47 +140,52 @@ function reportLayout(
   setRowValue(stats, 4, `<b>${tileCount}</b>`)
 }
 
-async function runPacking(): Promise<void> {
-  runBtn.disabled = true
+function setRunDisabled(disabled: boolean): void {
+  runShortestBtn.disabled = disabled
+  runJustifiedBtn.disabled = disabled
+}
+
+async function runPacking(kind: LayoutKind): Promise<void> {
+  const runBtn = kind === 'shortest' ? runShortestBtn : runJustifiedBtn
+  const panel = kind === 'shortest' ? shortestPanel : justifiedPanel
+  const stats = kind === 'shortest' ? shortestStats : justifiedStats
+  const label = kind === 'shortest' ? 'shortest columns' : 'justified rows'
+
+  setRunDisabled(true)
   runBtn.textContent = 'Packing...'
-  clearPanels()
+  try {
+    clearPanel(panel, stats)
 
-  const count = getCount()
-  const cacheBust = getCacheBust()
-  const columns = getColumns()
-  const targetRowHeight = getTargetRowHeight()
-  const urls = buildUrls(count, cacheBust)
-  setMeta(count, cacheBust, 'probing dimensions')
+    const count = getCount()
+    const cacheBust = getCacheBust()
+    const columns = getColumns()
+    const targetRowHeight = getTargetRowHeight()
+    const urls = buildUrls(count, cacheBust)
+    setMeta(count, cacheBust, `${label} · probing dimensions`)
 
-  const { aspects, elapsedMs: dimsMs } = await probeAspects(urls, cacheBust)
+    const { aspects, elapsedMs: dimsMs } = await probeAspects(urls, cacheBust, stats)
 
-  const shortestWidth = shortestPanel.getBoundingClientRect().width
-  const justifiedWidth = justifiedPanel.getBoundingClientRect().width
+    const panelWidth = panel.getBoundingClientRect().width
 
-  const shortestStart = performance.now()
-  const shortest = packShortestColumn(aspects, {
-    columns,
-    gap: GAP,
-    panelWidth: shortestWidth,
-  })
-  const shortestMs = performance.now() - shortestStart
+    const packStart = performance.now()
+    const layout = kind === 'shortest'
+      ? packShortestColumn(aspects, { columns, gap: GAP, panelWidth })
+      : packJustifiedRows(aspects, { panelWidth, targetRowHeight, gap: GAP })
+    const packMs = performance.now() - packStart
 
-  const justifiedStart = performance.now()
-  const justified = packJustifiedRows(aspects, {
-    panelWidth: justifiedWidth,
-    targetRowHeight,
-    gap: GAP,
-  })
-  const justifiedMs = performance.now() - justifiedStart
+    renderPacked(panel, urls, layout)
+    reportLayout(stats, dimsMs, packMs, layout.totalHeight, layout.placements.length)
+    setMeta(
+      count,
+      cacheBust,
+      kind === 'shortest' ? `${columns} columns` : `${targetRowHeight}px rows`,
+    )
 
-  renderPacked(shortestPanel, urls, shortest)
-  renderPacked(justifiedPanel, urls, justified)
-  reportLayout(shortestStats, dimsMs, shortestMs, shortest.totalHeight, shortest.placements.length)
-  reportLayout(justifiedStats, dimsMs, justifiedMs, justified.totalHeight, justified.placements.length)
-  setMeta(count, cacheBust, `${columns} columns · ${targetRowHeight}px rows`)
-
-  runBtn.disabled = false
-  runBtn.textContent = 'Pack again'
+    runBtn.textContent = 'Pack again'
+  } finally {
+    if (runBtn.textContent === 'Packing...') runBtn.textContent = 'Pack'
+    setRunDisabled(false)
+  }
 }
 
 function updateLabels(): void {
@@ -194,8 +198,11 @@ function updateLabels(): void {
 countSlider.addEventListener('input', updateLabels)
 columnsSlider.addEventListener('input', updateLabels)
 rowHeightSlider.addEventListener('input', updateLabels)
-runBtn.addEventListener('click', () => {
-  void runPacking()
+runShortestBtn.addEventListener('click', () => {
+  void runPacking('shortest')
+})
+runJustifiedBtn.addEventListener('click', () => {
+  void runPacking('justified')
 })
 
 updateLabels()
