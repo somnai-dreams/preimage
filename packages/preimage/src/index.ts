@@ -14,6 +14,7 @@ export {
   preparedFromMeasurement,
   getOriginStrategy,
   clearOriginStrategyCache,
+  DEFAULT_RANGE_BYTES_BY_FORMAT,
   type PreparedImage,
   type PreparedSource,
   type PrepareOptions,

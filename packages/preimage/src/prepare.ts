@@ -15,9 +15,9 @@
 // `recordKnownMeasurement` is the lower-level version that writes
 // directly into the shared measurement cache.
 
-import { normalizeSrc } from './analysis.js'
+import { detectImageFormat, normalizeSrc, type ImageFormat } from './analysis.js'
 import { fitRect, type FittedRect, type ObjectFit } from './fit.js'
-import { type OrientationCode } from './orientation.js'
+import { readExifOrientation, type OrientationCode } from './orientation.js'
 import {
   peekImageMeasurement,
   recordKnownMeasurement,
@@ -152,9 +152,10 @@ export type PrepareOptions = MeasureOptions & {
    *  - `'stream'`: `fetch(url)`, feed `response.body` through
    *    `probeImageStream`, abort via `AbortController` the instant the
    *    header bytes parse. No warmed element, but dims land at
-   *    header-bytes time instead of poll-loop time — much faster at
-   *    high concurrency (~200 parallel probes), where the `'img'`
-   *    path's `setTimeout(0)` polling gets event-loop-starved.
+   *    header-bytes time instead of poll-loop time — faster at high
+   *    concurrency because parsing kicks off the moment bytes arrive,
+   *    rather than waiting on the browser's image subsystem to decode
+   *    a header before `naturalWidth` flips.
    *  - `'range'`: `fetch(url, { headers: { Range: 'bytes=0-N' } })`.
    *    Server returns 206 Partial Content with just the requested
    *    bytes — no abort dance, no race between "header parsed" and
@@ -172,9 +173,91 @@ export type PrepareOptions = MeasureOptions & {
    *  `prepared.element` for render). Blob sources ignore this entirely;
    *  they always byte-probe directly. */
   strategy?: 'img' | 'stream' | 'range' | 'auto'
-  /** Number of bytes to request when `strategy: 'range'`. Defaults to
-   *  4096 — comfortably past any supported header parser's max. */
+  /** Number of bytes to request when `strategy: 'range'`. Applies when
+   *  `rangeBytesByFormat` has no matching entry for the detected format
+   *  (and when the format can't be detected from the URL).
+   *
+   *  Default: derived from the per-format table (see `rangeBytesByFormat`).
+   *  Pass this to override with a single universal size. */
   rangeBytes?: number
+  /** Per-format byte budget for the initial Range request. Keys are
+   *  `ImageFormat` values (`'jpeg' | 'png' | ...`); values are bytes.
+   *
+   *  Defaults (from a 7500-URL corpus sweep; see
+   *  `benchmarks/probe-byte-threshold-full.json`):
+   *    png  256    gif   256    webp 256    bmp   256
+   *    avif 768    heic  768    svg  2048   jpeg  4096
+   *    unknown 4096
+   *
+   *  JPEG needs the widest budget because EXIF and ICC-profile segments
+   *  push the SOF marker past the typical small-header range; its p95
+   *  in the corpus is 6KB. Every other raster format lands under 1KB.
+   *  SVG needs more headroom because the `<svg>` root tag can trail
+   *  comments, XML declarations, and wide attribute lists.
+   *
+   *  Pass a partial map to override specific formats; undefined entries
+   *  fall back to the default table above. */
+  rangeBytesByFormat?: Partial<Record<ImageFormat, number>>
+  /** Second-chance Range request size when the first probe fails to
+   *  parse dimensions. A re-range is issued *only* when the initial
+   *  response was 206 and bytes came back short of what the parser
+   *  needed; 200-fallback paths consume the full body directly.
+   *
+   *  Default: 24576 (24KB) — covers the 99.9th-percentile JPEG in the
+   *  corpus plus some ICC-profile outliers. Set to 0 to disable. */
+  rangeRetryBytes?: number
+  /** When `strategy: 'auto'` (or cached from a prior auto-resolved
+   *  probe), retry via `strategy: 'img'` if the initial `fetch()`
+   *  throws — usually CORS, sometimes hard network failure. Browsers
+   *  can't distinguish the two from JS, so both cases fall through
+   *  together; if the origin is genuinely down the `<img>` retry fails
+   *  too and the caller still gets a rejection.
+   *
+   *  `<img>` doesn't need CORS for `naturalWidth` reads (tainting only
+   *  applies to canvas pixel extraction), so this is the only path
+   *  that gets dims out of a CORS-hostile origin. Cost is bandwidth:
+   *  the `<img>` probe pulls a TCP receive window's worth of bytes
+   *  (tens of KB) instead of the 256B–4KB Range would fetch. The
+   *  origin is then cached as `'img'` so subsequent probes skip the
+   *  fetch attempt.
+   *
+   *  Explicit `strategy: 'range'` / `'stream'` / `'img'` never falls
+   *  back — callers who opted in specifically get the exact behavior
+   *  they asked for, with errors surfaced.
+   *
+   *  Default: `false`. Enable for gallery / virtualization flows that
+   *  want dims-before-paint on mixed-origin URL sets and are willing
+   *  to pay the bandwidth on CORS-hostile origins in exchange. */
+  fallbackToImgOnFetchError?: boolean
+}
+
+/** Default range-byte budget per format (see `rangeBytesByFormat`). Derived
+ *  from corpus measurements; exposed for benches and diagnostics. */
+export const DEFAULT_RANGE_BYTES_BY_FORMAT: Readonly<Record<ImageFormat, number>> = Object.freeze({
+  png: 256,
+  jpeg: 4096,
+  webp: 256,
+  gif: 256,
+  bmp: 256,
+  avif: 768,
+  heic: 768,
+  svg: 2048,
+  ico: 256,
+  apng: 256,
+  unknown: 4096,
+})
+
+const DEFAULT_RANGE_RETRY_BYTES = 24576
+
+function rangeBytesFor(src: string, options: PrepareOptions): number {
+  const format = detectImageFormat(src)
+  const perFormat = options.rangeBytesByFormat
+  if (perFormat !== undefined) {
+    const override = perFormat[format]
+    if (override !== undefined) return override
+  }
+  if (options.rangeBytes !== undefined) return options.rangeBytes
+  return DEFAULT_RANGE_BYTES_BY_FORMAT[format]
 }
 
 // --- Public API ---
@@ -286,9 +369,22 @@ type ConcreteStrategy = 'img' | 'stream' | 'range'
 // Per-origin strategy memory. First probe against a new origin tries
 // 'range'; the result records which strategy the server actually
 // supports, so every subsequent probe for the same origin skips the
-// fallback. Scoped to the module (shared across PrepareQueue instances
-// and direct prepare() callers in the same page).
+// fallback dance. Outcomes:
+//   'range'  → 206 Partial Content, stays on range
+//   'stream' → 200 OK, server ignored the Range header
+//   'img'    → fetch threw (CORS or hard network), and the caller
+//              opted into `fallbackToImgOnFetchError`
+// Scoped to the module (shared across PrepareQueue instances and
+// direct prepare() callers in the same page).
 const originStrategyCache = new Map<string, ConcreteStrategy>()
+
+function forwardAbort(signal: AbortSignal | undefined, controller: AbortController): void {
+  if (signal === undefined) return
+  if (signal.aborted) {
+    throw signal.reason ?? new DOMException('Aborted', 'AbortError')
+  }
+  signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true })
+}
 
 function originOf(src: string): string | null {
   try {
@@ -302,6 +398,17 @@ function originOf(src: string): string | null {
 function rememberOriginStrategy(src: string, strategy: ConcreteStrategy): void {
   const origin = originOf(src)
   if (origin !== null) originStrategyCache.set(origin, strategy)
+}
+
+// Decide whether a thrown error should trigger the img fallback.
+// `fetch()` throws a `TypeError` for CORS and hard network failures;
+// both are opaque to JS (browsers deliberately don't distinguish them,
+// so a misconfigured origin can't probe for whether the target exists).
+// Everything else — AbortError from `options.signal`, HTTP-status
+// errors (which arrive as `response.ok === false`, not throws), parse
+// errors — should not trigger fallback.
+function isFetchNetworkError(err: unknown): boolean {
+  return err instanceof TypeError
 }
 
 /** Read the remembered strategy for an origin, or `null` if nothing
@@ -326,10 +433,11 @@ export function clearOriginStrategyCache(): void {
  *  Returns `fromAuto: true` when the strategy came from `'auto'`
  *  resolution (explicit or cached). Callers use this to gate writes to
  *  `originStrategyCache`: only auto-originated probes record their
- *  outcome. Without the gate, explicit selections (e.g. a user picking
- *  `'stream'` from a demo nav) would overwrite whatever auto had
- *  discovered, so switching back to `'auto'` would silently inherit
- *  the manual choice instead of rediscovering. */
+ *  outcome, including the fetch-error → img fallback. Without the
+ *  gate, explicit selections (e.g. a user picking `'stream'` from a
+ *  demo nav) would overwrite whatever auto had discovered, so
+ *  switching back to `'auto'` would silently inherit the manual
+ *  choice instead of rediscovering. */
 function resolveStrategy(
   src: string,
   options: PrepareOptions,
@@ -384,7 +492,10 @@ async function prepareFromUrlRange(
   options: PrepareOptions,
   fromAuto: boolean,
 ): Promise<PreparedImage> {
-  const rangeBytes = options.rangeBytes ?? 4096
+  const initialRangeBytes = rangeBytesFor(src, options)
+  const controller = new AbortController()
+  forwardAbort(options.signal, controller)
+
   const credentials =
     options.crossOrigin === 'use-credentials'
       ? 'include'
@@ -392,12 +503,29 @@ async function prepareFromUrlRange(
       ? 'omit'
       : 'same-origin'
 
-  const fetchInit: RequestInit = {
-    headers: { Range: `bytes=0-${rangeBytes - 1}` },
-    credentials,
+  const doRangeFetch = async (bytesRequested: number): Promise<Response> => {
+    const init: RequestInit = {
+      headers: { Range: `bytes=0-${bytesRequested - 1}` },
+      credentials,
+      signal: controller.signal,
+    }
+    return await fetch(src, init)
   }
-  if (options.signal !== undefined) fetchInit.signal = options.signal
-  const response = await fetch(src, fetchInit)
+
+  let response: Response
+  try {
+    response = await doRangeFetch(initialRangeBytes)
+  } catch (err) {
+    if (
+      fromAuto &&
+      options.fallbackToImgOnFetchError === true &&
+      isFetchNetworkError(err)
+    ) {
+      rememberOriginStrategy(src, 'img')
+      return await prepareFromUrlImg(src, key, options)
+    }
+    throw err
+  }
   if (!response.ok && response.status !== 206) {
     throw new Error(`preimage: fetch ${src} failed with status ${response.status}`)
   }
@@ -413,22 +541,39 @@ async function prepareFromUrlRange(
       throw new Error(`preimage: fetch ${src} returned no body`)
     }
     if (fromAuto) rememberOriginStrategy(src, 'stream')
-    return await consumeStreamForDims(src, key, response.body, options, undefined, parseContentLength(response))
+    return await consumeStreamForDims(src, key, response.body, options, controller, parseContentLength(response))
   }
 
   // 206: read the partial body and parse directly. No abort needed —
   // the response body is already short.
-  const bytes = new Uint8Array(await response.arrayBuffer())
-  const probed = probeImageBytes(bytes)
+  let bytes = new Uint8Array(await response.arrayBuffer())
+  let probed = probeImageBytes(bytes)
+  let byteLength = parseContentRangeTotal(response) ?? parseContentLength(response)
+
+  // Re-range: if the initial budget was too stingy (rare but real for
+  // JPEGs with huge EXIF), make one larger request before giving up.
+  // Only worth trying when the retry window is actually larger than
+  // what we already have and when the full resource itself is larger
+  // still — otherwise we already have the whole file.
+  const retryBytes = options.rangeRetryBytes ?? DEFAULT_RANGE_RETRY_BYTES
+  if (probed === null && retryBytes > bytes.length && (byteLength === null || byteLength > bytes.length)) {
+    const retry = await doRangeFetch(retryBytes)
+    if (retry.status === 206 || retry.ok) {
+      const retryBody = new Uint8Array(await retry.arrayBuffer())
+      const retryProbed = probeImageBytes(retryBody)
+      if (retryProbed !== null) {
+        bytes = retryBody
+        probed = retryProbed
+        byteLength = parseContentRangeTotal(retry) ?? parseContentLength(retry) ?? byteLength
+      }
+    }
+  }
+
   if (probed === null) {
     throw new Error(
       `preimage: range probe of ${src} (${bytes.length} bytes) yielded no dimensions`,
     )
   }
-  // 206 responses put the full resource size after the slash in
-  // Content-Range: `bytes 0-4095/12345`. Falls back to null when the
-  // header is missing or malformed.
-  const byteLength = parseContentRangeTotal(response) ?? parseContentLength(response)
   if (fromAuto) rememberOriginStrategy(src, 'range')
   const measurement = recordKnownMeasurement(key, probed.width, probed.height, {
     orientation: options.orientation ?? 1,
@@ -472,12 +617,7 @@ async function prepareFromUrlStream(
   fromAuto: boolean,
 ): Promise<PreparedImage> {
   const controller = new AbortController()
-  if (options.signal !== undefined) {
-    if (options.signal.aborted) {
-      throw options.signal.reason ?? new DOMException('Aborted', 'AbortError')
-    }
-    options.signal.addEventListener('abort', () => controller.abort(), { once: true })
-  }
+  forwardAbort(options.signal, controller)
 
   const credentials =
     options.crossOrigin === 'use-credentials'
@@ -486,7 +626,20 @@ async function prepareFromUrlStream(
       ? 'omit'
       : 'same-origin'
 
-  const response = await fetch(src, { signal: controller.signal, credentials })
+  let response: Response
+  try {
+    response = await fetch(src, { signal: controller.signal, credentials })
+  } catch (err) {
+    if (
+      fromAuto &&
+      options.fallbackToImgOnFetchError === true &&
+      isFetchNetworkError(err)
+    ) {
+      rememberOriginStrategy(src, 'img')
+      return await prepareFromUrlImg(src, key, options)
+    }
+    throw err
+  }
   if (!response.ok) {
     throw new Error(`preimage: fetch ${src} failed with status ${response.status}`)
   }
@@ -497,9 +650,10 @@ async function prepareFromUrlStream(
   return await consumeStreamForDims(src, key, response.body, options, controller, parseContentLength(response))
 }
 
-/** Read a body stream through `probeImageStream`, abort the optional
- *  controller as soon as dims are known when `dimsOnly`. Shared by
- *  the stream strategy and the range strategy's 200-fallback path. */
+/** Read a body stream through `probeImageStream`, aborting the optional
+ *  controller as soon as dims are known. The stream/range-fallback paths
+ *  do not return a warmed element or retained blob, so reading past the
+ *  header would only waste bandwidth. */
 async function consumeStreamForDims(
   src: string,
   key: string,
@@ -514,7 +668,7 @@ async function consumeStreamForDims(
     const result = await probeImageStream(body, {
       onDims: (d) => {
         probed = d
-        if (options.dimsOnly === true && controller !== undefined) {
+        if (controller !== undefined) {
           aborted = true
           controller.abort()
         }
@@ -589,52 +743,93 @@ async function prepareFromUrlImg(
   return wrap(measurement, options.dimsOnly === true ? null : img, 'network')
 }
 
+// Shared `<img>.naturalWidth` poll. One `setTimeout(0)` timer walks every
+// pending image per tick, instead of N timers each rescheduling themselves
+// independently. Matters at high concurrency (virtualized grids probing
+// 200+ URLs at once): the per-image loop spawned one timer per image, and
+// each timer contended for the event loop, pushing dims-known latency up
+// and starving unrelated tasks. One shared timer keeps the tick cost O(N)
+// per frame rather than O(N) timers × O(1) per timer.
+//
+// `setTimeout(0)` over `requestAnimationFrame` because we're not syncing
+// to a paint — we just want to wake as soon as the browser hands JS back
+// after a decode completes. rAF is gated on display vsync (~16ms on
+// 60Hz), which would add a frame of latency for no benefit.
+
+type PollWaiter = {
+  img: HTMLImageElement
+  resolve: (dims: { width: number; height: number }) => void
+  reject: (err: Error) => void
+  done: boolean
+}
+
+const pollWaiters = new Set<PollWaiter>()
+let pollScheduled = false
+
+function schedulePollTick(): void {
+  if (pollScheduled) return
+  pollScheduled = true
+  setTimeout(runPollTick, 0)
+}
+
+function runPollTick(): void {
+  pollScheduled = false
+  for (const waiter of pollWaiters) {
+    if (waiter.done) {
+      pollWaiters.delete(waiter)
+      continue
+    }
+    const img = waiter.img
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      waiter.done = true
+      pollWaiters.delete(waiter)
+      waiter.resolve({ width: img.naturalWidth, height: img.naturalHeight })
+      continue
+    }
+    if (img.complete) {
+      // Load finished but no dims — corrupt image, SVG without
+      // intrinsic size, etc. (The `error` listener normally catches
+      // outright load failures before we get here.)
+      waiter.done = true
+      pollWaiters.delete(waiter)
+      waiter.reject(new Error('preimage: image loaded with no dimensions'))
+    }
+  }
+  if (pollWaiters.size > 0) schedulePollTick()
+}
+
 function pollForNaturalSize(
   img: HTMLImageElement,
 ): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
-    let finished = false
-    const onError = (): void => {
-      if (finished) return
-      finished = true
-      reject(new Error('preimage: image load failed'))
-    }
-    img.addEventListener('error', onError, { once: true })
-
-    const tick = (): void => {
-      if (finished) return
-      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-        finished = true
-        resolve({ width: img.naturalWidth, height: img.naturalHeight })
-        return
-      }
-      if (img.complete) {
-        // Load finished but no dims — corrupt image, SVG without
-        // intrinsic size, etc.
-        finished = true
-        reject(new Error('preimage: image loaded with no dimensions'))
-        return
-      }
-      // setTimeout(0) polling is ~5x faster than requestAnimationFrame
-      // (which is gated on display vsync) and avoids the task-starvation
-      // pitfall of MessageChannel spinning. Empirically ~4-8ms to
-      // dims-known after bytes arrive.
-      setTimeout(tick, 0)
-    }
-    tick()
+    const waiter: PollWaiter = { img, resolve, reject, done: false }
+    img.addEventListener(
+      'error',
+      () => {
+        if (waiter.done) return
+        waiter.done = true
+        pollWaiters.delete(waiter)
+        reject(new Error('preimage: image load failed'))
+      },
+      { once: true },
+    )
+    pollWaiters.add(waiter)
+    schedulePollTick()
   })
 }
 
 // --- Blob path: byte-probe the first ~4KB, fall back to decode ---
 
 async function prepareFromBlob(blob: Blob, options: PrepareOptions): Promise<PreparedImage> {
-  const headBytes = new Uint8Array(await blob.slice(0, MAX_HEADER_BYTES).arrayBuffer())
+  const headBuffer = await blob.slice(0, MAX_HEADER_BYTES).arrayBuffer()
+  const headBytes = new Uint8Array(headBuffer)
   const probed = probeImageBytes(headBytes)
   const url = URL.createObjectURL(blob)
+  const orientation = options.orientation ?? readExifOrientation(headBuffer) ?? 1
 
   if (probed !== null) {
     const measurement = recordKnownMeasurement(url, probed.width, probed.height, {
-      orientation: options.orientation ?? 1,
+      orientation,
       byteLength: blob.size,
       hasAlpha: probed.hasAlpha,
       isProgressive: probed.isProgressive,

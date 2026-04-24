@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage bench · range-sizing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="../demos/demo-styles.css" />
+  <style>
+    .page { max-width: 1100px; }
+    .bench-controls { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 14px; align-items: center; padding: 14px 16px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 16px; font-size: 13px; }
+    .bench-controls label { font-size: 12px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+    .bench-controls .val { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; min-width: 6ch; text-align: right; }
+    .bench-run { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .bench-run .meta { color: var(--text-muted); font-size: 12px; flex: 1; min-width: 200px; font-variant-numeric: tabular-nums; }
+    .bench-results { margin-top: 16px; }
+    pre.bench-json { font: 12px/1.5 ui-monospace, 'SF Mono', Consolas, monospace; background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; overflow: auto; color: var(--text); }
+
+    .format-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .format-cell { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--surface); display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; }
+    .format-cell .fmt-label { font-size: 12px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; grid-column: 1 / 3; }
+    .format-cell .sub { font-size: 10px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+    .format-cell input[type=number] { font: inherit; font-size: 13px; padding: 3px 6px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); width: 90px; font-variant-numeric: tabular-nums; text-align: right; }
+    .format-cell .cnt { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; }
+
+    table.results { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; margin-bottom: 14px; }
+    table.results th, table.results td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+    table.results th:first-child, table.results td:first-child { text-align: left; }
+    table.results th { font-size: 11px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+    table.results td.fmt { font-weight: 600; color: var(--text); }
+    table.results td.fail { color: var(--danger, #d94545); }
+    table.results td.ok { color: var(--accent); }
+
+    details.failures { margin-bottom: 14px; }
+    details.failures summary { cursor: pointer; font-size: 13px; color: var(--text); padding: 6px 0; }
+    details.failures ul { margin: 4px 0 0; padding-left: 18px; font-size: 12px; color: var(--text-muted); line-height: 1.6; font-family: ui-monospace, 'SF Mono', Consolas, monospace; }
+    details.failures li { word-break: break-all; }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="../">preimage demos</a>
+    <a href="./">benchmarks</a>
+    <span class="spacer"></span>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page">
+    <header class="page-header">
+      <h1>Range sizing × format</h1>
+      <p>Probes N URLs per format through <code>prepare(url, { strategy: 'range', rangeBytesByFormat })</code>, varying the bytes requested per format. Each probe is cache-busted. Reports per-format time distribution, success count, failure categories (CORS, network, probe-yielded-no-dims), and the effect of the library's re-range fallback. Defaults come from <code>DEFAULT_RANGE_BYTES_BY_FORMAT</code>, which was itself derived from the byte-threshold corpus sweep.</p>
+    </header>
+
+    <div class="bench-controls">
+      <label>Corpus</label>
+      <select id="corpusSelect" style="font: inherit; font-size: 13px; padding: 4px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text);">
+        <option value="full">probe-byte-threshold-full.json (raster-heavy, 7370 URLs)</option>
+        <option value="modern2">probe-byte-threshold-modern2.json (AVIF/HEIC, 154 URLs)</option>
+        <option value="both" selected>Both combined</option>
+      </select>
+      <span id="corpusCount" class="val">…</span>
+
+      <label>Per-format URLs</label>
+      <input id="perFormatCap" type="range" min="5" max="100" value="30" step="5" />
+      <span id="perFormatCapVal" class="val">30</span>
+
+      <label>Concurrency</label>
+      <input id="concSlider" type="range" min="1" max="64" value="16" step="1" />
+      <span id="concVal" class="val">16</span>
+
+      <label>Re-range</label>
+      <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; text-transform: none; color: var(--text);">
+        <input type="checkbox" id="reRange" checked />
+        <span>On probe failure, retry with larger Range (24KB)</span>
+      </label>
+      <span></span>
+
+      <label>Network</label>
+      <input id="networkLabel" type="text" placeholder="e.g. home gigabit, phone tether 5g" style="font: inherit; font-size: 13px; padding: 4px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text);" />
+      <span style="font-size: 11px; color: var(--text-soft);">persists across runs</span>
+    </div>
+
+    <div id="formatGrid" class="format-grid"></div>
+
+    <div class="bench-run">
+      <button id="run" class="primary">Run benchmark</button>
+      <button id="save" class="primary" disabled style="background: var(--surface); color: var(--text); border: 1px solid var(--border);">Save as JSON</button>
+      <button id="upload" class="primary" disabled style="background: var(--surface); color: var(--text); border: 1px solid var(--border);" title="Upload to the shared gist. Requires ?t=<token> on the URL once per device.">Upload</button>
+      <span id="meta" class="meta"></span>
+    </div>
+
+    <div id="results" class="bench-results"></div>
+  </main>
+
+  <script type="module" src="./range-sizing.ts"></script>
+</body>
+</html>

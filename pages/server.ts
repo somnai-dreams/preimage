@@ -26,10 +26,12 @@ import benchCompareHtml from './bench/compare.html'
 import benchFirstScreenHtml from './bench/first-screen.html'
 import benchVirtualScrollHtml from './bench/virtual-scroll.html'
 import benchLoadingPatternHtml from './bench/loading-pattern.html'
+import benchRangeSizingHtml from './bench/range-sizing.html'
 
 const port = Number(Bun.env.PORT ?? 3000)
 const hostname = Bun.env.HOST ?? '0.0.0.0'
 const pagesRoot = import.meta.dir
+const repoRoot = join(pagesRoot, '..')
 
 const server = serve({
   port,
@@ -57,6 +59,16 @@ const server = serve({
     '/bench/first-screen.html': benchFirstScreenHtml,
     '/bench/virtual-scroll.html': benchVirtualScrollHtml,
     '/bench/loading-pattern.html': benchLoadingPatternHtml,
+    '/bench/range-sizing.html': benchRangeSizingHtml,
+    '/benchmarks/*': async (req) => {
+      // Serve bench-output JSON corpora so browser-side bench pages can
+      // iterate over URLs collected by the node-side harnesses.
+      const url = new URL(req.url)
+      const rel = url.pathname.replace(/^\/+/, '')
+      const file = Bun.file(join(repoRoot, rel))
+      if (!(await file.exists())) return new Response('not found', { status: 404 })
+      return new Response(file, { headers: { 'content-type': 'application/json' } })
+    },
     '/assets/*': async (req) => {
       // Strip leading "/" and map into pages/assets/.
       const url = new URL(req.url)

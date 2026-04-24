@@ -11,7 +11,7 @@
 // Uses `node:fs`, so this module is Node-only. The browser-safe
 // primitives live in `./core` (probeImageBytes, measureFromSvgText).
 
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { open, readdir, readFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 
 import { MAX_HEADER_BYTES, measureFromSvgText, probeImageBytes } from './core.js'
@@ -39,6 +39,7 @@ export type BuildManifestOptions = {
 }
 
 const DEFAULT_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg'] as const
+const JPEG_EXTENSIONS = new Set(['jpg', 'jpeg'])
 
 export async function buildManifest(options: BuildManifestOptions): Promise<Manifest> {
   const root = resolve(options.root)
@@ -88,21 +89,38 @@ async function probeFile(path: string, ext: string): Promise<ManifestEntry | nul
     const dims = measureFromSvgText(text)
     return dims === null ? null : { width: dims.width, height: dims.height }
   }
-  const bytes = await readHeader(path)
+  const bytes = await readPrefix(path, MAX_HEADER_BYTES)
   if (bytes === null) return null
-  const probed = probeImageBytes(bytes)
+  let probed = probeImageBytes(bytes)
+  if (probed === null && JPEG_EXTENSIONS.has(ext)) {
+    const fullBytes = await readFileBytes(path)
+    if (fullBytes !== null && fullBytes.byteLength > bytes.byteLength) {
+      probed = probeImageBytes(fullBytes)
+    }
+  }
   return probed === null ? null : { width: probed.width, height: probed.height }
 }
 
-// Read only the bytes we need. For most formats MAX_HEADER_BYTES is
-// plenty; JPEGs with unusually large APP segments can require more, in
-// which case we read the full file.
-async function readHeader(path: string): Promise<Uint8Array | null> {
-  const info = await stat(path)
-  if (info.size === 0) return null
+// Read only the prefix most parsers need. JPEG gets a full-file retry
+// in probeFile because EXIF / ICC APP segments can push SOF past 4KB.
+async function readPrefix(path: string, maxBytes: number): Promise<Uint8Array | null> {
+  const file = await open(path, 'r')
+  try {
+    const info = await file.stat()
+    if (info.size === 0) return null
+    const length = Math.min(maxBytes, info.size)
+    const bytes = new Uint8Array(length)
+    const { bytesRead } = await file.read(bytes, 0, length, 0)
+    return bytesRead === length ? bytes : bytes.subarray(0, bytesRead)
+  } finally {
+    await file.close()
+  }
+}
+
+async function readFileBytes(path: string): Promise<Uint8Array | null> {
   const bytes = await readFile(path)
-  if (bytes.length <= MAX_HEADER_BYTES) return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  return new Uint8Array(bytes.buffer, bytes.byteOffset, MAX_HEADER_BYTES)
+  if (bytes.length === 0) return null
+  return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 }
 
 function extname(path: string): string {
