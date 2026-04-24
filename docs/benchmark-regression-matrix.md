@@ -7,7 +7,8 @@ Every public value export and package subpath needs an automated owner. The sour
 - Public API additions must be assigned to a coverage area in `scripts/coverage-matrix-test.ts`.
 - Every coverage area must name at least one CI script. Larger or more variable measurements can also name local benchmark scripts or bench pages.
 - CI scripts test correctness and stable invariants. Browser/network timing comparisons should report metrics by default and only fail on explicit gates.
-- `benchmark-regression-test.ts` runs at the end of `check:all`, reads the latest JSON outputs from the preceding harnesses, and compares them to committed thresholds in `benchmarks/baselines/check-all-regression-baselines.json`.
+- `benchmark-regression-test.ts` runs at the end of `check:all`, reads the latest JSON outputs from the preceding offline harnesses, and compares them to committed thresholds in `benchmarks/baselines/check-all-regression-baselines.json`.
+- Network-heavy sweeps stay explicit. `bench:remote-loading` still emits self-checking JSON, but it is not part of default CI because cache-busted image runs spend real hosted bandwidth.
 - Per-run JSON output belongs in `benchmarks/` and is ignored unless a run is worth archiving deliberately.
 
 ## Current Areas
@@ -24,7 +25,7 @@ Every public value export and package subpath needs an automated owner. The sour
 | build-time manifest | `manifest-build-test.ts` | manifest JSON output |
 | layout algebra | `packer-sweep.ts` | `/bench/packing.html`, `/bench/first-screen.html` |
 | virtualized tile pool | `virtual-pool-test.ts`, `loading-gallery-test.ts` | `/bench/virtual-scroll.html` |
-| gallery loading orchestration | `loading-gallery-test.ts`, `remote-loading-strategy-bench.ts` | `bench:remote-loading`, `/bench/loading-pattern.html` |
+| gallery loading orchestration | `loading-gallery-test.ts` | `remote-loading-strategy-bench.ts`, `bench:remote-loading`, `/bench/loading-pattern.html` |
 | scroll prediction | `predict-test.ts` | `/bench/predict.html` |
 | pretext integration | `pretext-integration-test.ts` | pretext demo consumers |
 

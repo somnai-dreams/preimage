@@ -14,7 +14,7 @@ npm install
 
 ```sh
 bun run check           # run tsc type-check (no emit)
-bun run check:all       # run all regression harnesses
+bun run check:all       # run offline regression harnesses
 bun run build:package   # build packages/preimage/dist/ (ESM + .d.ts)
 bun run build:layout-algebra
 bun run build:all
@@ -25,7 +25,7 @@ bun run bench:remote-loading  # browser sweep against hosted demo photos
 
 ## Preview deploys (Vercel)
 
-`vercel.json` at the repo root configures Vercel for static-output deploys: `bun install --frozen-lockfile`, `bun run check && bun run build:demos`, serve `dist-demos/`. The existing GitHub Pages deploy (main only) keeps working alongside Vercel previews — they're independent.
+`vercel.json` at the repo root configures Vercel for static-output deploys: `bun install --frozen-lockfile`, `bun run check && bun run build:demos:vercel`, serve `dist-demos/`. The existing GitHub Pages deploy (main only) keeps working alongside Vercel previews — they're independent.
 
 One-time setup (~5 min):
 
@@ -35,6 +35,8 @@ One-time setup (~5 min):
 4. Pushes update the preview within ~1 minute.
 
 Static deploys work for the demo and bench pages that run entirely in the browser. Pages that depend on `pages/server.ts` endpoints need a matching static build step or an edge/API endpoint before they can deploy as plain files.
+
+Vercel previews redirect `/assets/demos/photos/*` to the GitHub Pages deployment, and the demo runtime chooses that same asset root on `*.vercel.app` and `preimage.dearlarry.co`. `build:demos:vercel` also removes the heavy photo fixtures from `dist-demos` after the normal build. The demos can still be bandwidth-heavy, but Vercel only serves the app shell and redirect responses instead of uploading or serving the image fixtures.
 
 ## Layout
 
@@ -56,9 +58,9 @@ Static deploys work for the demo and bench pages that run entirely in the browse
 
 ## Remote loading sweeps
 
-`bun run bench:remote-loading` starts a temporary local page, drives Chromium with Playwright, and loads the hosted demo photos from `https://preimage.dearlarry.co/assets/demos/photos/*.png`. It is not a demo bench: it lives under `scripts/` so it can serve as both a CI regression harness and a local strategy sweep while still exercising real browser image requests.
+`bun run bench:remote-loading` starts a temporary local page, drives Chromium with Playwright, and loads the hosted demo photos from `https://somnai-dreams.github.io/preimage/assets/demos/photos/*.png`. It is not a demo bench: it lives under `scripts/` so it can serve as a local strategy sweep while still exercising real browser image requests.
 
-The default local run compares `visible-first`, `queued`, `after-layout`, and `immediate` with remote cache-busted URLs, scripted scroll, first-image/done timings, max render concurrency, and visible pending-tile ratios. CI runs a smaller `visible-first` versus `queued` pass through `bun run check:all`; tune larger experiments with flags such as:
+The default local run compares `visible-first`, `queued`, `after-layout`, and `immediate` with remote cache-busted URLs, scripted scroll, first-image/done timings, max render concurrency, and visible pending-tile ratios. The default `check:all` stays offline so CI and routine local checks do not spend hosted image bandwidth. To deliberately include the small remote pass, run `PREIMAGE_CHECK_REMOTE_LOADING=1 bun run check:all`; tune larger experiments with flags such as:
 
 ```sh
 bun run bench:remote-loading -- --runs 3 --n 68 --strategies visible-first,queued
@@ -68,7 +70,7 @@ bun run bench:remote-loading -- --runs 3 --n 68 --strategies visible-first,queue
 
 Every public value export and package subpath is assigned to an automated owner in `scripts/coverage-matrix-test.ts`. `bun run check:all` runs that matrix first, so adding a public API without a regression or benchmark surface fails locally and in CI. The human-readable policy lives in `docs/benchmark-regression-matrix.md`.
 
-`check:all` also ends with `benchmark-regression-test.ts`. It reads the JSON files emitted by the preceding harnesses and checks them against `benchmarks/baselines/check-all-regression-baselines.json`; per-run files stay ignored, but the baseline thresholds are committed.
+`check:all` also ends with `benchmark-regression-test.ts`. It reads the JSON files emitted by the preceding offline harnesses and checks them against `benchmarks/baselines/check-all-regression-baselines.json`; per-run files stay ignored, but the baseline thresholds are committed.
 
 ## Dependencies
 

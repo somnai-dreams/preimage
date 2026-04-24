@@ -1,8 +1,6 @@
-// Local photos used by the reflow/sizing demos. Source is Midjourney output
-// committed at `pages/assets/demos/photos/`; the manifest is generated once
-// by `scripts/rename-and-manifest.ts`. Kept local rather than pulled from a
-// third-party CDN so demos are deterministic, honest about cache-busting,
-// and free of redirect chains.
+// Demo photos used by the reflow/sizing demos. Source is Midjourney
+// output committed at `pages/assets/demos/photos/`; the manifest is
+// generated once by `scripts/rename-and-manifest.ts`.
 
 import manifest from '../assets/demos/photos/photos.json'
 
@@ -21,14 +19,20 @@ export const PHOTOS: Photo[] = manifest.map((m, i) => ({
 }))
 
 export const PHOTO_COUNT = PHOTOS.length
+const GITHUB_PAGES_ASSET_ROOT = 'https://somnai-dreams.github.io/preimage/'
+const VERCEL_PHOTO_HOSTS = new Set([
+  'preimage.dearlarry.co',
+])
 
 // Directory that contains `assets/`, resolved from the current HTML page.
 // Demos live at `<root>/foo.html`; bench pages live at `<root>/bench/foo
-// .html` — both need `<root>/assets/…` to resolve the same way. Computed
-// from `document.baseURI` rather than `import.meta.url` so the bundler's
-// module flattening doesn't shift the anchor; the HTML path always tracks
-// the page's position in the served tree. Cached because it never changes
-// within a page.
+// .html` — both need `<root>/assets/…` to resolve the same way. Vercel
+// deploys use the GitHub Pages copy for photo bytes so static preview
+// bandwidth is spent on the app shell, not repeated image fixtures.
+// Computed from `document.baseURI` rather than `import.meta.url` so the
+// bundler's module flattening doesn't shift the anchor; the HTML path
+// always tracks the page's position in the served tree. Cached because it
+// never changes within a page.
 //
 // If a new nested subdirectory of pages/ is ever added alongside `bench/`,
 // extend the pop-list below.
@@ -40,13 +44,19 @@ function assetsRoot(): string {
   segs.pop() // drop filename
   if (segs[segs.length - 1] === 'bench') segs.pop()
   segs.push('') // trailing slash
-  cachedAssetsRoot = `${here.origin}${segs.join('/')}`
+  cachedAssetsRoot = shouldUseGitHubPagesAssets(here)
+    ? GITHUB_PAGES_ASSET_ROOT
+    : `${here.origin}${segs.join('/')}`
   return cachedAssetsRoot
 }
 
-// Absolute URL for an asset path like `assets/demos/photos/01.png`. Always
-// rooted at the current page's effective directory, so the returned URL
-// survives both the dev server and a GitHub Pages project path.
+function shouldUseGitHubPagesAssets(here: URL): boolean {
+  return here.hostname.endsWith('.vercel.app') || VERCEL_PHOTO_HOSTS.has(here.hostname)
+}
+
+// Absolute URL for an asset path like `assets/demos/photos/01.png`. Rooted
+// at the current page's effective directory unless the deployment has an
+// explicit external photo host.
 export function assetUrl(rel: string): string {
   return assetsRoot() + rel
 }

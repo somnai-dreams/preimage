@@ -92,7 +92,7 @@ const repoRoot = resolve(scriptDir, '..')
 const photosPath = resolve(repoRoot, 'pages/assets/demos/photos/photos.json')
 const tempDir = resolve(repoRoot, '.tmp/remote-loading-strategy-bench')
 
-const DEFAULT_ORIGIN = 'https://preimage.dearlarry.co'
+const DEFAULT_ORIGIN = 'https://somnai-dreams.github.io/preimage'
 const DEFAULT_STRATEGIES: Strategy[] = ['visible-first', 'queued', 'after-layout', 'immediate']
 
 function parseArgs(argv: string[]): Args {

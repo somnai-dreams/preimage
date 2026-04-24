@@ -1,7 +1,7 @@
 import { prepare, preparedFromMeasurement, clearCache } from '@somnai-dreams/preimage'
 import { recordKnownMeasurement } from '@somnai-dreams/preimage/core'
 import { packShortestColumn } from '@somnai-dreams/layout-algebra'
-import { newCacheBustToken, photosManifest } from './photo-source.js'
+import { assetUrl, newCacheBustToken, photosManifest } from './photo-source.js'
 import { getStrategy } from './nav-concurrency.js'
 import { fmtMs, setRowValue, resetStats } from './demo-formatting.js'
 
@@ -43,7 +43,7 @@ type HydratableEntry = {
 function freshEntries(token: string): HydratableEntry[] {
   return manifestEntries.map(([manifestKey, dims]) => ({
     manifestKey,
-    url: `.${manifestKey}?v=${token}`,
+    url: `${assetUrl(manifestKey.slice(1))}?v=${token}`,
     width: dims.width,
     height: dims.height,
   }))

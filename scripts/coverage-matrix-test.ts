@@ -173,7 +173,7 @@ const COVERAGE: CoverageArea[] = [
   {
     area: 'gallery loading orchestration',
     exports: ['loadGallery'],
-    ciScripts: ['loading-gallery-test.ts', 'remote-loading-strategy-bench.ts'],
+    ciScripts: ['loading-gallery-test.ts'],
     benchScripts: ['remote-loading-strategy-bench.ts'],
     benchPages: ['loading-pattern.html'],
     notes: 'loading modes, URL-order placement, destroy settling, remote visible-image scheduling metrics',

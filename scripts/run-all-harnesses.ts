@@ -2,7 +2,8 @@
 // `bun run check:all` entrypoint so one command answers "is
 // everything still green?" Outputs one line per harness with
 // pass/fail count + wall time; exits non-zero on any failure so
-// this slots into CI unchanged.
+// this slots into CI unchanged. Network-heavy sweeps stay out of
+// the default list unless explicitly enabled.
 //
 // Harnesses live in scripts/ and save their own JSON summaries to
 // benchmarks/. This runner invokes them as subprocesses and
@@ -28,16 +29,23 @@ const HARNESSES: Array<{ name: string; script: string; args?: string[] }> = [
   { name: 'pretext-integration', script: 'pretext-integration-test.ts' },
   { name: 'virtual-pool', script: 'virtual-pool-test.ts' },
   { name: 'loading-gallery', script: 'loading-gallery-test.ts' },
-  {
-    name: 'remote-loading',
-    script: 'remote-loading-strategy-bench.ts',
-    args: ['--n', '8', '--strategies', 'visible-first,queued', '--scroll-ms', '600', '--timeout-ms', '30000'],
-  },
   { name: 'predict', script: 'predict-test.ts' },
   { name: 'fit-analysis', script: 'fit-analysis-test.ts' },
   { name: 'parser-fuzz', script: 'parser-fuzz.ts' },
   { name: 'benchmark-regression', script: 'benchmark-regression-test.ts' },
 ]
+
+const REMOTE_LOADING_HARNESS = {
+  name: 'remote-loading',
+  script: 'remote-loading-strategy-bench.ts',
+  args: ['--n', '8', '--strategies', 'visible-first,queued', '--scroll-ms', '600', '--timeout-ms', '30000'],
+}
+
+if (process.env.PREIMAGE_CHECK_REMOTE_LOADING === '1') {
+  const regression = HARNESSES.pop()
+  HARNESSES.push(REMOTE_LOADING_HARNESS)
+  if (regression !== undefined) HARNESSES.push(regression)
+}
 
 type HarnessResult = {
   name: string

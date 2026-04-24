@@ -19,6 +19,7 @@
     "build:layout-algebra": "bun run --cwd packages/layout-algebra build",
     "build:all": "bun run build:package && bun run build:layout-algebra",
     "build:demos": "rm -rf dist-demos && bun build pages/demos/*.html --outdir dist-demos --root pages/demos && bun build pages/bench/*.html --outdir dist-demos/bench --root pages/bench && cp -r pages/assets/. dist-demos/assets/ && mkdir -p dist-demos/benchmarks && cp benchmarks/probe-byte-threshold-full.json benchmarks/probe-byte-threshold-modern2.json dist-demos/benchmarks/",
+    "build:demos:vercel": "bun run build:demos && find dist-demos/assets/demos/photos -type f ! -name 'photos.json' ! -name 'README.md' -delete",
     "start": "HOST=${HOST:-0.0.0.0} PORT=${PORT:-3000} bun --hot pages/server.ts",
     "start:windows": "bun --hot pages/server.ts",
     "distill:har": "bun scripts/distill-har.ts",

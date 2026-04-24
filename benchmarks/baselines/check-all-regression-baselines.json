@@ -123,20 +123,6 @@
       ]
     },
     {
-      "bench": "remote-loading-strategy",
-      "pattern": "remote-loading-strategy-*.json",
-      "checks": [
-        { "label": "check count", "path": "results.checks.length", "op": "min", "value": 20 },
-        { "label": "visible render errors", "path": "results.aggregate[strategy=visible-first].renderErrors", "op": "max", "value": 0 },
-        { "label": "queued render errors", "path": "results.aggregate[strategy=queued].renderErrors", "op": "max", "value": 0 },
-        { "label": "visible loaded images", "path": "results.aggregate[strategy=visible-first].renderLoads", "op": "min", "value": 1 },
-        { "label": "queued loaded images", "path": "results.aggregate[strategy=queued].renderLoads", "op": "min", "value": 1 }
-      ],
-      "every": [
-        { "label": "all remote checks passed", "arrayPath": "results.checks", "path": "ok", "op": "eq", "value": true }
-      ]
-    },
-    {
       "bench": "predict",
       "pattern": "predict-*.json",
       "checks": [

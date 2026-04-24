@@ -1,9 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "bun run check && bun run build:demos",
+  "buildCommand": "bun run check && bun run build:demos:vercel",
   "outputDirectory": "dist-demos",
   "installCommand": "bun install --frozen-lockfile",
   "framework": null,
+  "redirects": [
+    {
+      "source": "/assets/demos/photos/:path*",
+      "destination": "https://somnai-dreams.github.io/preimage/assets/demos/photos/:path*",
+      "permanent": false
+    }
+  ],
   "github": {
     "silent": false,
     "autoJobCancelation": true
