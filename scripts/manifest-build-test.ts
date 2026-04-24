@@ -9,6 +9,7 @@
 //   - Dotfiles / node_modules → skipped (documented behavior)
 //   - Custom base prefix → applied to every key
 //   - Custom extensions list → only matching files included
+//   - Large-header JPEG → full-file retry when SOF sits past prefix
 //   - Large directory (~100 files) → timed for regression baseline
 //
 // Usage:
@@ -79,6 +80,23 @@ function buildJpeg(width: number, height: number): Uint8Array {
   out.set(soi)
   out.set(sof, soi.length)
   out.set(eoi, soi.length + sof.length)
+  return out
+}
+
+function buildLargeHeaderJpeg(width: number, height: number, appBytes: number): Uint8Array {
+  const soi = new Uint8Array([0xff, 0xd8])
+  const app = new Uint8Array(appBytes + 4)
+  const appLength = appBytes + 2
+  app[0] = 0xff
+  app[1] = 0xe1
+  app[2] = (appLength >>> 8) & 0xff
+  app[3] = appLength & 0xff
+  app.fill(0xaa, 4)
+  const sofAndEoi = buildJpeg(width, height).subarray(2)
+  const out = new Uint8Array(soi.length + app.length + sofAndEoi.length)
+  out.set(soi)
+  out.set(app, soi.length)
+  out.set(sofAndEoi, soi.length + app.length)
   return out
 }
 
@@ -271,6 +289,27 @@ async function caseCorruptImageSkipped(): Promise<void> {
   }
 }
 
+async function caseLargeHeaderJpeg(): Promise<void> {
+  const dir = await setupTempDir('large-jpeg')
+  try {
+    await writeImage(dir, 'large.jpg', buildLargeHeaderJpeg(321, 123, 8192))
+    const skips: string[] = []
+    const m = await buildManifest({ root: dir, onSkip: (p, reason) => skips.push(`${p}: ${reason}`) })
+    const entry = m['large.jpg']
+    if (entry === undefined) {
+      fail('large-header-jpeg', `missing entry, skips: ${JSON.stringify(skips)}`)
+    } else if (entry.width !== 321 || entry.height !== 123) {
+      fail('large-header-jpeg/dims', `got ${entry.width}x${entry.height}, expected 321x123`)
+    } else if (skips.length !== 0) {
+      fail('large-header-jpeg/skips', `unexpected skips: ${JSON.stringify(skips)}`)
+    } else {
+      pass('large-header-jpeg')
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}
+
 async function casePerfLargeDir(): Promise<{ wallMs: number; count: number }> {
   const dir = await setupTempDir('perf')
   try {
@@ -307,6 +346,7 @@ async function main(): Promise<void> {
   await caseBasePrefix()
   await caseCustomExtensions()
   await caseCorruptImageSkipped()
+  await caseLargeHeaderJpeg()
   const perf = await casePerfLargeDir()
   const wallMs = performance.now() - t0
 

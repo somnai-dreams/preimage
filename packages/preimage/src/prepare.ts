@@ -17,7 +17,7 @@
 
 import { detectImageFormat, normalizeSrc, type ImageFormat } from './analysis.js'
 import { fitRect, type FittedRect, type ObjectFit } from './fit.js'
-import { type OrientationCode } from './orientation.js'
+import { readExifOrientation, type OrientationCode } from './orientation.js'
 import {
   peekImageMeasurement,
   recordKnownMeasurement,
@@ -378,6 +378,14 @@ type ConcreteStrategy = 'img' | 'stream' | 'range'
 // direct prepare() callers in the same page).
 const originStrategyCache = new Map<string, ConcreteStrategy>()
 
+function forwardAbort(signal: AbortSignal | undefined, controller: AbortController): void {
+  if (signal === undefined) return
+  if (signal.aborted) {
+    throw signal.reason ?? new DOMException('Aborted', 'AbortError')
+  }
+  signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true })
+}
+
 function originOf(src: string): string | null {
   try {
     const base = typeof location !== 'undefined' ? location.href : undefined
@@ -485,6 +493,9 @@ async function prepareFromUrlRange(
   fromAuto: boolean,
 ): Promise<PreparedImage> {
   const initialRangeBytes = rangeBytesFor(src, options)
+  const controller = new AbortController()
+  forwardAbort(options.signal, controller)
+
   const credentials =
     options.crossOrigin === 'use-credentials'
       ? 'include'
@@ -496,8 +507,8 @@ async function prepareFromUrlRange(
     const init: RequestInit = {
       headers: { Range: `bytes=0-${bytesRequested - 1}` },
       credentials,
+      signal: controller.signal,
     }
-    if (options.signal !== undefined) init.signal = options.signal
     return await fetch(src, init)
   }
 
@@ -530,7 +541,7 @@ async function prepareFromUrlRange(
       throw new Error(`preimage: fetch ${src} returned no body`)
     }
     if (fromAuto) rememberOriginStrategy(src, 'stream')
-    return await consumeStreamForDims(src, key, response.body, options, undefined, parseContentLength(response))
+    return await consumeStreamForDims(src, key, response.body, options, controller, parseContentLength(response))
   }
 
   // 206: read the partial body and parse directly. No abort needed —
@@ -606,12 +617,7 @@ async function prepareFromUrlStream(
   fromAuto: boolean,
 ): Promise<PreparedImage> {
   const controller = new AbortController()
-  if (options.signal !== undefined) {
-    if (options.signal.aborted) {
-      throw options.signal.reason ?? new DOMException('Aborted', 'AbortError')
-    }
-    options.signal.addEventListener('abort', () => controller.abort(), { once: true })
-  }
+  forwardAbort(options.signal, controller)
 
   const credentials =
     options.crossOrigin === 'use-credentials'
@@ -644,9 +650,10 @@ async function prepareFromUrlStream(
   return await consumeStreamForDims(src, key, response.body, options, controller, parseContentLength(response))
 }
 
-/** Read a body stream through `probeImageStream`, abort the optional
- *  controller as soon as dims are known when `dimsOnly`. Shared by
- *  the stream strategy and the range strategy's 200-fallback path. */
+/** Read a body stream through `probeImageStream`, aborting the optional
+ *  controller as soon as dims are known. The stream/range-fallback paths
+ *  do not return a warmed element or retained blob, so reading past the
+ *  header would only waste bandwidth. */
 async function consumeStreamForDims(
   src: string,
   key: string,
@@ -661,7 +668,7 @@ async function consumeStreamForDims(
     const result = await probeImageStream(body, {
       onDims: (d) => {
         probed = d
-        if (options.dimsOnly === true && controller !== undefined) {
+        if (controller !== undefined) {
           aborted = true
           controller.abort()
         }
@@ -814,13 +821,15 @@ function pollForNaturalSize(
 // --- Blob path: byte-probe the first ~4KB, fall back to decode ---
 
 async function prepareFromBlob(blob: Blob, options: PrepareOptions): Promise<PreparedImage> {
-  const headBytes = new Uint8Array(await blob.slice(0, MAX_HEADER_BYTES).arrayBuffer())
+  const headBuffer = await blob.slice(0, MAX_HEADER_BYTES).arrayBuffer()
+  const headBytes = new Uint8Array(headBuffer)
   const probed = probeImageBytes(headBytes)
   const url = URL.createObjectURL(blob)
+  const orientation = options.orientation ?? readExifOrientation(headBuffer) ?? 1
 
   if (probed !== null) {
     const measurement = recordKnownMeasurement(url, probed.width, probed.height, {
-      orientation: options.orientation ?? 1,
+      orientation,
       byteLength: blob.size,
       hasAlpha: probed.hasAlpha,
       isProgressive: probed.isProgressive,

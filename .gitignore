@@ -23,6 +23,7 @@ benchmarks/orientation-corpus-*.json
 benchmarks/parser-robustness-*.json
 benchmarks/parser-fuzz-*.json
 benchmarks/prepare-queue-*.json
+benchmarks/prepare-strategy-*.json
 benchmarks/stream-probe-*.json
 benchmarks/url-pattern-corpus-*.json
 benchmarks/packer-sweep-*.json

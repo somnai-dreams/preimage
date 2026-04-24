@@ -15,8 +15,8 @@
   "scripts": {
     "check": "tsc",
     "check:all": "bun scripts/run-all-harnesses.ts",
-    "build:package": "bun --cwd packages/preimage run build",
-    "build:layout-algebra": "bun --cwd packages/layout-algebra run build",
+    "build:package": "bun run --cwd packages/preimage build",
+    "build:layout-algebra": "bun run --cwd packages/layout-algebra build",
     "build:all": "bun run build:package && bun run build:layout-algebra",
     "build:demos": "rm -rf dist-demos && bun build pages/demos/*.html --outdir dist-demos --root pages/demos && bun build pages/bench/*.html --outdir dist-demos/bench --root pages/bench && cp -r pages/assets/. dist-demos/assets/ && mkdir -p dist-demos/benchmarks && cp benchmarks/probe-byte-threshold-full.json benchmarks/probe-byte-threshold-modern2.json dist-demos/benchmarks/",
     "start": "HOST=${HOST:-0.0.0.0} PORT=${PORT:-3000} bun --hot pages/server.ts",

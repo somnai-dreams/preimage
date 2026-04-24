@@ -14,7 +14,7 @@ npm install
 
 ```sh
 bun run check           # run tsc type-check (no emit)
-bun run check:all       # run all offline regression harnesses (~1.3s, 9 harnesses, 562 checks)
+bun run check:all       # run all offline regression harnesses
 bun run build:package   # build dist/ (ESM + .d.ts)
 bun start               # run the demo site locally on port 3000
 ```
