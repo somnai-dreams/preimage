@@ -63,7 +63,7 @@
   <main class="page wide">
     <header class="page-header">
       <h1>Masonry — reflow during image loads</h1>
-      <p>Two grids, same photos, separate Run buttons so you feel each one. The left uses stock <code>&lt;img&gt;</code> tags with no reserved dimensions — the column stretches as each image decodes and every tile below it shifts. The right calls <code>prepare()</code> per image first, then commits the layout from <code>@somnai-dreams/layout-algebra</code> in one synchronous pass; tiles are positioned before any pixel paints. Toggle between shortest-column masonry (<code>packShortestColumn</code>) and Flickr-style justified rows (<code>packJustifiedRows</code>).</p>
+      <p>Two grids, same photos, separate Run buttons so you feel each one. The left uses stock <code>&lt;img&gt;</code> tags with no reserved dimensions — the column stretches as each image decodes and every tile below it shifts. The right runs the same loading strategies as <code>@somnai-dreams/preimage/loading</code>: first skeletons, first pixels, and throttled below-fold work are all explicit choices. Toggle between shortest-column masonry (<code>packShortestColumn</code>) and Flickr-style justified rows (<code>packJustifiedRows</code>).</p>
     </header>
 
     <div class="controls">
@@ -78,10 +78,18 @@
           <label><input type="radio" name="layout" value="column" checked> Shortest column</label>
           <label><input type="radio" name="layout" value="rows"> Justified rows</label>
         </div>
-        <span class="controls-label">Placement</span>
+        <span class="controls-label">Naive timing</span>
         <div class="segmented" role="radiogroup" aria-label="Placement mode">
           <label><input type="radio" name="mode" value="progressive" checked> When size known</label>
           <label><input type="radio" name="mode" value="batch"> Wait for all</label>
+        </div>
+        <span class="controls-label">Measured loading</span>
+        <div class="segmented loading-strategies" role="radiogroup" aria-label="Measured loading strategy">
+          <label><input type="radio" name="loading" value="viewport-first" checked> Viewport</label>
+          <label><input type="radio" name="loading" value="skeleton-first"> Skeleton</label>
+          <label><input type="radio" name="loading" value="throttled"> Throttled</label>
+          <label><input type="radio" name="loading" value="streamed"> Streamed</label>
+          <label><input type="radio" name="loading" value="manifest-hydrated"> Manifest</label>
         </div>
         <span class="controls-label">Cache-bust</span>
         <div class="segmented" role="radiogroup" aria-label="Cache-bust">

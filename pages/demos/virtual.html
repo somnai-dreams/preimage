@@ -72,7 +72,7 @@
   <main class="page wide">
     <header class="page-header">
       <h1>Virtual — ten thousand tiles, DOM-recycled</h1>
-      <p>Windowing a grid of non-uniform-height tiles is the chicken-and-egg: you need heights to position items, but heights come from loading them. The left panel is the naive attempt — drop N <code>&lt;img&gt;</code> tags into a CSS column layout and let the browser fetch, decode, and reflow all at once. The right panel uses <code>prepare()</code> with <code>dimsOnly</code> to measure every URL for just the header bytes (~4KB each), packs the full layout from the returned aspect ratios, then recycles a pool of ~40 DOM nodes as you scroll. Crank the slider; the scrollbar length is honest from the first frame, no matter the count.</p>
+      <p>Windowing a grid of non-uniform-height tiles is the chicken-and-egg: you need heights to position items, but heights come from loading them. The left panel is the naive attempt — drop N <code>&lt;img&gt;</code> tags into a CSS column layout and let the browser fetch, decode, and reflow all at once. The right panel runs <code>@somnai-dreams/preimage/loading</code> over a DOM-recycled pool, so you can compare the same viewport-first, skeleton-first, throttled, streamed, and manifest-backed choices while scrolling. Crank the slider; the scrollbar length is honest from the first frame, no matter the count.</p>
     </header>
 
     <div class="controls">
@@ -81,6 +81,14 @@
           <span>Tiles</span>
           <input id="countSlider" type="range" min="500" max="10000" value="2000" step="100" />
           <span id="countVal" class="count-val">2000</span>
+        </div>
+        <span class="controls-label">Measured loading</span>
+        <div class="segmented loading-strategies" role="radiogroup" aria-label="Measured loading strategy">
+          <label><input type="radio" name="loading" value="viewport-first" checked> Viewport</label>
+          <label><input type="radio" name="loading" value="skeleton-first"> Skeleton</label>
+          <label><input type="radio" name="loading" value="throttled"> Throttled</label>
+          <label><input type="radio" name="loading" value="streamed"> Streamed</label>
+          <label><input type="radio" name="loading" value="manifest-hydrated"> Manifest</label>
         </div>
       </div>
       <span id="meta" class="meta"></span>
@@ -115,7 +123,7 @@
         </div>
         <div class="panel-stats stat-list" id="measuredStats">
           <div class="row"><span class="label">DOM nodes (live)</span><span class="value"><b>&mdash;</b></span></div>
-          <div class="row"><span class="label">Dims probed</span><span class="value"><b>&mdash;</b></span></div>
+          <div class="row"><span class="label">Dims ready</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row"><span class="label">First tile placed</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row"><span class="label">All tiles placed</span><span class="value"><b>&mdash;</b></span></div>
           <div class="row"><span class="label">Bytes transferred</span><span class="value"><b>&mdash;</b></span></div>

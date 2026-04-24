@@ -1,5 +1,12 @@
-import { prepare } from '@somnai-dreams/preimage'
+import { PrepareQueue, prepare, recordKnownMeasurement } from '@somnai-dreams/preimage'
 import {
+  loadGallery,
+  type GalleryPhase,
+  type LoadingPattern,
+  type PackerCursor,
+} from '@somnai-dreams/preimage/loading'
+import {
+  estimateFirstScreenCount,
   justifiedRowCursor,
   packJustifiedRows,
   packShortestColumn,
@@ -8,7 +15,7 @@ import {
 } from '@somnai-dreams/layout-algebra'
 import { newCacheBustToken, photoUrl, takePhotos, PHOTO_COUNT } from './photo-source.js'
 import { observeShifts } from './demo-utils.js'
-import { getStrategy } from './nav-concurrency.js'
+import { getConcurrency, getStrategy } from './nav-concurrency.js'
 import { fmtMs, setRowValue, resetStats } from './demo-formatting.js'
 
 const countSlider = document.getElementById('countSlider') as HTMLInputElement
@@ -30,6 +37,8 @@ const TARGET_ROW_HEIGHT = 220
 type Mode = 'batch' | 'progressive'
 type Layout = 'column' | 'rows'
 
+let activeMeasuredGallery: ReturnType<typeof loadGallery> | null = null
+
 function getCount(): number {
   return Math.min(Number(countSlider.value), PHOTO_COUNT)
 }
@@ -44,6 +53,20 @@ function getLayout(): Layout {
   return checked?.value === 'rows' ? 'rows' : 'column'
 }
 
+function getLoadingPattern(): LoadingPattern {
+  const checked = document.querySelector<HTMLInputElement>('input[name="loading"]:checked')
+  const value = checked?.value
+  switch (value) {
+    case 'streamed':
+    case 'skeleton-first':
+    case 'manifest-hydrated':
+    case 'throttled':
+    case 'viewport-first':
+      return value
+  }
+  return 'viewport-first'
+}
+
 function getCacheBust(): string | null {
   const checked = document.querySelector<HTMLInputElement>('input[name="cache"]:checked')
   return checked?.value === 'off' ? null : newCacheBustToken()
@@ -51,6 +74,18 @@ function getCacheBust(): string | null {
 
 function buildUrls(count: number, cacheBust: string | null): string[] {
   return takePhotos(count).map((p) => photoUrl(p, cacheBust))
+}
+
+function buildAspects(count: number): number[] {
+  return takePhotos(count).map((p) => p.width / p.height)
+}
+
+function hydrateKnownMeasurements(urls: readonly string[], count: number): void {
+  const photos = takePhotos(count)
+  for (let i = 0; i < urls.length; i++) {
+    const photo = photos[i]!
+    recordKnownMeasurement(urls[i]!, photo.width, photo.height)
+  }
 }
 
 function setMeta(count: number, cacheBust: string | null): void {
@@ -96,13 +131,18 @@ function createTile(place: Placement, img: HTMLImageElement): Tile {
     container.classList.add('has-image')
   }
   container.appendChild(img)
+  const pendingSrc = img.dataset.src
+  if (pendingSrc !== undefined) {
+    img.src = pendingSrc
+    delete img.dataset.src
+  }
   return { container, img }
 }
 
 function imgForPrepared(url: string, warmed: HTMLImageElement | null): HTMLImageElement {
   if (warmed !== null) return warmed
   const img = new Image()
-  img.src = url
+  img.dataset.src = url
   return img
 }
 
@@ -117,6 +157,53 @@ function waitForImage(tile: Tile): Promise<void> {
     else {
       tile.img.addEventListener('load', done, { once: true })
       tile.img.addEventListener('error', done, { once: true })
+    }
+  })
+}
+
+type MeasuredTile = {
+  container: HTMLElement
+  img: HTMLImageElement | null
+}
+
+function renderMeasuredSkeleton(el: HTMLElement, _idx: number, place: Placement): void {
+  el.className = 'item'
+  el.style.left = `${place.x}px`
+  el.style.top = `${place.y}px`
+  el.style.width = `${place.width}px`
+  el.style.height = `${place.height}px`
+}
+
+function renderMeasuredImage(el: HTMLElement, _idx: number, url: string): void {
+  if (el.querySelector('img') !== null) return
+  const img = new Image()
+  img.alt = ''
+  const tile: MeasuredTile = { container: el, img }
+  el.appendChild(img)
+  void waitForMeasuredImage(tile)
+  img.src = url
+}
+
+function resetMeasuredTile(el: HTMLElement): void {
+  const img = el.querySelector('img')
+  if (img !== null) img.src = ''
+  el.innerHTML = ''
+  el.className = 'item'
+}
+
+function waitForMeasuredImage(tile: MeasuredTile): Promise<void> {
+  const img = tile.img
+  if (img === null) return Promise.resolve()
+  return new Promise<void>((resolve) => {
+    const done = (): void => {
+      img.classList.add('loaded')
+      tile.container.classList.add('has-image')
+      resolve()
+    }
+    if (img.complete && img.naturalWidth > 0) done()
+    else {
+      img.addEventListener('load', done, { once: true })
+      img.addEventListener('error', done, { once: true })
     }
   })
 }
@@ -229,18 +316,26 @@ async function runNaiveBatch(urls: readonly string[]): Promise<void> {
 async function runMeasured(): Promise<void> {
   runMeasuredBtn.disabled = true
   runMeasuredBtn.textContent = 'Running…'
-  measuredPanel.innerHTML = ''
-  measuredPanel.style.height = '0px'
-  resetStats(measuredStats)
-
   const count = getCount()
   const cacheBust = getCacheBust()
   const mode = getMode()
   const layout = getLayout()
-  setMeta(count, cacheBust)
   const urls = buildUrls(count, cacheBust)
+  hydrateKnownMeasurements(urls, count)
 
-  if (mode === 'batch') {
+  if (activeMeasuredGallery !== null) {
+    activeMeasuredGallery.destroy()
+    activeMeasuredGallery = null
+  }
+  measuredPanel.innerHTML = ''
+  measuredPanel.style.height = '0px'
+  resetStats(measuredStats)
+
+  setMeta(count, cacheBust)
+
+  if (layout === 'column') {
+    await runMeasuredLoadingPattern(urls, buildAspects(count), getLoadingPattern())
+  } else if (mode === 'batch') {
     await runMeasuredBatch(urls, layout)
   } else {
     await runMeasuredProgressive(urls, layout)
@@ -248,6 +343,82 @@ async function runMeasured(): Promise<void> {
 
   runMeasuredBtn.disabled = false
   runMeasuredBtn.textContent = 'Run again'
+}
+
+async function runMeasuredLoadingPattern(
+  urls: readonly string[],
+  aspects: readonly number[],
+  pattern: LoadingPattern,
+): Promise<void> {
+  const t0 = performance.now()
+  const dimTimes: number[] = []
+  const panelWidth = measuredPanel.getBoundingClientRect().width
+  const packer: PackerCursor = shortestColumnCursor({ columns: COLUMNS, gap: GAP, panelWidth })
+  const queue = new PrepareQueue({ concurrency: getConcurrency() })
+  const strategy = getStrategy()
+  setRowValue(measuredStats, 2, '<b>known</b>')
+
+  const trackedQueue = {
+    enqueue(src: string, options?: Parameters<PrepareQueue['enqueue']>[1]) {
+      return queue.enqueue(src, options).then((prepared) => {
+        dimTimes.push(performance.now() - t0)
+        const avg = dimTimes.reduce((a, b) => a + b, 0) / dimTimes.length
+        setRowValue(measuredStats, 2, `<b>${fmtMs(avg)}</b>`)
+        return prepared
+      })
+    },
+    boostMany(srcs: readonly string[]) {
+      queue.boostMany(srcs)
+    },
+  }
+
+  const firstK = estimateFirstScreenCount({
+    mode: 'columns',
+    panelWidth,
+    viewportHeight: window.innerHeight,
+    gap: GAP,
+    columns: COLUMNS,
+  })
+
+  const phaseTimes: Partial<Record<GalleryPhase, number>> = {}
+  const gallery = loadGallery({
+    urls,
+    scrollContainer: document.scrollingElement as HTMLElement,
+    contentContainer: measuredPanel,
+    packer,
+    pattern,
+    overscan: { ahead: 500, behind: 160 },
+    probe: {
+      queue: trackedQueue,
+      options: { dimsOnly: true, strategy },
+      boostFirstScreen: firstK,
+    },
+    aspects,
+    renderConcurrency: 8,
+    renderSkeleton: renderMeasuredSkeleton,
+    renderImage: renderMeasuredImage,
+    resetTile: resetMeasuredTile,
+    onPhase: (phase, elapsedMs) => {
+      phaseTimes[phase] = elapsedMs
+      if (phase === 'first-placement') {
+        setRowValue(measuredStats, 1, `<b>${fmtMs(elapsedMs)}</b>`)
+      } else if (phase === 'all-placements') {
+        setRowValue(measuredStats, 3, `<b>${fmtMs(elapsedMs)}</b>`)
+      }
+    },
+  })
+  activeMeasuredGallery = gallery
+
+  await gallery.done
+  if (phaseTimes['first-placement'] === undefined) {
+    setRowValue(measuredStats, 1, `<b>${fmtMs(performance.now() - t0)}</b>`)
+  }
+  if (phaseTimes['all-placements'] === undefined) {
+    setRowValue(measuredStats, 3, `<b>${fmtMs(performance.now() - t0)}</b>`)
+  }
+  if (dimTimes.length === 0) {
+    setRowValue(measuredStats, 2, '<b>instant</b>')
+  }
 }
 
 async function runMeasuredBatch(urls: readonly string[], layout: Layout): Promise<void> {

@@ -53,6 +53,7 @@ type PatternResults = {
 }
 
 let lastRun: { meta: RunMetadata; params: PatternParams; results: PatternResults } | null = null
+let activeGallery: ReturnType<typeof loadGallery> | null = null
 
 runBtn.addEventListener('click', () => { void run() })
 saveBtn.addEventListener('click', () => {
@@ -67,6 +68,10 @@ async function run(): Promise<void> {
   metaEl.textContent = ''
   statHost.innerHTML = ''
   jsonHost.innerHTML = ''
+  if (activeGallery !== null) {
+    activeGallery.destroy()
+    activeGallery = null
+  }
   canvas.innerHTML = ''
   canvas.style.height = '0px'
   scrollBox.scrollTop = 0
@@ -74,7 +79,7 @@ async function run(): Promise<void> {
   const n = Number(nInput.value)
   const concurrency = Number(concInput.value)
   const patternEl = document.querySelector<HTMLInputElement>('input[name="pattern"]:checked')
-  const pattern = (patternEl?.value ?? 'skeleton-first') as LoadingPattern
+  const pattern = (patternEl?.value ?? 'viewport-first') as LoadingPattern
 
   const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const urls = cycledUrls(n, token)
@@ -176,6 +181,7 @@ async function run(): Promise<void> {
       if (phase === 'first-image' && firstImageMs === null) firstImageMs = elapsedMs
     },
   })
+  activeGallery = gallery
 
   await gallery.done
   // Let in-flight image requests settle into the PerformanceObserver

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0
+
+- **New subpath `@somnai-dreams/preimage/loading`.** `loadGallery({ pattern })` wraps the probe queue, virtual tile pool, and caller-owned render hooks behind five named loading strategies: `streamed`, `viewport-first`, `skeleton-first`, `manifest-hydrated`, and `throttled`. `viewport-first` is the UX-focused path: place first-screen skeletons in URL order, load current-viewport images next, then let mounted/overscan work trickle through a throttled render queue that keeps promoting newly visible tiles on scroll. When callers pass known `aspects`, `viewport-first` commits the frame layer synchronously and still keeps that image sequencing. `Gallery.done` waits for probes plus the initially visible image loads/errors, so benches and callers can record phase timings without racing the render-side fetches. Throttled rendering tracks queued work by tile element, so a recycled DOM node never receives an old image request. The virtual and masonry demos now drive the same strategy choices for their measured shortest-column panels; both seed local photo dimensions before rerun reset so the next frame layer can commit immediately.
+
 ## 0.10.1
 
 - **Fix: SVG dimension parsing when `width` / `height` are not the first attribute.** Both `probeImageBytes` and `measureFromSvgText` used a regex prefix `[^>"']*` that couldn't skip across quoted attribute values. Effect: `<svg xmlns="..." width="240" height="180">` and `<svg width="240" height="180" xmlns="...">` both failed to find `height` because the regex engine couldn't cross the earlier `"` character. Fix isolates the opening `<svg ...>` tag first, then runs per-attribute regexes over just the attribute block. Caught by `scripts/parser-robustness-test.ts`.

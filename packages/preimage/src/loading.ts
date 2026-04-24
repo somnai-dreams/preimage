@@ -2,7 +2,7 @@
 // with a named pattern knob so callers (and benches) can swap the
 // sequencing without rewriting the orchestration each time.
 //
-// Four patterns ship in v1; add new ones by branching `loadGallery`:
+// Five patterns ship in v1; add new ones by branching `loadGallery`:
 //
 //   'streamed'          Mount-with-image-fetch fires per probe resolve.
 //                       User sees a growing, heterogeneous layout:
@@ -29,6 +29,14 @@
 //                       their queue isn't bandwidth-bound by full
 //                       image fetches. Middle ground between
 //                       streamed and skeleton-first.
+//
+//   'viewport-first'    UX-focused sequence: first-screen probes get
+//                       placed as skeletons in URL order, then the
+//                       current viewport's images jump the render
+//                       queue, then the rest of the mounted/overscan
+//                       images trickle through the same throttled
+//                       render queue. Scroll events keep promoting
+//                       newly visible mounted tiles.
 //
 // The orchestrator owns the pool; callers pass container elements
 // plus two small renderers (`renderSkeleton`, `renderImage`) and get
@@ -57,13 +65,13 @@ export type LoadingPattern =
   | 'skeleton-first'
   | 'manifest-hydrated'
   | 'throttled'
+  | 'viewport-first'
 
 export type GalleryPhase =
   | 'start'
   | 'first-placement'
   | 'all-placements'
   | 'first-image'
-  | 'all-images'
   | 'done'
 
 /** Pure-math packer cursor. Matches the shape of
@@ -95,7 +103,7 @@ export type GalleryConfig = {
 
   overscan?: number | { ahead: number; behind: number }
 
-  // Probe-based patterns ('streamed', 'skeleton-first', 'throttled'):
+  // Probe-based patterns ('streamed', 'skeleton-first', 'throttled', 'viewport-first'):
   probe?: {
     /** If omitted, a fresh `PrepareQueue` is constructed with
      *  adaptive default concurrency. */
@@ -108,7 +116,9 @@ export type GalleryConfig = {
     boostFirstScreen?: number
   }
 
-  // 'manifest-hydrated' only: aspect ratio per url index.
+  // Aspect ratio per URL index. Required for 'manifest-hydrated';
+  // when provided to 'viewport-first', frames can commit immediately
+  // while image fetches still follow the viewport-first sequencing.
   aspects?: readonly number[]
 
   // 'throttled' only: concurrency of the render-phase image fetches.
@@ -120,8 +130,8 @@ export type GalleryConfig = {
 
 export type Gallery = {
   pool: VirtualTilePool
-  /** Resolves once every probe + viewport-visible image has landed
-   *  (or, for manifest-hydrated, once the first-paint frame fires). */
+  /** Resolves once every probe + initially viewport-visible image has
+   *  reached load/error. */
   done: Promise<void>
   destroy(): void
 }
@@ -142,6 +152,8 @@ export function loadGallery(config: GalleryConfig): Gallery {
       return runManifestHydrated(config, emit)
     case 'throttled':
       return runThrottled(config, emit)
+    case 'viewport-first':
+      return runViewportFirst(config, emit)
   }
 }
 
@@ -151,23 +163,32 @@ function runStreamed(config: GalleryConfig, emit: (p: GalleryPhase) => void): Ga
   const { urls, packer } = config
   const placements: Placement[] = []
   const indexUrl: string[] = []
+  const mountedTiles = new Map<number, HTMLElement>()
+  const imageLoads = new Map<number, ImageLoad>()
   let firstPlacementEmitted = false
   let firstImageEmitted = false
-  let imagesLoaded = 0
+
+  function attachImage(idx: number, el: HTMLElement): Promise<void> | null {
+    const url = indexUrl[idx]
+    if (url === undefined) return null
+    config.renderImage(el, idx, url)
+    const load = waitForImage(el, () => {
+      if (!firstImageEmitted) {
+        firstImageEmitted = true
+        emit('first-image')
+      }
+    })
+    imageLoads.set(idx, { el, promise: load })
+    return load
+  }
 
   const pool = createPool(config, (idx, el, place) => {
     config.renderSkeleton(el, idx, place)
-    const url = indexUrl[idx]
-    if (url !== undefined) {
-      config.renderImage(el, idx, url)
-      markImageListener(el, () => {
-        if (!firstImageEmitted) {
-          firstImageEmitted = true
-          emit('first-image')
-        }
-        imagesLoaded++
-      })
-    }
+    mountedTiles.set(idx, el)
+    attachImage(idx, el)
+  }, (idx, _el) => {
+    mountedTiles.delete(idx)
+    imageLoads.delete(idx)
   })
 
   const queue = getQueue(config)
@@ -184,11 +205,11 @@ function runStreamed(config: GalleryConfig, emit: (p: GalleryPhase) => void): Ga
         scheduleRender(config, placements, pool)
       }),
     ),
-  ).then(() => {
+  ).then(async () => {
     emit('all-placements')
-    // Streamed's "all images" milestone is harder — we can't know
-    // without tracking mount-to-load per tile across the whole run.
-    // The mount callback increments imagesLoaded; we just emit done.
+    config.contentContainer.style.height = `${packer.totalHeight()}px`
+    pool.setPlacements(placements)
+    await waitForVisibleLoads(mountedTiles, imageLoads)
     emit('done')
   })
 
@@ -207,20 +228,23 @@ function runSkeletonFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
   const placements: Placement[] = []
   const indexUrl: string[] = []
   const mountedTiles = new Map<number, HTMLElement>()
+  const imageLoads = new Map<number, ImageLoad>()
   let renderPhase = false
   let firstPlacementEmitted = false
   let firstImageEmitted = false
 
-  function attachImage(idx: number, el: HTMLElement): void {
+  function attachImage(idx: number, el: HTMLElement): Promise<void> | null {
     const url = indexUrl[idx]
-    if (url === undefined) return
+    if (url === undefined) return null
     config.renderImage(el, idx, url)
-    markImageListener(el, () => {
+    const load = waitForImage(el, () => {
       if (!firstImageEmitted) {
         firstImageEmitted = true
         emit('first-image')
       }
     })
+    imageLoads.set(idx, { el, promise: load })
+    return load
   }
 
   const pool = createPool(config, (idx, el, place) => {
@@ -229,6 +253,7 @@ function runSkeletonFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
     if (renderPhase) attachImage(idx, el)
   }, (idx, _el) => {
     mountedTiles.delete(idx)
+    imageLoads.delete(idx)
   })
 
   const queue = getQueue(config)
@@ -245,14 +270,19 @@ function runSkeletonFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
         scheduleRender(config, placements, pool)
       }),
     ),
-  ).then(() => {
+  ).then(async () => {
     // Final placements flush (in case any rAF hadn't fired yet) then
     // flip render phase.
     config.contentContainer.style.height = `${packer.totalHeight()}px`
     pool.setPlacements(placements)
     emit('all-placements')
     renderPhase = true
-    for (const [idx, el] of mountedTiles) attachImage(idx, el)
+    const visibleLoads: Promise<void>[] = []
+    for (const [idx, el] of mountedTiles) {
+      const load = attachImage(idx, el)
+      if (load !== null) visibleLoads.push(load)
+    }
+    await Promise.all(visibleLoads)
     emit('done')
   })
 
@@ -277,25 +307,34 @@ function runManifestHydrated(config: GalleryConfig, emit: (p: GalleryPhase) => v
   emit('all-placements')
 
   let firstImageEmitted = false
+  const mountedTiles = new Map<number, HTMLElement>()
+  const imageLoads = new Map<number, ImageLoad>()
 
   const pool = createPool(config, (idx, el, place) => {
     config.renderSkeleton(el, idx, place)
+    mountedTiles.set(idx, el)
     config.renderImage(el, idx, urls[idx]!)
-    markImageListener(el, () => {
+    const load = waitForImage(el, () => {
       if (!firstImageEmitted) {
         firstImageEmitted = true
         emit('first-image')
       }
     })
+    imageLoads.set(idx, { el, promise: load })
+  }, (idx, _el) => {
+    mountedTiles.delete(idx)
+    imageLoads.delete(idx)
   })
 
   config.contentContainer.style.height = `${packer.totalHeight()}px`
   pool.setPlacements(placements)
-  emit('done')
+  const done = waitForVisibleLoads(mountedTiles, imageLoads).then(() => {
+    emit('done')
+  })
 
   return {
     pool,
-    done: Promise.resolve(),
+    done,
     destroy: () => pool.destroy(),
   }
 }
@@ -307,6 +346,7 @@ function runThrottled(config: GalleryConfig, emit: (p: GalleryPhase) => void): G
   const placements: Placement[] = []
   const indexUrl: string[] = []
   const mountedTiles = new Map<number, HTMLElement>()
+  const imageLoads = new Map<number, ImageLoad>()
   let firstPlacementEmitted = false
   let firstImageEmitted = false
 
@@ -315,33 +355,54 @@ function runThrottled(config: GalleryConfig, emit: (p: GalleryPhase) => void): G
   // boost, etc.) don't match an image-render backlog — here we want
   // plain FIFO with bounded in-flight.
   const renderCap = config.renderConcurrency ?? 8
-  const renderQueue: Array<() => Promise<void>> = []
+  const renderQueue: RenderJob[] = []
   let renderInflight = 0
   function pumpRender(): void {
     while (renderInflight < renderCap && renderQueue.length > 0) {
-      const task = renderQueue.shift()!
+      const job = renderQueue.shift()!
+      const currentLoad = imageLoads.get(job.idx)
+      const currentEl = mountedTiles.get(job.idx)
+      if (
+        currentLoad === undefined ||
+        currentLoad.el !== job.el ||
+        currentLoad.promise !== job.promise ||
+        currentEl !== job.el ||
+        job.el.querySelector('img') !== null
+      ) {
+        if (currentLoad?.el === job.el && currentLoad.promise === job.promise) {
+          imageLoads.delete(job.idx)
+        }
+        job.resolve()
+        continue
+      }
       renderInflight++
-      void task().finally(() => {
+      config.renderImage(job.el, job.idx, job.url)
+      void waitForImage(job.el, () => {
+        if (!firstImageEmitted) {
+          firstImageEmitted = true
+          emit('first-image')
+        }
+      }).then(job.resolve).finally(() => {
+        const latest = imageLoads.get(job.idx)
+        if (latest?.el === job.el && latest.promise === job.promise) {
+          imageLoads.delete(job.idx)
+        }
         renderInflight--
         pumpRender()
       })
     }
   }
-  function enqueueRender(idx: number, el: HTMLElement, url: string): void {
-    renderQueue.push(
-      () =>
-        new Promise<void>((resolve) => {
-          config.renderImage(el, idx, url)
-          markImageListener(el, () => {
-            if (!firstImageEmitted) {
-              firstImageEmitted = true
-              emit('first-image')
-            }
-            resolve()
-          })
-        }),
-    )
+  function enqueueRender(idx: number, el: HTMLElement, url: string): Promise<void> {
+    const existing = imageLoads.get(idx)
+    if (existing?.el === el) return existing.promise
+    let resolveJob!: () => void
+    const promise = new Promise<void>((resolve) => {
+      resolveJob = resolve
+    })
+    imageLoads.set(idx, { el, promise })
+    renderQueue.push({ idx, el, url, promise, resolve: resolveJob })
     pumpRender()
+    return promise
   }
 
   const pool = createPool(config, (idx, el, place) => {
@@ -351,6 +412,8 @@ function runThrottled(config: GalleryConfig, emit: (p: GalleryPhase) => void): G
     if (url !== undefined) enqueueRender(idx, el, url)
   }, (idx, _el) => {
     mountedTiles.delete(idx)
+    const load = imageLoads.get(idx)
+    if (load?.el === _el) imageLoads.delete(idx)
   })
 
   const queue = getQueue(config)
@@ -367,18 +430,23 @@ function runThrottled(config: GalleryConfig, emit: (p: GalleryPhase) => void): G
         scheduleRender(config, placements, pool)
       }),
     ),
-  ).then(() => {
+  ).then(async () => {
     emit('all-placements')
     // After all probes resolve, ensure any still-mounted tiles
     // without an in-flight render get queued. mount fires before
     // indexUrl is set if probe resolution order differs from pool
     // mount order; guard against that by sweeping here.
+    const visibleLoads: Promise<void>[] = []
     for (const [idx, el] of mountedTiles) {
       const url = indexUrl[idx]
       if (url !== undefined && el.querySelector('img') === null) {
-        enqueueRender(idx, el, url)
+        visibleLoads.push(enqueueRender(idx, el, url))
+      } else {
+        const load = imageLoads.get(idx)
+        if (load?.el === el) visibleLoads.push(load.promise)
       }
     }
+    await Promise.all(visibleLoads)
     emit('done')
   })
 
@@ -387,6 +455,227 @@ function runThrottled(config: GalleryConfig, emit: (p: GalleryPhase) => void): G
     pool,
     done,
     destroy: () => pool.destroy(),
+  }
+}
+
+// --- Pattern: viewport-first ---
+
+function runViewportFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void): Gallery {
+  const { urls, packer } = config
+  const readyAspects: Array<number | null> = new Array(urls.length).fill(null)
+  const placements: Placement[] = []
+  const indexUrl: string[] = []
+  const mountedTiles = new Map<number, HTMLElement>()
+  const imageLoads = new Map<number, ImageLoad>()
+  let nextPlaceIndex = 0
+  let firstPlacementEmitted = false
+  let firstImageEmitted = false
+  let viewportRenderStarted = false
+  let normalRenderEnabled = false
+
+  const firstScreenTarget = Math.min(config.probe?.boostFirstScreen ?? 0, urls.length)
+  const renderCap = config.renderConcurrency ?? 8
+  const renderQueue: PriorityRenderJob[] = []
+  let renderInflight = 0
+
+  function pumpRender(): void {
+    while (renderInflight < renderCap && renderQueue.length > 0) {
+      const job = renderQueue.shift()!
+      job.started = true
+      const currentLoad = imageLoads.get(job.idx)
+      const currentEl = mountedTiles.get(job.idx)
+      if (
+        currentLoad === undefined ||
+        currentLoad.el !== job.el ||
+        currentLoad.promise !== job.promise ||
+        currentEl !== job.el ||
+        job.el.querySelector('img') !== null
+      ) {
+        if (currentLoad?.el === job.el && currentLoad.promise === job.promise) {
+          imageLoads.delete(job.idx)
+        }
+        job.resolve()
+        continue
+      }
+      renderInflight++
+      config.renderImage(job.el, job.idx, job.url)
+      void waitForImage(job.el, () => {
+        if (!firstImageEmitted) {
+          firstImageEmitted = true
+          emit('first-image')
+        }
+      }).then(job.resolve).finally(() => {
+        const latest = imageLoads.get(job.idx)
+        if (latest?.el === job.el && latest.promise === job.promise) {
+          imageLoads.delete(job.idx)
+        }
+        renderInflight--
+        pumpRender()
+      })
+    }
+  }
+
+  function promoteQueuedJob(idx: number, el: HTMLElement, promise: Promise<void>): void {
+    const queuedIndex = renderQueue.findIndex(
+      (job) => !job.started && job.idx === idx && job.el === el && job.promise === promise,
+    )
+    if (queuedIndex <= 0) return
+    const [job] = renderQueue.splice(queuedIndex, 1)
+    if (job !== undefined) {
+      job.priority = 'high'
+      renderQueue.unshift(job)
+    }
+  }
+
+  function enqueueRender(
+    idx: number,
+    el: HTMLElement,
+    url: string,
+    priority: RenderPriority,
+  ): Promise<void> {
+    const existing = imageLoads.get(idx)
+    if (existing?.el === el) {
+      if (priority === 'high') promoteQueuedJob(idx, el, existing.promise)
+      return existing.promise
+    }
+    if (el.querySelector('img') !== null) return Promise.resolve()
+
+    let resolveJob!: () => void
+    const promise = new Promise<void>((resolve) => {
+      resolveJob = resolve
+    })
+    const job: PriorityRenderJob = { idx, el, url, priority, promise, resolve: resolveJob, started: false }
+    imageLoads.set(idx, { el, promise })
+    if (priority === 'high') renderQueue.unshift(job)
+    else renderQueue.push(job)
+    pumpRender()
+    return promise
+  }
+
+  function enqueueMountedImage(idx: number, el: HTMLElement): Promise<void> | null {
+    if (!viewportRenderStarted) return null
+    const url = indexUrl[idx]
+    const place = placements[idx]
+    if (url === undefined || place === undefined) return null
+    const isViewport = isInViewport(config, place)
+    if (!isViewport && !normalRenderEnabled) return null
+    return enqueueRender(idx, el, url, isViewport ? 'high' : 'normal')
+  }
+
+  function enqueueMountedImages(): Promise<void>[] {
+    const loads: Promise<void>[] = []
+    for (const [idx, el] of mountedTiles) {
+      const load = enqueueMountedImage(idx, el)
+      if (load !== null) loads.push(load)
+    }
+    return loads
+  }
+
+  function startViewportRenderIfReady(): void {
+    if (viewportRenderStarted) return
+    if (urls.length > 0 && placements.length === 0) return
+    if (nextPlaceIndex < firstScreenTarget) return
+
+    config.contentContainer.style.height = `${packer.totalHeight()}px`
+    pool.setPlacements(placements)
+    viewportRenderStarted = true
+    const firstViewportLoads = enqueueMountedImages()
+    void Promise.all(firstViewportLoads).then(() => {
+      normalRenderEnabled = true
+      enqueueMountedImages()
+    })
+  }
+
+  function placeReadyAspects(): void {
+    while (nextPlaceIndex < urls.length) {
+      const aspect = readyAspects[nextPlaceIndex]
+      if (aspect === null || aspect === undefined) break
+      placements.push(packer.add(aspect))
+      indexUrl.push(urls[nextPlaceIndex]!)
+      nextPlaceIndex++
+      if (!firstPlacementEmitted) {
+        firstPlacementEmitted = true
+        emit('first-placement')
+      }
+    }
+    if (placements.length > 0) scheduleRender(config, placements, pool)
+    startViewportRenderIfReady()
+  }
+
+  const pool = createPool(config, (idx, el, place) => {
+    config.renderSkeleton(el, idx, place)
+    mountedTiles.set(idx, el)
+    enqueueMountedImage(idx, el)
+  }, (idx, _el) => {
+    mountedTiles.delete(idx)
+    const load = imageLoads.get(idx)
+    if (load?.el === _el) imageLoads.delete(idx)
+  })
+
+  let viewportBoostPending = false
+  function scheduleViewportBoost(): void {
+    if (viewportBoostPending) return
+    viewportBoostPending = true
+    requestAnimationFrame(() => {
+      viewportBoostPending = false
+      enqueueMountedImages()
+    })
+  }
+  config.scrollContainer.addEventListener('scroll', scheduleViewportBoost, { passive: true })
+
+  if (config.aspects !== undefined) {
+    if (config.aspects.length !== urls.length) {
+      throw new Error("loadGallery: aspects[] must match urls.length")
+    }
+    const done = (async (): Promise<void> => {
+      for (let i = 0; i < urls.length; i++) readyAspects[i] = config.aspects![i]!
+      placeReadyAspects()
+      config.contentContainer.style.height = `${packer.totalHeight()}px`
+      pool.setPlacements(placements)
+      emit('all-placements')
+      startViewportRenderIfReady()
+      await waitForVisibleLoads(mountedTiles, imageLoads)
+      emit('done')
+    })()
+    return {
+      pool,
+      done,
+      destroy: () => {
+        config.scrollContainer.removeEventListener('scroll', scheduleViewportBoost)
+        pool.destroy()
+      },
+    }
+  }
+
+  const queue = getQueue(config)
+  const options = getProbeOptions(config)
+  const done = Promise.all(
+    urls.map((url, index) =>
+      queue.enqueue(url, options).then((prepared) => {
+        readyAspects[index] = prepared.aspectRatio
+        placeReadyAspects()
+      }),
+    ),
+  ).then(async () => {
+    placeReadyAspects()
+    config.contentContainer.style.height = `${packer.totalHeight()}px`
+    pool.setPlacements(placements)
+    emit('all-placements')
+    startViewportRenderIfReady()
+    normalRenderEnabled = true
+    enqueueMountedImages()
+    await waitForVisibleLoads(mountedTiles, imageLoads)
+    emit('done')
+  })
+
+  maybeBoost(queue, urls, config)
+  return {
+    pool,
+    done,
+    destroy: () => {
+      config.scrollContainer.removeEventListener('scroll', scheduleViewportBoost)
+      pool.destroy()
+    },
   }
 }
 
@@ -442,17 +731,68 @@ function scheduleRender(
 }
 const renderState = new WeakMap<VirtualTilePool, { pending: boolean }>()
 
-/** Hook a one-shot load/error listener on the first `<img>` under
- *  `el`. No-op if there isn't one. */
-function markImageListener(el: HTMLElement, onLoad: () => void): void {
-  const img = el.querySelector('img')
-  if (img === null) return
-  if (img.complete && img.naturalWidth > 0) {
-    onLoad()
-    return
+type ImageLoad = {
+  el: HTMLElement
+  promise: Promise<void>
+}
+
+type RenderJob = {
+  idx: number
+  el: HTMLElement
+  url: string
+  promise: Promise<void>
+  resolve: () => void
+}
+
+type RenderPriority = 'high' | 'normal'
+
+type PriorityRenderJob = RenderJob & {
+  priority: RenderPriority
+  started: boolean
+}
+
+function isInViewport(config: GalleryConfig, place: Placement): boolean {
+  const scrollTop = config.scrollContainer.scrollTop
+  const scrollRect = config.scrollContainer.getBoundingClientRect()
+  const contentRect = config.contentContainer.getBoundingClientRect()
+  const contentOffsetTop = contentRect.top - scrollRect.top + scrollTop
+  const top = scrollTop - contentOffsetTop
+  const bottom = scrollTop + config.scrollContainer.clientHeight - contentOffsetTop
+  return place.y + place.height >= top && place.y <= bottom
+}
+
+function waitForVisibleLoads(
+  mountedTiles: ReadonlyMap<number, HTMLElement>,
+  imageLoads: ReadonlyMap<number, ImageLoad>,
+): Promise<void> {
+  const visibleLoads: Promise<void>[] = []
+  for (const [idx, el] of mountedTiles) {
+    const load = imageLoads.get(idx)
+    if (load?.el === el) visibleLoads.push(load.promise)
   }
-  img.addEventListener('load', onLoad, { once: true })
-  img.addEventListener('error', onLoad, { once: true })
+  return Promise.all(visibleLoads).then(() => {})
+}
+
+/** Resolve when the first `<img>` under `el` reaches load/error. No-op
+ *  if the renderer did not create one. */
+function waitForImage(el: HTMLElement, onLoad: () => void): Promise<void> {
+  const img = el.querySelector('img')
+  if (img === null) return Promise.resolve()
+  if (img.complete) {
+    onLoad()
+    return Promise.resolve()
+  }
+  return new Promise((resolve) => {
+    let settled = false
+    const done = (): void => {
+      if (settled) return
+      settled = true
+      onLoad()
+      resolve()
+    }
+    img.addEventListener('load', done, { once: true })
+    img.addEventListener('error', done, { once: true })
+  })
 }
 
 export type { Placement, VirtualTilePool, PreparedImage, PrepareQueueLike }

@@ -1,11 +1,16 @@
-import { PrepareQueue } from '@somnai-dreams/preimage'
-import { createVirtualTilePool } from '@somnai-dreams/preimage/virtual'
+import { PrepareQueue, recordKnownMeasurement } from '@somnai-dreams/preimage'
+import {
+  loadGallery,
+  type GalleryPhase,
+  type LoadingPattern,
+  type PackerCursor,
+} from '@somnai-dreams/preimage/loading'
 import {
   estimateFirstScreenCount,
   shortestColumnCursor,
   type Placement,
 } from '@somnai-dreams/layout-algebra'
-import { cycledUrls } from './photo-source.js'
+import { cycledUrls, PHOTOS } from './photo-source.js'
 import { getConcurrency, getStrategy } from './nav-concurrency.js'
 import { fmtMs, fmtBytes, fmtCount, setRowValue, resetStats } from './demo-formatting.js'
 
@@ -28,21 +33,46 @@ const GAP = 3
 // investigate before reintroducing direction-aware behavior.
 const OVERSCAN = 600
 
-// Retained across runs so "Run again" can tear down the pool from the
-// prior run before creating a new one. Without this, each run leaks a
-// scroll listener + ResizeObserver on measuredScroll; the stale pool
-// still holds the previous run's placements and on every scroll event
-// re-appends its orphaned recycled elements into measuredPanel at the
-// old placement coordinates. Result: ghost tiles from earlier runs
-// overlaid on top of the current grid.
-let activeMeasuredPool: { destroy: () => void } | null = null
+// Retained across runs so "Run again" tears down the prior gallery's
+// scroll listener, ResizeObserver, queued renders, and recycled nodes.
+let activeMeasuredGallery: { destroy: () => void } | null = null
 
 function getCount(): number {
   return Number(countSlider.value)
 }
 
+function getLoadingPattern(): LoadingPattern {
+  const checked = document.querySelector<HTMLInputElement>('input[name="loading"]:checked')
+  const value = checked?.value
+  switch (value) {
+    case 'streamed':
+    case 'skeleton-first':
+    case 'manifest-hydrated':
+    case 'throttled':
+    case 'viewport-first':
+      return value
+  }
+  return 'viewport-first'
+}
+
 function freshToken(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function cycledAspects(count: number): number[] {
+  const out: number[] = []
+  for (let i = 0; i < count; i++) {
+    const photo = PHOTOS[i % PHOTOS.length]!
+    out.push(photo.width / photo.height)
+  }
+  return out
+}
+
+function hydrateCycledMeasurements(urls: readonly string[]): void {
+  for (let i = 0; i < urls.length; i++) {
+    const photo = PHOTOS[i % PHOTOS.length]!
+    recordKnownMeasurement(urls[i]!, photo.width, photo.height)
+  }
 }
 
 function setMeta(msg: string): void {
@@ -159,19 +189,28 @@ function markTileLoaded(el: HTMLElement, img: HTMLImageElement): void {
 async function runMeasured(): Promise<void> {
   runMeasuredBtn.disabled = true
   runMeasuredBtn.textContent = 'Running…'
-  if (activeMeasuredPool !== null) {
-    activeMeasuredPool.destroy()
-    activeMeasuredPool = null
+
+  const count = getCount()
+  const token = freshToken()
+  const loadingPattern = getLoadingPattern()
+  const urls = cycledUrls(count, token)
+  const aspects = cycledAspects(count)
+  // The virtual demo owns this local photo manifest, so dimensions are
+  // not something the first visible frame needs to discover. Seed the
+  // cache before resetting DOM; the selected strategy still controls
+  // image fetch sequencing inside those already-sized frames.
+  hydrateCycledMeasurements(urls)
+
+  if (activeMeasuredGallery !== null) {
+    activeMeasuredGallery.destroy()
+    activeMeasuredGallery = null
   }
   measuredPanel.innerHTML = ''
   measuredPanel.style.height = '0px'
   measuredScroll.scrollTop = 0
   resetStats(measuredStats)
 
-  const count = getCount()
-  const token = freshToken()
-  setMeta(`${fmtCount(count)} tiles · measured building`)
-  const urls = cycledUrls(count, token)
+  setMeta(`${fmtCount(count)} tiles · measured building · ${loadingPattern}`)
 
   const urlSet = new Set(
     urls.map((u) => new URL(u, location.href).pathname + new URL(u, location.href).search),
@@ -183,116 +222,34 @@ async function runMeasured(): Promise<void> {
 
   const t0 = performance.now()
 
-  const packer = shortestColumnCursor({
+  const packer: PackerCursor = shortestColumnCursor({
     columns: COLUMNS,
     gap: GAP,
     panelWidth: measuredPanel.getBoundingClientRect().width,
   })
-
-  // Transient state. Promise resolves only mutate these; all DOM
-  // writes live in render().
-  const placements: Placement[] = []
-  const indexUrl: string[] = []
   let dimsProbed = 0
-  let firstPlacedMs: number | null = null
+  let liveTiles = 0
+  setRowValue(measuredStats, 2, '<b>known</b>')
 
-  // Phase separation. During the probe phase tiles mount as skeletons
-  // only — placement + background, no `<img>`. Image fetches are
-  // gated behind `renderPhase = true`, flipped after every probe has
-  // resolved. Why: a probe is ~4 KB and a full image is ~1 MB; if we
-  // start image fetches on probe resolve the images saturate the
-  // network pipe and the remaining probes starve behind them. Full
-  // skeletons first, then images, is both faster overall and easier
-  // on the eye (homogeneous state throughout, no partial-loaded flash).
-  let renderPhase = false
-  const mountedTiles = new Map<number, HTMLElement>()
-
-  function attachImage(idx: number, el: HTMLElement): void {
-    if (el.querySelector('img') !== null) return
-    const img = new Image()
-    img.alt = ''
-    img.src = indexUrl[idx]!
-    if (img.complete && img.naturalWidth > 0) {
-      markTileLoaded(el, img)
-    } else {
-      img.addEventListener('load', () => markTileLoaded(el, img), { once: true })
-    }
-    el.appendChild(img)
+  function reportLiveTiles(): void {
+    setRowValue(measuredStats, 1, `<b>${fmtCount(liveTiles)}</b>`)
   }
 
-  const pool = createVirtualTilePool({
-    scrollContainer: measuredScroll,
-    contentContainer: measuredPanel,
-    overscan: OVERSCAN,
-    mount: (idx, el, place) => {
-      el.className = 'vtile pending'
-      el.style.left = `${place.x}px`
-      el.style.top = `${place.y}px`
-      el.style.width = `${place.width}px`
-      el.style.height = `${place.height}px`
-      mountedTiles.set(idx, el)
-      // Only attach the image if probing is done; otherwise the tile
-      // sits as a skeleton until phase 2 flips renderPhase.
-      if (renderPhase) attachImage(idx, el)
-    },
-    unmount: (idx, el) => {
-      const img = el.querySelector('img')
-      if (img !== null) img.src = ''
-      el.innerHTML = ''
-      el.className = 'vtile pending'
-      mountedTiles.delete(idx)
-    },
-  })
-  activeMeasuredPool = pool
-
-  // rAF-batched render. All the DOM writes that used to fire per
-  // probe-resolve now coalesce into one pass per frame. With up to
-  // 20 concurrent probes per frame this trims 20× redundant layout
-  // reads inside pool.setPlacements and 20× stat-row innerHTML ops
-  // down to a single pass.
-  let renderPending = false
-  function scheduleRender(): void {
-    if (renderPending) return
-    renderPending = true
-    requestAnimationFrame(() => {
-      renderPending = false
-      render()
-    })
-  }
-  function render(): void {
-    measuredPanel.style.height = `${packer.totalHeight()}px`
-    pool.setPlacements(placements)
-    setRowValue(measuredStats, 1, `<b>${fmtCount(pool.activeCount)}</b>`)
-    setRowValue(measuredStats, 2, `<b>${fmtCount(dimsProbed)} / ${fmtCount(urls.length)}</b>`)
-    if (firstPlacedMs !== null) {
-      setRowValue(measuredStats, 3, `<b>${fmtMs(firstPlacedMs)}</b>`)
-    }
-  }
-
-  // Fire every prepare(dimsOnly) through the queue. concurrency: 20
-  // is the H2 sweet spot; on H1 the browser's 6-slot cap gatekeeps
-  // automatically with no penalty. Each prepare reads ~4KB of header
-  // bytes and aborts — for 10k tiles at 4KB each that's ~40MB vs.
-  // hundreds of MB for full-body fetches.
   const queue = new PrepareQueue({ concurrency: getConcurrency() })
   const strategy = getStrategy()
+  const trackedQueue = {
+    enqueue(src: string, options?: Parameters<PrepareQueue['enqueue']>[1]) {
+      return queue.enqueue(src, options).then((prepared) => {
+        dimsProbed++
+        setRowValue(measuredStats, 2, `<b>${fmtCount(dimsProbed)} / ${fmtCount(urls.length)}</b>`)
+        return prepared
+      })
+    },
+    boostMany(srcs: readonly string[]) {
+      queue.boostMany(srcs)
+    },
+  }
 
-  const placePromises = urls.map((url) =>
-    queue.enqueue(url, { dimsOnly: true, strategy }).then((prepared) => {
-      const aspect = prepared.aspectRatio
-      placements.push(packer.add(aspect))
-      indexUrl.push(url)
-      dimsProbed++
-      if (firstPlacedMs === null) firstPlacedMs = performance.now() - t0
-      scheduleRender()
-    }),
-  )
-
-  // First-screen prioritization: ask layout-algebra how many leading
-  // tiles will land in the first viewport under our columns/gap/width
-  // config, then boost just those URLs to the front of the queue so
-  // they probe before the below-fold backlog. The probe-per-tile cost
-  // is the same, but the tiles you're actually looking at land first.
   const firstK = estimateFirstScreenCount({
     mode: 'columns',
     panelWidth: measuredPanel.getBoundingClientRect().width,
@@ -300,23 +257,71 @@ async function runMeasured(): Promise<void> {
     gap: GAP,
     columns: COLUMNS,
   })
-  queue.boostMany(urls.slice(0, firstK))
 
-  await Promise.all(placePromises)
+  const phaseTimes: Partial<Record<GalleryPhase, number>> = {}
+  const gallery = loadGallery({
+    urls,
+    scrollContainer: measuredScroll,
+    contentContainer: measuredPanel,
+    packer,
+    pattern: loadingPattern,
+    overscan: OVERSCAN,
+    probe: {
+      queue: trackedQueue,
+      options: { dimsOnly: true, strategy },
+      boostFirstScreen: firstK,
+    },
+    aspects,
+    renderConcurrency: 8,
+    renderSkeleton: (el, _idx, place) => {
+      el.className = 'vtile pending'
+      el.style.left = `${place.x}px`
+      el.style.top = `${place.y}px`
+      el.style.width = `${place.width}px`
+      el.style.height = `${place.height}px`
+      liveTiles++
+      reportLiveTiles()
+    },
+    renderImage: (el, _idx, url) => {
+      if (el.querySelector('img') !== null) return
+      const img = new Image()
+      img.alt = ''
+      el.appendChild(img)
+      const onLoad = (): void => markTileLoaded(el, img)
+      img.addEventListener('load', onLoad, { once: true })
+      img.src = url
+      if (img.complete && img.naturalWidth > 0) onLoad()
+    },
+    resetTile: (el) => {
+      const img = el.querySelector('img')
+      if (img !== null) img.src = ''
+      el.innerHTML = ''
+      el.className = 'vtile pending'
+      liveTiles = Math.max(0, liveTiles - 1)
+      reportLiveTiles()
+    },
+    onPhase: (phase, elapsedMs) => {
+      phaseTimes[phase] = elapsedMs
+      if (phase === 'first-placement') {
+        setRowValue(measuredStats, 3, `<b>${fmtMs(elapsedMs)}</b>`)
+      } else if (phase === 'all-placements') {
+        setRowValue(measuredStats, 4, `<b>${fmtMs(elapsedMs)}</b>`)
+      }
+    },
+  })
+  activeMeasuredGallery = gallery
 
-  // Phase 2: probing is done, all skeletons are placed. Flip the
-  // flag and attach images to every currently-mounted tile. Future
-  // scroll-triggered mounts will attach images immediately via the
-  // same code path in the mount callback.
-  renderPhase = true
-  for (const [idx, el] of mountedTiles) attachImage(idx, el)
+  if (loadingPattern === 'manifest-hydrated') {
+    setRowValue(measuredStats, 2, '<b>manifest</b>')
+  }
 
-  // Final render — inline, not rAF, because we're reporting the
-  // terminal state and a possibly-still-pending scheduled rAF would
-  // race with the stat writes below.
-  render()
-  const allPlacedMs = performance.now() - t0
-  setRowValue(measuredStats, 4, `<b>${fmtMs(allPlacedMs)}</b>`)
+  await gallery.done
+  if (phaseTimes['first-placement'] === undefined) {
+    setRowValue(measuredStats, 3, `<b>${fmtMs(performance.now() - t0)}</b>`)
+  }
+  if (phaseTimes['all-placements'] === undefined) {
+    setRowValue(measuredStats, 4, `<b>${fmtMs(performance.now() - t0)}</b>`)
+  }
 
   // Give the first paint of in-viewport tiles a beat to settle, then
   // snapshot bytes. Byte count here is probes + whatever full fetches
@@ -324,7 +329,7 @@ async function runMeasured(): Promise<void> {
   await new Promise((r) => setTimeout(r, 500))
   setRowValue(measuredStats, 5, `<b>${fmtBytes(bytesMeter.stop())}</b>`)
 
-  setMeta(`${fmtCount(count)} tiles · measured done · scroll to load more tiles`)
+  setMeta(`${fmtCount(count)} tiles · measured done · ${loadingPattern} · scroll to load more tiles`)
   runMeasuredBtn.disabled = false
   runMeasuredBtn.textContent = 'Run again'
 }

@@ -53,7 +53,7 @@
   <main class="page">
     <header class="page-header">
       <h1>Loading patterns</h1>
-      <p>Runs the same gallery workload under each named loading pattern and times the phase milestones. <code>streamed</code> fires image fetches per probe resolve; <code>skeleton-first</code> finishes probing before any image fetches; <code>manifest-hydrated</code> skips probing entirely via provided aspect ratios; <code>throttled</code> caps parallel image fetches while probes run at full tilt. All four drive the same virtual tile pool.</p>
+      <p>Runs the same gallery workload under each named loading pattern and times the phase milestones. <code>streamed</code> fires image fetches per probe resolve; <code>skeleton-first</code> finishes probing before any image fetches; <code>manifest-hydrated</code> skips probing entirely via provided aspect ratios; <code>throttled</code> caps parallel image fetches while probes run at full tilt; <code>viewport-first</code> gets first-screen skeletons in place, then current-viewport images, then throttled mounted work. All five drive the same virtual tile pool.</p>
     </header>
 
     <div class="bench-controls">
@@ -63,7 +63,8 @@
       <label>Pattern</label>
       <div class="pattern-row">
         <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="pattern" value="streamed" /> streamed</label>
-        <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="pattern" value="skeleton-first" checked /> skeleton-first</label>
+        <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="pattern" value="viewport-first" checked /> viewport-first</label>
+        <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="pattern" value="skeleton-first" /> skeleton-first</label>
         <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="pattern" value="manifest-hydrated" /> manifest-hydrated</label>
         <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="pattern" value="throttled" /> throttled (render cap 8)</label>
       </div>
