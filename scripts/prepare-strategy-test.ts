@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 import {
   clearCache,
   clearOriginStrategyCache,
+  disposePreparedImage,
   prepare,
 } from '../packages/preimage/src/index.ts'
 
@@ -115,6 +116,26 @@ type HeaderFetchStub = {
   tailSent: boolean
   rangeHeader: string | null
   restore: () => void
+}
+
+type FetchCountStub = {
+  count: number
+  restore: () => void
+}
+
+function installCountingFetch(response: () => Response): FetchCountStub {
+  const originalFetch = globalThis.fetch
+  const stub: FetchCountStub = {
+    count: 0,
+    restore: () => {
+      globalThis.fetch = originalFetch
+    },
+  }
+  globalThis.fetch = (() => {
+    stub.count++
+    return Promise.resolve(response())
+  }) as typeof fetch
+  return stub
 }
 
 function headerValue(headers: HeadersInit | undefined, name: string): string | null {
@@ -252,6 +273,131 @@ async function caseBlobExifOrientation(): Promise<void> {
   }
 }
 
+async function caseDisposeBlobPreparedImage(): Promise<void> {
+  clearCache()
+  const urlApi = URL as unknown as {
+    createObjectURL: (blob: Blob) => string
+    revokeObjectURL: (url: string) => void
+  }
+  const originalCreateObjectUrl = urlApi.createObjectURL
+  const originalRevokeObjectUrl = urlApi.revokeObjectURL
+  const revoked: string[] = []
+  urlApi.createObjectURL = () => 'blob:preimage-test'
+  urlApi.revokeObjectURL = (url: string) => {
+    revoked.push(url)
+  }
+  try {
+    const prepared = await prepare(new Blob([buildPng(20, 10)], { type: 'image/png' }))
+    disposePreparedImage(prepared)
+    disposePreparedImage(prepared)
+    if (prepared.measurement.blobUrl !== undefined) {
+      fail('dispose-blob/blobUrl', `still set to ${prepared.measurement.blobUrl}`)
+    } else if (JSON.stringify(revoked) !== JSON.stringify(['blob:preimage-test'])) {
+      fail('dispose-blob/revoke', `got ${JSON.stringify(revoked)}`)
+    } else {
+      pass('dispose-blob')
+    }
+  } finally {
+    urlApi.createObjectURL = originalCreateObjectUrl
+    urlApi.revokeObjectURL = originalRevokeObjectUrl
+  }
+}
+
+async function caseImgAbortRejects(): Promise<void> {
+  clearCache()
+  const g = globalThis as typeof globalThis & {
+    Image?: unknown
+    HTMLImageElement?: unknown
+  }
+  const originalImage = g.Image
+  const originalHtmlImageElement = g.HTMLImageElement
+  class FakeImage {
+    naturalWidth = 0
+    naturalHeight = 0
+    complete = false
+    decoding = ''
+    src = ''
+    private readonly listeners = new Map<string, Set<() => void>>()
+    addEventListener(type: string, cb: () => void): void {
+      const set = this.listeners.get(type) ?? new Set<() => void>()
+      set.add(cb)
+      this.listeners.set(type, set)
+    }
+    removeEventListener(type: string, cb: () => void): void {
+      this.listeners.get(type)?.delete(cb)
+    }
+  }
+  g.Image = FakeImage
+  g.HTMLImageElement = FakeImage
+  const controller = new AbortController()
+  try {
+    const promise = prepare('https://img-abort.example/photo.jpg', {
+      strategy: 'img',
+      signal: controller.signal,
+    })
+    controller.abort(new DOMException('Aborted', 'AbortError'))
+    const result = await Promise.race([
+      promise.then(
+        () => 'resolved',
+        (err) => (err instanceof DOMException ? err.name : err instanceof Error ? err.name : String(err)),
+      ),
+      new Promise<string>((resolve) => setTimeout(() => resolve('timeout'), 50)),
+    ])
+    if (result !== 'AbortError') fail('img-abort/rejects', `got ${result}`)
+    else pass('img-abort/rejects')
+  } finally {
+    g.Image = originalImage
+    g.HTMLImageElement = originalHtmlImageElement
+  }
+}
+
+async function caseInvalidRangeOptions(): Promise<void> {
+  clearCache()
+  clearOriginStrategyCache()
+  const noFetch = installCountingFetch(() => new Response(new Uint8Array(), { status: 206 }))
+  try {
+    let threw = false
+    try {
+      await prepare('https://range-invalid.example/photo.png?case=zero', {
+        dimsOnly: true,
+        strategy: 'range',
+        rangeBytes: 0,
+      })
+    } catch (err) {
+      threw = err instanceof RangeError
+    }
+    if (!threw) fail('range-options/rangeBytes-zero', 'did not throw RangeError')
+    else if (noFetch.count !== 0) fail('range-options/rangeBytes-zero-fetch', `fetch count ${noFetch.count}`)
+    else pass('range-options/rangeBytes-zero')
+  } finally {
+    noFetch.restore()
+  }
+
+  const badRetry = installCountingFetch(
+    () => new Response(new Uint8Array([1, 2, 3]), {
+      status: 206,
+      headers: { 'content-range': 'bytes 0-2/100' },
+    }),
+  )
+  try {
+    let threw = false
+    try {
+      await prepare('https://range-invalid.example/photo.png?case=retry', {
+        dimsOnly: true,
+        strategy: 'range',
+        rangeRetryBytes: -1,
+      })
+    } catch (err) {
+      threw = err instanceof RangeError
+    }
+    if (!threw) fail('range-options/rangeRetry-negative', 'did not throw RangeError')
+    else if (badRetry.count !== 1) fail('range-options/rangeRetry-fetch-count', `fetch count ${badRetry.count}`)
+    else pass('range-options/rangeRetry-negative')
+  } finally {
+    badRetry.restore()
+  }
+}
+
 // --- Main ---
 
 async function main(): Promise<void> {
@@ -259,6 +405,9 @@ async function main(): Promise<void> {
   await caseStreamAbortsAfterDims()
   await caseRangeFallbackAbortsAfterDims()
   await caseBlobExifOrientation()
+  await caseDisposeBlobPreparedImage()
+  await caseImgAbortRejects()
+  await caseInvalidRangeOptions()
   const wallMs = performance.now() - t0
 
   const total = results.length

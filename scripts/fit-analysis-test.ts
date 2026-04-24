@@ -10,10 +10,13 @@ import { fileURLToPath } from 'node:url'
 
 import { fitRect, type ObjectFit } from '../packages/preimage/src/fit.ts'
 import {
+  analyzeImage,
   detectImageFormat,
   detectSourceKind,
+  getCachedAnalysis,
   normalizeSrc,
 } from '../packages/preimage/src/analysis.ts'
+import { clearMeasurementCaches, recordKnownMeasurement } from '../packages/preimage/src/measurement.ts'
 
 type Check =
   | { ok: true; case: string; notes?: string }
@@ -237,6 +240,43 @@ function checkNormalizeSrc(): void {
   }
 }
 
+function checkMalformedQuery(): void {
+  const bad = '/photo.jpg?w=%E0%A4%A&h=200'
+  try {
+    const analysis = analyzeImage(bad)
+    if (analysis.declaredWidth !== null || analysis.declaredHeight !== 200) {
+      fail('analysis/malformed-query', `unexpected declared dims ${analysis.declaredWidth}x${analysis.declaredHeight}`)
+    } else {
+      pass('analysis/malformed-query')
+    }
+  } catch (err) {
+    fail('analysis/malformed-query-throws', err instanceof Error ? err.message : String(err))
+  }
+
+  try {
+    const cached = getCachedAnalysis('/cached.jpg?w=%E0%A4%A&h=240')
+    if (cached.declaredWidth !== null || cached.declaredHeight !== 240) {
+      fail('analysis/malformed-query-cache', `unexpected declared dims ${cached.declaredWidth}x${cached.declaredHeight}`)
+    } else {
+      pass('analysis/malformed-query-cache')
+    }
+  } catch (err) {
+    fail('analysis/malformed-query-cache-throws', err instanceof Error ? err.message : String(err))
+  }
+
+  clearMeasurementCaches()
+  try {
+    const m = recordKnownMeasurement('/known.jpg?w=%E0%A4%A&h=320', 100, 50)
+    if (m.displayWidth !== 100 || m.displayHeight !== 50) {
+      fail('analysis/malformed-query-record', `unexpected measurement ${m.displayWidth}x${m.displayHeight}`)
+    } else {
+      pass('analysis/malformed-query-record')
+    }
+  } catch (err) {
+    fail('analysis/malformed-query-record-throws', err instanceof Error ? err.message : String(err))
+  }
+}
+
 // --- Main ---
 
 async function main(): Promise<void> {
@@ -245,6 +285,7 @@ async function main(): Promise<void> {
   checkDetectImageFormat()
   checkDetectSourceKind()
   checkNormalizeSrc()
+  checkMalformedQuery()
   const wallMs = performance.now() - t0
 
   const total = results.length

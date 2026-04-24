@@ -100,7 +100,19 @@ async function caseDedup(): Promise<void> {
     } else {
       pass('dedup/pending-count')
     }
-    void p1; void p2; void p3
+
+    const p4 = queue.enqueue('/a.png', { strategy: 'stream', dimsOnly: true })
+    if (p4 === p1) {
+      fail('dedup/different-options', 'same URL with different options returned same promise')
+    } else {
+      pass('dedup/different-options')
+    }
+    if (queue.pendingCount !== 2) {
+      fail('dedup/different-options-pending', `expected 2, got ${queue.pendingCount}`)
+    } else {
+      pass('dedup/different-options-pending')
+    }
+    void p1; void p2; void p3; void p4
   } finally {
     stub.restore()
   }

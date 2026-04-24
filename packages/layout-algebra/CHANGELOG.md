@@ -3,6 +3,7 @@
 ## 0.5.0
 
 - **New: `estimateFirstScreenCount({ mode, panelWidth, viewportHeight, gap, ... })`.** Pure-math estimate of how many leading items will land on the first viewport before any aspects are known. `columns` mode assumes roughly-square tiles (`tileHeight ≈ panelWidth / columns`); `rows` mode uses `targetRowHeight` plus `round(panelWidth / targetRowHeight)` items per row. Returns a count, not indices — caller slices their URL array and feeds the slice into `PrepareQueue.boostMany` so those probes jump the queue ahead of the below-fold backlog. Rough by design (no aspects = no exact pack); the whole point is pre-measurement prioritization.
+- **Config validation is stricter at the layout boundary.** `shortestColumnCursor()` now rejects fractional/zero columns, non-positive panel widths, negative gaps, and impossible column widths. `estimateFirstScreenCount()` rejects non-positive panel/viewport/target sizes, fractional columns, and negative gaps before those values can turn into bogus queue priorities.
 
 ## 0.4.0
 

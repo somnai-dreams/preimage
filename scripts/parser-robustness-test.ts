@@ -188,6 +188,10 @@ function runSyntheticEdgeCases(): void {
     format: 'bmp',
   })
 
+  // ICO.
+  expectDims('ico-valid', buildIco(32, 48), { width: 32, height: 48, format: 'ico' })
+  expectDims('ico-256-sentinel', buildIco(256, 256), { width: 256, height: 256, format: 'ico' })
+
   // WebP variants.
   expectDims(
     'webp-vp8-lossy',
@@ -456,6 +460,15 @@ function buildBmp(width: number, height: number): Uint8Array {
     u32le(0), // clrImportant
   )
   return concat(fileHeader, infoHeader)
+}
+
+function buildIco(width: number, height: number): Uint8Array {
+  return new Uint8Array([
+    0, 0, 1, 0, 1, 0,
+    width === 256 ? 0 : width,
+    height === 256 ? 0 : height,
+    0, 0, 1, 0, 32, 0, 0, 0, 0, 0, 22, 0, 0, 0,
+  ])
 }
 
 function buildWebpVP8(width: number, height: number): Uint8Array {

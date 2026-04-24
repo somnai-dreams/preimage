@@ -3,7 +3,7 @@ import { recordKnownMeasurement } from '@somnai-dreams/preimage/core'
 import {
   loadGallery,
   type GalleryPhase,
-  type LoadingPattern,
+  type GalleryImageLoading,
 } from '@somnai-dreams/preimage/loading'
 import {
   estimateFirstScreenCount,
@@ -35,13 +35,14 @@ const canvas = document.getElementById('canvas') as HTMLElement
 const COLUMNS = 4
 const GAP = 4
 
-type PatternParams = {
+type LoadingRunParams = {
   n: number
-  pattern: LoadingPattern
+  imageLoading: GalleryImageLoading
+  knownAspects: boolean
   concurrency: number
 }
 
-type PatternResults = {
+type LoadingRunResults = {
   firstPlacementMs: number | null
   allPlacementsMs: number | null
   firstImageMs: number | null
@@ -52,7 +53,7 @@ type PatternResults = {
   activeTilesAtDone: number
 }
 
-let lastRun: { meta: RunMetadata; params: PatternParams; results: PatternResults } | null = null
+let lastRun: { meta: RunMetadata; params: LoadingRunParams; results: LoadingRunResults } | null = null
 let activeGallery: ReturnType<typeof loadGallery> | null = null
 
 runBtn.addEventListener('click', () => { void run() })
@@ -78,8 +79,9 @@ async function run(): Promise<void> {
 
   const n = Number(nInput.value)
   const concurrency = Number(concInput.value)
-  const patternEl = document.querySelector<HTMLInputElement>('input[name="pattern"]:checked')
-  const pattern = (patternEl?.value ?? 'viewport-first') as LoadingPattern
+  const imageLoadingEl = document.querySelector<HTMLInputElement>('input[name="imageLoading"]:checked')
+  const imageLoading = (imageLoadingEl?.value ?? 'visible-first') as GalleryImageLoading
+  const knownAspects = (document.getElementById('knownAspects') as HTMLInputElement).checked
 
   const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const urls = cycledUrls(n, token)
@@ -107,11 +109,11 @@ async function run(): Promise<void> {
 
   const phaseTimes: Partial<Record<GalleryPhase, number>> = {}
 
-  // For manifest-hydrated, precompute aspects from the local manifest
-  // so the pattern has the dims ahead of time. For everything else
-  // aspects is undefined and the pattern runs the probe queue.
+  // Known aspects are independent from image scheduling. When this
+  // is on, layout can commit from local manifest dimensions and the
+  // selected imageLoading mode only controls visible image fetches.
   let aspects: number[] | undefined = undefined
-  if (pattern === 'manifest-hydrated') {
+  if (knownAspects) {
     const manifest = photosManifest()
     const manifestEntries = Object.entries(manifest)
     aspects = urls.map((_url, i) => {
@@ -127,8 +129,8 @@ async function run(): Promise<void> {
     }
   }
 
-  // First-screen prioritization parameter — the patterns that run a
-  // probe queue feed this into boostMany.
+  // First-screen prioritization parameter. Modes that run a probe
+  // queue feed this into boostMany.
   const firstK = estimateFirstScreenCount({
     mode: 'columns',
     panelWidth,
@@ -146,7 +148,7 @@ async function run(): Promise<void> {
     scrollContainer: scrollBox,
     contentContainer: canvas,
     packer,
-    pattern,
+    imageLoading,
     overscan: 400,
     probe: {
       queue,
@@ -190,7 +192,7 @@ async function run(): Promise<void> {
   observer.disconnect()
 
   const activeTilesAtDone = gallery.pool.activeCount
-  const results: PatternResults = {
+  const results: LoadingRunResults = {
     firstPlacementMs: phaseTimes['first-placement'] ?? null,
     allPlacementsMs: phaseTimes['all-placements'] ?? null,
     firstImageMs,
@@ -205,7 +207,7 @@ async function run(): Promise<void> {
     'loading-pattern',
     new URL('../assets/preimage-symbol.svg', location.href).href,
   )
-  const params: PatternParams = { n, pattern, concurrency }
+  const params: LoadingRunParams = { n, imageLoading, knownAspects, concurrency }
   lastRun = { meta, params, results }
 
   renderStats(results)
@@ -216,7 +218,8 @@ async function run(): Promise<void> {
 
   const labelBit = meta.network.label !== null ? ` · ${meta.network.label}` : ''
   const rttBit = meta.network.warmupRttMs !== null ? ` · rtt ${meta.network.warmupRttMs.toFixed(0)}ms` : ''
-  metaEl.textContent = `${pattern} · n=${n} · c=${concurrency} · ${meta.protocol ?? '?'}${rttBit}${labelBit} · ${new Date(meta.date).toLocaleTimeString()}`
+  const aspectBit = knownAspects ? 'known aspects' : 'probed aspects'
+  metaEl.textContent = `${imageLoading} · ${aspectBit} · n=${n} · c=${concurrency} · ${meta.protocol ?? '?'}${rttBit}${labelBit} · ${new Date(meta.date).toLocaleTimeString()}`
   runBtn.disabled = false
   runBtn.textContent = 'Run again'
   saveBtn.disabled = false
@@ -226,7 +229,7 @@ async function run(): Promise<void> {
   void gallery
 }
 
-function renderStats(r: PatternResults): void {
+function renderStats(r: LoadingRunResults): void {
   const grid = document.createElement('div')
   grid.className = 'stat-grid'
   const add = (label: string, value: string, unit = ''): void => {
@@ -245,7 +248,7 @@ function renderStats(r: PatternResults): void {
   add('First placement', r.firstPlacementMs !== null ? r.firstPlacementMs.toFixed(0) : '—', 'ms')
   add('All placements', r.allPlacementsMs !== null ? r.allPlacementsMs.toFixed(0) : '—', 'ms')
   add('First image', r.firstImageMs !== null ? r.firstImageMs.toFixed(0) : '—', 'ms')
-  add('Pattern done', r.doneMs !== null ? r.doneMs.toFixed(0) : '—', 'ms')
+  add('Done', r.doneMs !== null ? r.doneMs.toFixed(0) : '—', 'ms')
   add('Bytes transferred', fmtBytes(r.bytesTransferred))
   add('Bytes / tile', fmtBytes(r.bytesTransferred / Math.max(1, r.resolved)))
   add('Active tiles at done', String(r.activeTilesAtDone))

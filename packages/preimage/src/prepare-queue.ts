@@ -11,14 +11,11 @@
 // lets callers reorder pending work: `boost(url)` moves a URL to the
 // front so a scroll-into-view trigger actually jumps the line.
 //
-// The default concurrency is 50 — suited to HTTP/2 origins (most modern
-// CDNs, GitHub Pages, Cloudflare, Vercel, Netlify), which typically
-// advertise SETTINGS_MAX_CONCURRENT_STREAMS of 100. On HTTP/1.1 origins
-// the browser's 6-slot cap gatekeeps automatically: we'd fire 50, the
-// browser accepts all into its network layer, runs 6 in parallel, queues
-// the rest. Same effective throughput as passing concurrency: 6, no
-// penalty. Set a lower value if you know you're on H1 and want to stop
-// blocking the render side's fetches behind 44 pending probes.
+// The default concurrency is adaptive: 50 for ordinary connections (the
+// HTTP/2 sweet spot) and 6 for save-data / slow cellular hints. On
+// HTTP/1.1 origins the browser's own 6-slot cap still gatekeeps; pass a
+// lower explicit value when you want probes to leave room for render-side
+// fetches.
 //
 //   const queue = new PrepareQueue({ concurrency: 50 })
 //   const p1 = queue.enqueue(url1)
@@ -26,9 +23,10 @@
 //   // ... user scrolls to url50 ...
 //   queue.boost(url50)
 //
-// Duplicate enqueues for the same URL share a single in-flight prepare,
-// so calling `enqueue(url)` is idempotent and cheap. `clear()` drops the
-// pending backlog but does not abort work that's already started.
+// Duplicate enqueues for the same URL and equivalent prepare options
+// share a single in-flight prepare, so repeated `enqueue(url, options)`
+// calls are idempotent and cheap. `clear()` drops the pending backlog
+// but does not abort work that's already started.
 
 import { prepare, type PreparedImage, type PrepareOptions } from './prepare.js'
 import { normalizeSrc } from './analysis.js'
@@ -60,11 +58,49 @@ export function pickAdaptiveConcurrency(): number {
 
 type PendingEntry = {
   key: string
+  srcKey: string
   src: string
   options: PrepareOptions
   promise: Promise<PreparedImage>
   resolve: (value: PreparedImage) => void
   reject: (err: unknown) => void
+}
+
+let nextSignalId = 1
+const signalIds = new WeakMap<AbortSignal, number>()
+
+function signalKey(signal: AbortSignal | undefined): number | null {
+  if (signal === undefined) return null
+  let id = signalIds.get(signal)
+  if (id === undefined) {
+    id = nextSignalId++
+    signalIds.set(signal, id)
+  }
+  return id
+}
+
+function sortedRangeBytesByFormat(options: PrepareOptions): Array<[string, number]> | null {
+  const map = options.rangeBytesByFormat
+  if (map === undefined) return null
+  return Object.entries(map)
+    .filter((entry): entry is [string, number] => entry[1] !== undefined)
+    .sort(([a], [b]) => a.localeCompare(b))
+}
+
+function prepareKey(src: string, options: PrepareOptions): { key: string; srcKey: string } {
+  const srcKey = normalizeSrc(src)
+  const optionKey = JSON.stringify({
+    crossOrigin: options.crossOrigin ?? null,
+    dimsOnly: options.dimsOnly ?? null,
+    fallbackToImgOnFetchError: options.fallbackToImgOnFetchError ?? null,
+    orientation: options.orientation ?? null,
+    rangeBytes: options.rangeBytes ?? null,
+    rangeBytesByFormat: sortedRangeBytesByFormat(options),
+    rangeRetryBytes: options.rangeRetryBytes ?? null,
+    signal: signalKey(options.signal),
+    strategy: options.strategy ?? null,
+  })
+  return { key: `${srcKey}\u0000${optionKey}`, srcKey }
 }
 
 export class PrepareQueue {
@@ -86,9 +122,9 @@ export class PrepareQueue {
   }
 
   // Enqueue a prepare. Returns a shared promise — calling `enqueue` twice
-  // for the same URL reuses the in-flight work.
+  // for the same URL with equivalent options reuses the in-flight work.
   enqueue(src: string, options: PrepareOptions = {}): Promise<PreparedImage> {
-    const key = normalizeSrc(src)
+    const { key, srcKey } = prepareKey(src, options)
     const existingInflight = this.inflight.get(key)
     if (existingInflight !== undefined) return existingInflight
     const existingPending = this.pendingByKey.get(key)
@@ -103,6 +139,7 @@ export class PrepareQueue {
 
     const entry: PendingEntry = {
       key,
+      srcKey,
       src,
       options,
       promise,
@@ -118,11 +155,11 @@ export class PrepareQueue {
   // Move a URL to the front of the pending queue. If it's already
   // in-flight or complete, this is a no-op.
   boost(src: string): boolean {
-    const key = normalizeSrc(src)
-    const entry = this.pendingByKey.get(key)
-    if (entry === undefined) return false
-    const idx = this.pending.indexOf(entry)
+    const srcKey = normalizeSrc(src)
+    const idx = this.pending.findIndex((entry) => entry.srcKey === srcKey)
+    if (idx < 0) return false
     if (idx <= 0) return idx === 0
+    const entry = this.pending[idx]!
     this.pending.splice(idx, 1)
     this.pending.unshift(entry)
     return true
@@ -140,18 +177,20 @@ export class PrepareQueue {
     const keys = new Set(srcs.map(normalizeSrc))
     // Pull every matching entry out of its current position while
     // preserving caller-supplied order at the front.
-    const matched = new Map<string, PendingEntry>()
+    const matched = new Map<string, PendingEntry[]>()
     for (let i = this.pending.length - 1; i >= 0; i--) {
       const entry = this.pending[i]!
-      if (keys.has(entry.key)) {
-        matched.set(entry.key, entry)
+      if (keys.has(entry.srcKey)) {
+        const list = matched.get(entry.srcKey) ?? []
+        list.unshift(entry)
+        matched.set(entry.srcKey, list)
         this.pending.splice(i, 1)
       }
     }
     const front: PendingEntry[] = []
     for (const src of srcs) {
-      const entry = matched.get(normalizeSrc(src))
-      if (entry !== undefined) front.push(entry)
+      const entries = matched.get(normalizeSrc(src))
+      if (entries !== undefined) front.push(...entries)
     }
     this.pending.unshift(...front)
   }
@@ -165,7 +204,7 @@ export class PrepareQueue {
     const moved: PendingEntry[] = []
     for (let i = this.pending.length - 1; i >= 0; i--) {
       const entry = this.pending[i]!
-      if (keys.has(entry.key)) {
+      if (keys.has(entry.srcKey)) {
         moved.unshift(entry) // preserve original relative order
         this.pending.splice(i, 1)
       }

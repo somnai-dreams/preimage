@@ -11,6 +11,7 @@ export {
   measureNaturalSize,
   getMeasurement,
   getElement,
+  disposePreparedImage,
   preparedFromMeasurement,
   getOriginStrategy,
   clearOriginStrategyCache,

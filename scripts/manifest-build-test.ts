@@ -100,6 +100,56 @@ function buildLargeHeaderJpeg(width: number, height: number, appBytes: number): 
   return out
 }
 
+function u32be(n: number): Uint8Array {
+  return new Uint8Array([
+    (n >>> 24) & 0xff,
+    (n >>> 16) & 0xff,
+    (n >>> 8) & 0xff,
+    n & 0xff,
+  ])
+}
+
+function ascii(s: string): Uint8Array {
+  return new TextEncoder().encode(s)
+}
+
+function buildIsobmff(brand: 'avif' | 'heic', width: number, height: number): Uint8Array {
+  const ftyp = concatBytes(
+    u32be(20),
+    ascii('ftyp'),
+    ascii(brand),
+    u32be(0),
+    ascii(brand),
+  )
+  const ispe = concatBytes(
+    u32be(20),
+    ascii('ispe'),
+    u32be(0),
+    u32be(width),
+    u32be(height),
+  )
+  return concatBytes(ftyp, ispe)
+}
+
+function buildIco(width: number, height: number): Uint8Array {
+  return new Uint8Array([
+    0, 0, 1, 0, 1, 0,
+    width === 256 ? 0 : width,
+    height === 256 ? 0 : height,
+    0, 0, 1, 0, 32, 0, 0, 0, 0, 0, 22, 0, 0, 0,
+  ])
+}
+
+function concatBytes(...parts: Uint8Array[]): Uint8Array {
+  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.byteLength, 0))
+  let offset = 0
+  for (const part of parts) {
+    out.set(part, offset)
+    offset += part.byteLength
+  }
+  return out
+}
+
 // --- Test utilities ---
 
 async function setupTempDir(prefix: string): Promise<string> {
@@ -310,6 +360,37 @@ async function caseLargeHeaderJpeg(): Promise<void> {
   }
 }
 
+async function caseDefaultModernExtensions(): Promise<void> {
+  const dir = await setupTempDir('modern-ext')
+  try {
+    await writeImage(dir, 'image.avif', buildIsobmff('avif', 111, 222))
+    await writeImage(dir, 'image.heic', buildIsobmff('heic', 333, 444))
+    await writeImage(dir, 'image.heif', buildIsobmff('heic', 555, 666))
+    await writeImage(dir, 'animated.apng', buildPng(77, 88))
+    await writeImage(dir, 'icon.ico', buildIco(32, 48))
+    const m = await buildManifest({ root: dir, onSkip: () => {} })
+    const expected: Record<string, { width: number; height: number }> = {
+      'image.avif': { width: 111, height: 222 },
+      'image.heic': { width: 333, height: 444 },
+      'image.heif': { width: 555, height: 666 },
+      'animated.apng': { width: 77, height: 88 },
+      'icon.ico': { width: 32, height: 48 },
+    }
+    for (const [key, dims] of Object.entries(expected)) {
+      const entry = m[key]
+      if (entry === undefined) {
+        fail(`modern-ext/${key}`, `missing from manifest: ${JSON.stringify(Object.keys(m).sort())}`)
+      } else if (entry.width !== dims.width || entry.height !== dims.height) {
+        fail(`modern-ext/${key}`, `got ${entry.width}x${entry.height}`)
+      } else {
+        pass(`modern-ext/${key}`)
+      }
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}
+
 async function casePerfLargeDir(): Promise<{ wallMs: number; count: number }> {
   const dir = await setupTempDir('perf')
   try {
@@ -347,6 +428,7 @@ async function main(): Promise<void> {
   await caseCustomExtensions()
   await caseCorruptImageSkipped()
   await caseLargeHeaderJpeg()
+  await caseDefaultModernExtensions()
   const perf = await casePerfLargeDir()
   const wallMs = performance.now() - t0
 

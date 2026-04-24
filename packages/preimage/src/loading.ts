@@ -1,42 +1,12 @@
-// Gallery loading patterns. Wraps the probe + pool + packer dance
-// with a named pattern knob so callers (and benches) can swap the
-// sequencing without rewriting the orchestration each time.
+// Gallery image loading helper. Wraps the probe + pool + packer dance
+// while keeping the public API around two separate facts:
 //
-// Five patterns ship in v1; add new ones by branching `loadGallery`:
+//   aspects       Caller already knows dimensions for each URL. When
+//                 present, layout can commit without a probe phase.
 //
-//   'streamed'          Mount-with-image-fetch fires per probe resolve.
-//                       User sees a growing, heterogeneous layout:
-//                       some tiles have images already, others are
-//                       skeletons. Fast to first image, jarring under
-//                       the viewport.
-//
-//   'skeleton-first'    Probes run to completion; placements appear as
-//                       skeletons progressively; image fetches start
-//                       only after every probe has resolved. Full
-//                       skeletons before any image → homogeneous
-//                       visual state while probing. Slower to first
-//                       image, calmer overall.
-//
-//   'manifest-hydrated' No probe phase. Caller provides aspects up
-//                       front (from a build-time manifest or server
-//                       headers). Placements commit synchronously,
-//                       image fetches start via the pool's mount as
-//                       tiles enter view. Fastest possible.
-//
-//   'throttled'         Probe queue (high concurrency, e.g. 50) and
-//                       render queue (low concurrency, e.g. 8) run
-//                       in parallel. Probes stay ahead because
-//                       their queue isn't bandwidth-bound by full
-//                       image fetches. Middle ground between
-//                       streamed and skeleton-first.
-//
-//   'viewport-first'    UX-focused sequence: first-screen probes get
-//                       placed as skeletons in URL order, then the
-//                       current viewport's images jump the render
-//                       queue, then the rest of the mounted/overscan
-//                       images trickle through the same throttled
-//                       render queue. Scroll events keep promoting
-//                       newly visible mounted tiles.
+//   imageLoading  When mounted tiles should start their visible image
+//                 requests: visible-first, immediate, after-layout, or
+//                 queued.
 //
 // The orchestrator owns the pool; callers pass container elements
 // plus two small renderers (`renderSkeleton`, `renderImage`) and get
@@ -60,12 +30,18 @@ type PrepareQueueLike = {
   boostMany(srcs: readonly string[]): void
 }
 
-export type LoadingPattern =
-  | 'streamed'
-  | 'skeleton-first'
-  | 'manifest-hydrated'
-  | 'throttled'
-  | 'viewport-first'
+export type GalleryImageLoading =
+  /** Prioritize current viewport images, then let mounted/overscan
+   *  images continue through the same bounded render queue. */
+  | 'visible-first'
+  /** Start an image request as soon as a tile mounts. */
+  | 'immediate'
+  /** Place the skeleton layout first; start visible image requests
+   *  only after every placement is known. */
+  | 'after-layout'
+  /** Place skeletons as dimensions arrive, but send mounted images
+   *  through a bounded FIFO render queue. */
+  | 'queued'
 
 export type GalleryPhase =
   | 'start'
@@ -74,11 +50,8 @@ export type GalleryPhase =
   | 'first-image'
   | 'done'
 
-/** Pure-math packer cursor. Matches the shape of
- *  `shortestColumnCursor` / `justifiedRowCursor` from layout-algebra;
- *  callers pass whichever they like. For justifiedRows the `add` call
- *  may return multiple placements on row-close; the orchestrator
- *  assumes one-placement-per-add today (shortestColumn semantics). */
+/** Pure-math packer cursor with shortest-column semantics: every
+ *  `add(aspect)` returns exactly one finalized placement. */
 export type PackerCursor = {
   add(aspect: number): Placement
   totalHeight(): number
@@ -93,7 +66,9 @@ export type GalleryConfig = {
   scrollContainer: HTMLElement
   contentContainer: HTMLElement
   packer: PackerCursor
-  pattern: LoadingPattern
+  /** Controls when mounted tiles start visible image requests.
+   *  Defaults to `'visible-first'`. */
+  imageLoading?: GalleryImageLoading
 
   renderSkeleton: RenderSkeleton
   renderImage: RenderImage
@@ -103,7 +78,6 @@ export type GalleryConfig = {
 
   overscan?: number | { ahead: number; behind: number }
 
-  // Probe-based patterns ('streamed', 'skeleton-first', 'throttled', 'viewport-first'):
   probe?: {
     /** If omitted, a fresh `PrepareQueue` is constructed with
      *  adaptive default concurrency. */
@@ -116,12 +90,13 @@ export type GalleryConfig = {
     boostFirstScreen?: number
   }
 
-  // Aspect ratio per URL index. Required for 'manifest-hydrated';
-  // when provided to 'viewport-first', frames can commit immediately
-  // while image fetches still follow the viewport-first sequencing.
+  // Aspect ratio per URL index. When provided, frames can commit
+  // without probing; image fetch sequencing still follows
+  // `imageLoading`.
   aspects?: readonly number[]
 
-  // 'throttled' only: concurrency of the render-phase image fetches.
+  // Used by 'visible-first' and 'queued': concurrency of the
+  // render-phase image fetches.
   renderConcurrency?: number
 
   /** Called with milestone timestamps relative to `loadGallery` start. */
@@ -137,38 +112,92 @@ export type Gallery = {
 }
 
 export function loadGallery(config: GalleryConfig): Gallery {
+  const state = createGalleryState()
   const t0 = performance.now()
   const emit = (phase: GalleryPhase): void => {
+    if (state.cancelled) return
     if (config.onPhase !== undefined) config.onPhase(phase, performance.now() - t0)
   }
   emit('start')
 
-  switch (config.pattern) {
-    case 'streamed':
-      return runStreamed(config, emit)
-    case 'skeleton-first':
-      return runSkeletonFirst(config, emit)
-    case 'manifest-hydrated':
-      return runManifestHydrated(config, emit)
-    case 'throttled':
-      return runThrottled(config, emit)
-    case 'viewport-first':
-      return runViewportFirst(config, emit)
+  const imageLoading = config.imageLoading ?? 'visible-first'
+  switch (imageLoading) {
+    case 'immediate':
+      return runImmediate(config, state, emit)
+    case 'after-layout':
+      return runAfterLayout(config, state, emit)
+    case 'queued':
+      return runQueued(config, state, emit)
+    case 'visible-first':
+      return runVisibleFirst(config, state, emit)
   }
 }
 
-// --- Pattern: streamed ---
+type GalleryState = {
+  cancelled: boolean
+  abortController: AbortController
+  cancelPromise: Promise<void>
+  cancel: () => void
+  cleanup: Array<() => void>
+}
 
-function runStreamed(config: GalleryConfig, emit: (p: GalleryPhase) => void): Gallery {
+function createGalleryState(): GalleryState {
+  let resolveCancel!: () => void
+  const state: GalleryState = {
+    cancelled: false,
+    abortController: new AbortController(),
+    cancelPromise: new Promise<void>((resolve) => {
+      resolveCancel = resolve
+    }),
+    cancel: () => {
+      if (state.cancelled) return
+      state.cancelled = true
+      state.abortController.abort(new DOMException('Gallery destroyed', 'AbortError'))
+      resolveCancel()
+    },
+    cleanup: [],
+  }
+  return state
+}
+
+function finishGallery(state: GalleryState, pool: VirtualTilePool, work: Promise<void>): Gallery {
+  const guardedWork = work.catch((err) => {
+    if (state.cancelled) return
+    throw err
+  })
+  const done = Promise.race([guardedWork, state.cancelPromise]).then(() => {})
+  return {
+    pool,
+    done,
+    destroy: () => {
+      if (state.cancelled) return
+      state.cancel()
+      for (const cleanup of state.cleanup.splice(0)) cleanup()
+      pool.destroy()
+    },
+  }
+}
+
+// --- Image loading: immediate ---
+
+function runImmediate(
+  config: GalleryConfig,
+  state: GalleryState,
+  emit: (p: GalleryPhase) => void,
+): Gallery {
+  if (config.aspects !== undefined) return runKnownAspectsImmediate(config, state, emit)
   const { urls, packer } = config
+  const readyAspects: Array<number | null> = new Array(urls.length).fill(null)
   const placements: Placement[] = []
   const indexUrl: string[] = []
   const mountedTiles = new Map<number, HTMLElement>()
   const imageLoads = new Map<number, ImageLoad>()
+  let nextPlaceIndex = 0
   let firstPlacementEmitted = false
   let firstImageEmitted = false
 
   function attachImage(idx: number, el: HTMLElement): Promise<void> | null {
+    if (state.cancelled) return null
     const url = indexUrl[idx]
     if (url === undefined) return null
     config.renderImage(el, idx, url)
@@ -182,7 +211,24 @@ function runStreamed(config: GalleryConfig, emit: (p: GalleryPhase) => void): Ga
     return load
   }
 
+  function placeReadyAspects(): void {
+    if (state.cancelled) return
+    while (nextPlaceIndex < urls.length) {
+      const aspect = readyAspects[nextPlaceIndex]
+      if (aspect === null || aspect === undefined) break
+      placements.push(packer.add(aspect))
+      indexUrl.push(urls[nextPlaceIndex]!)
+      nextPlaceIndex++
+      if (!firstPlacementEmitted) {
+        firstPlacementEmitted = true
+        emit('first-placement')
+      }
+    }
+    if (placements.length > 0) scheduleRender(config, state, placements, pool)
+  }
+
   const pool = createPool(config, (idx, el, place) => {
+    if (state.cancelled) return
     config.renderSkeleton(el, idx, place)
     mountedTiles.set(idx, el)
     attachImage(idx, el)
@@ -191,49 +237,52 @@ function runStreamed(config: GalleryConfig, emit: (p: GalleryPhase) => void): Ga
     imageLoads.delete(idx)
   })
 
-  const queue = getQueue(config)
-  const options = getProbeOptions(config)
-  const done = Promise.all(
-    urls.map((url) =>
+  const { queue, owned } = getQueue(config)
+  if (owned) clearQueueOnCancel(state, queue)
+  const options = getProbeOptions(config, state)
+  const work = Promise.all(
+    urls.map((url, index) =>
       queue.enqueue(url, options).then((prepared) => {
-        placements.push(packer.add(prepared.aspectRatio))
-        indexUrl.push(url)
-        if (!firstPlacementEmitted) {
-          firstPlacementEmitted = true
-          emit('first-placement')
-        }
-        scheduleRender(config, placements, pool)
+        if (state.cancelled) return
+        readyAspects[index] = prepared.aspectRatio
+        placeReadyAspects()
       }),
     ),
   ).then(async () => {
+    if (state.cancelled) return
+    placeReadyAspects()
     emit('all-placements')
     config.contentContainer.style.height = `${packer.totalHeight()}px`
     pool.setPlacements(placements)
     await waitForVisibleLoads(mountedTiles, imageLoads)
+    if (state.cancelled) return
     emit('done')
   })
 
   maybeBoost(queue, urls, config)
-  return {
-    pool,
-    done,
-    destroy: () => pool.destroy(),
-  }
+  return finishGallery(state, pool, work)
 }
 
-// --- Pattern: skeleton-first ---
+// --- Image loading: after-layout ---
 
-function runSkeletonFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void): Gallery {
+function runAfterLayout(
+  config: GalleryConfig,
+  state: GalleryState,
+  emit: (p: GalleryPhase) => void,
+): Gallery {
   const { urls, packer } = config
+  const readyAspects: Array<number | null> = new Array(urls.length).fill(null)
   const placements: Placement[] = []
   const indexUrl: string[] = []
   const mountedTiles = new Map<number, HTMLElement>()
   const imageLoads = new Map<number, ImageLoad>()
+  let nextPlaceIndex = 0
   let renderPhase = false
   let firstPlacementEmitted = false
   let firstImageEmitted = false
 
   function attachImage(idx: number, el: HTMLElement): Promise<void> | null {
+    if (state.cancelled) return null
     const url = indexUrl[idx]
     if (url === undefined) return null
     config.renderImage(el, idx, url)
@@ -247,7 +296,24 @@ function runSkeletonFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
     return load
   }
 
+  function placeReadyAspects(): void {
+    if (state.cancelled) return
+    while (nextPlaceIndex < urls.length) {
+      const aspect = readyAspects[nextPlaceIndex]
+      if (aspect === null || aspect === undefined) break
+      placements.push(packer.add(aspect))
+      indexUrl.push(urls[nextPlaceIndex]!)
+      nextPlaceIndex++
+      if (!firstPlacementEmitted) {
+        firstPlacementEmitted = true
+        emit('first-placement')
+      }
+    }
+    if (placements.length > 0) scheduleRender(config, state, placements, pool)
+  }
+
   const pool = createPool(config, (idx, el, place) => {
+    if (state.cancelled) return
     config.renderSkeleton(el, idx, place)
     mountedTiles.set(idx, el)
     if (renderPhase) attachImage(idx, el)
@@ -256,21 +322,9 @@ function runSkeletonFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
     imageLoads.delete(idx)
   })
 
-  const queue = getQueue(config)
-  const options = getProbeOptions(config)
-  const done = Promise.all(
-    urls.map((url) =>
-      queue.enqueue(url, options).then((prepared) => {
-        placements.push(packer.add(prepared.aspectRatio))
-        indexUrl.push(url)
-        if (!firstPlacementEmitted) {
-          firstPlacementEmitted = true
-          emit('first-placement')
-        }
-        scheduleRender(config, placements, pool)
-      }),
-    ),
-  ).then(async () => {
+  async function finishLayoutThenLoad(): Promise<void> {
+    if (state.cancelled) return
+    placeReadyAspects()
     // Final placements flush (in case any rAF hadn't fired yet) then
     // flip render phase.
     config.contentContainer.style.height = `${packer.totalHeight()}px`
@@ -283,26 +337,47 @@ function runSkeletonFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
       if (load !== null) visibleLoads.push(load)
     }
     await Promise.all(visibleLoads)
+    if (state.cancelled) return
     emit('done')
-  })
+  }
+
+  if (config.aspects !== undefined) {
+    validateAspects(config)
+    const work = (async (): Promise<void> => {
+      for (let i = 0; i < urls.length; i++) readyAspects[i] = config.aspects![i]!
+      await finishLayoutThenLoad()
+    })()
+    return finishGallery(state, pool, work)
+  }
+
+  const { queue, owned } = getQueue(config)
+  if (owned) clearQueueOnCancel(state, queue)
+  const options = getProbeOptions(config, state)
+  const work = Promise.all(
+    urls.map((url, index) =>
+      queue.enqueue(url, options).then((prepared) => {
+        if (state.cancelled) return
+        readyAspects[index] = prepared.aspectRatio
+        placeReadyAspects()
+      }),
+    ),
+  ).then(finishLayoutThenLoad)
 
   maybeBoost(queue, urls, config)
-  return {
-    pool,
-    done,
-    destroy: () => pool.destroy(),
-  }
+  return finishGallery(state, pool, work)
 }
 
-// --- Pattern: manifest-hydrated ---
+// --- Known aspects + immediate image loading ---
 
-function runManifestHydrated(config: GalleryConfig, emit: (p: GalleryPhase) => void): Gallery {
+function runKnownAspectsImmediate(
+  config: GalleryConfig,
+  state: GalleryState,
+  emit: (p: GalleryPhase) => void,
+): Gallery {
   const { urls, packer, aspects } = config
-  if (aspects === undefined || aspects.length !== urls.length) {
-    throw new Error("loadGallery: pattern 'manifest-hydrated' requires aspects[] of equal length")
-  }
+  validateAspects(config)
   const placements: Placement[] = []
-  for (let i = 0; i < urls.length; i++) placements.push(packer.add(aspects[i]!))
+  for (let i = 0; i < urls.length; i++) placements.push(packer.add(aspects![i]!))
   emit('first-placement')
   emit('all-placements')
 
@@ -311,6 +386,7 @@ function runManifestHydrated(config: GalleryConfig, emit: (p: GalleryPhase) => v
   const imageLoads = new Map<number, ImageLoad>()
 
   const pool = createPool(config, (idx, el, place) => {
+    if (state.cancelled) return
     config.renderSkeleton(el, idx, place)
     mountedTiles.set(idx, el)
     config.renderImage(el, idx, urls[idx]!)
@@ -328,25 +404,28 @@ function runManifestHydrated(config: GalleryConfig, emit: (p: GalleryPhase) => v
 
   config.contentContainer.style.height = `${packer.totalHeight()}px`
   pool.setPlacements(placements)
-  const done = waitForVisibleLoads(mountedTiles, imageLoads).then(() => {
+  const work = waitForVisibleLoads(mountedTiles, imageLoads).then(() => {
+    if (state.cancelled) return
     emit('done')
   })
 
-  return {
-    pool,
-    done,
-    destroy: () => pool.destroy(),
-  }
+  return finishGallery(state, pool, work)
 }
 
-// --- Pattern: throttled ---
+// --- Image loading: queued ---
 
-function runThrottled(config: GalleryConfig, emit: (p: GalleryPhase) => void): Gallery {
+function runQueued(
+  config: GalleryConfig,
+  state: GalleryState,
+  emit: (p: GalleryPhase) => void,
+): Gallery {
   const { urls, packer } = config
+  const readyAspects: Array<number | null> = new Array(urls.length).fill(null)
   const placements: Placement[] = []
   const indexUrl: string[] = []
   const mountedTiles = new Map<number, HTMLElement>()
   const imageLoads = new Map<number, ImageLoad>()
+  let nextPlaceIndex = 0
   let firstPlacementEmitted = false
   let firstImageEmitted = false
 
@@ -356,10 +435,16 @@ function runThrottled(config: GalleryConfig, emit: (p: GalleryPhase) => void): G
   // plain FIFO with bounded in-flight.
   const renderCap = config.renderConcurrency ?? 8
   const renderQueue: RenderJob[] = []
+  const activeRenderJobs = new Set<RenderJob>()
   let renderInflight = 0
   function pumpRender(): void {
+    if (state.cancelled) return
     while (renderInflight < renderCap && renderQueue.length > 0) {
       const job = renderQueue.shift()!
+      if (state.cancelled) {
+        job.resolve()
+        continue
+      }
       const currentLoad = imageLoads.get(job.idx)
       const currentEl = mountedTiles.get(job.idx)
       if (
@@ -376,6 +461,7 @@ function runThrottled(config: GalleryConfig, emit: (p: GalleryPhase) => void): G
         continue
       }
       renderInflight++
+      activeRenderJobs.add(job)
       config.renderImage(job.el, job.idx, job.url)
       void waitForImage(job.el, () => {
         if (!firstImageEmitted) {
@@ -383,16 +469,19 @@ function runThrottled(config: GalleryConfig, emit: (p: GalleryPhase) => void): G
           emit('first-image')
         }
       }).then(job.resolve).finally(() => {
+        activeRenderJobs.delete(job)
         const latest = imageLoads.get(job.idx)
         if (latest?.el === job.el && latest.promise === job.promise) {
           imageLoads.delete(job.idx)
         }
         renderInflight--
+        if (state.cancelled) return
         pumpRender()
       })
     }
   }
   function enqueueRender(idx: number, el: HTMLElement, url: string): Promise<void> {
+    if (state.cancelled) return Promise.resolve()
     const existing = imageLoads.get(idx)
     if (existing?.el === el) return existing.promise
     let resolveJob!: () => void
@@ -405,7 +494,31 @@ function runThrottled(config: GalleryConfig, emit: (p: GalleryPhase) => void): G
     return promise
   }
 
+  function placeReadyAspects(): void {
+    if (state.cancelled) return
+    while (nextPlaceIndex < urls.length) {
+      const aspect = readyAspects[nextPlaceIndex]
+      if (aspect === null || aspect === undefined) break
+      placements.push(packer.add(aspect))
+      indexUrl.push(urls[nextPlaceIndex]!)
+      nextPlaceIndex++
+      if (!firstPlacementEmitted) {
+        firstPlacementEmitted = true
+        emit('first-placement')
+      }
+    }
+    if (placements.length > 0) scheduleRender(config, state, placements, pool)
+  }
+
+  state.cleanup.push(() => {
+    for (const job of renderQueue.splice(0)) job.resolve()
+    for (const job of activeRenderJobs) job.resolve()
+    activeRenderJobs.clear()
+    imageLoads.clear()
+  })
+
   const pool = createPool(config, (idx, el, place) => {
+    if (state.cancelled) return
     config.renderSkeleton(el, idx, place)
     mountedTiles.set(idx, el)
     const url = indexUrl[idx]
@@ -416,21 +529,11 @@ function runThrottled(config: GalleryConfig, emit: (p: GalleryPhase) => void): G
     if (load?.el === _el) imageLoads.delete(idx)
   })
 
-  const queue = getQueue(config)
-  const options = getProbeOptions(config)
-  const done = Promise.all(
-    urls.map((url) =>
-      queue.enqueue(url, options).then((prepared) => {
-        placements.push(packer.add(prepared.aspectRatio))
-        indexUrl.push(url)
-        if (!firstPlacementEmitted) {
-          firstPlacementEmitted = true
-          emit('first-placement')
-        }
-        scheduleRender(config, placements, pool)
-      }),
-    ),
-  ).then(async () => {
+  async function finishQueuedLayout(): Promise<void> {
+    if (state.cancelled) return
+    placeReadyAspects()
+    config.contentContainer.style.height = `${packer.totalHeight()}px`
+    pool.setPlacements(placements)
     emit('all-placements')
     // After all probes resolve, ensure any still-mounted tiles
     // without an in-flight render get queued. mount fires before
@@ -447,20 +550,43 @@ function runThrottled(config: GalleryConfig, emit: (p: GalleryPhase) => void): G
       }
     }
     await Promise.all(visibleLoads)
+    if (state.cancelled) return
     emit('done')
-  })
+  }
+
+  if (config.aspects !== undefined) {
+    validateAspects(config)
+    const work = (async (): Promise<void> => {
+      for (let i = 0; i < urls.length; i++) readyAspects[i] = config.aspects![i]!
+      await finishQueuedLayout()
+    })()
+    return finishGallery(state, pool, work)
+  }
+
+  const { queue, owned } = getQueue(config)
+  if (owned) clearQueueOnCancel(state, queue)
+  const options = getProbeOptions(config, state)
+  const work = Promise.all(
+    urls.map((url, index) =>
+      queue.enqueue(url, options).then((prepared) => {
+        if (state.cancelled) return
+        readyAspects[index] = prepared.aspectRatio
+        placeReadyAspects()
+      }),
+    ),
+  ).then(finishQueuedLayout)
 
   maybeBoost(queue, urls, config)
-  return {
-    pool,
-    done,
-    destroy: () => pool.destroy(),
-  }
+  return finishGallery(state, pool, work)
 }
 
-// --- Pattern: viewport-first ---
+// --- Image loading: visible-first ---
 
-function runViewportFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void): Gallery {
+function runVisibleFirst(
+  config: GalleryConfig,
+  state: GalleryState,
+  emit: (p: GalleryPhase) => void,
+): Gallery {
   const { urls, packer } = config
   const readyAspects: Array<number | null> = new Array(urls.length).fill(null)
   const placements: Placement[] = []
@@ -476,11 +602,17 @@ function runViewportFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
   const firstScreenTarget = Math.min(config.probe?.boostFirstScreen ?? 0, urls.length)
   const renderCap = config.renderConcurrency ?? 8
   const renderQueue: PriorityRenderJob[] = []
+  const activeRenderJobs = new Set<PriorityRenderJob>()
   let renderInflight = 0
 
   function pumpRender(): void {
+    if (state.cancelled) return
     while (renderInflight < renderCap && renderQueue.length > 0) {
       const job = renderQueue.shift()!
+      if (state.cancelled) {
+        job.resolve()
+        continue
+      }
       job.started = true
       const currentLoad = imageLoads.get(job.idx)
       const currentEl = mountedTiles.get(job.idx)
@@ -498,6 +630,7 @@ function runViewportFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
         continue
       }
       renderInflight++
+      activeRenderJobs.add(job)
       config.renderImage(job.el, job.idx, job.url)
       void waitForImage(job.el, () => {
         if (!firstImageEmitted) {
@@ -505,17 +638,20 @@ function runViewportFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
           emit('first-image')
         }
       }).then(job.resolve).finally(() => {
+        activeRenderJobs.delete(job)
         const latest = imageLoads.get(job.idx)
         if (latest?.el === job.el && latest.promise === job.promise) {
           imageLoads.delete(job.idx)
         }
         renderInflight--
+        if (state.cancelled) return
         pumpRender()
       })
     }
   }
 
   function promoteQueuedJob(idx: number, el: HTMLElement, promise: Promise<void>): void {
+    if (state.cancelled) return
     const queuedIndex = renderQueue.findIndex(
       (job) => !job.started && job.idx === idx && job.el === el && job.promise === promise,
     )
@@ -533,6 +669,7 @@ function runViewportFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
     url: string,
     priority: RenderPriority,
   ): Promise<void> {
+    if (state.cancelled) return Promise.resolve()
     const existing = imageLoads.get(idx)
     if (existing?.el === el) {
       if (priority === 'high') promoteQueuedJob(idx, el, existing.promise)
@@ -553,6 +690,7 @@ function runViewportFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
   }
 
   function enqueueMountedImage(idx: number, el: HTMLElement): Promise<void> | null {
+    if (state.cancelled) return null
     if (!viewportRenderStarted) return null
     const url = indexUrl[idx]
     const place = placements[idx]
@@ -563,6 +701,7 @@ function runViewportFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
   }
 
   function enqueueMountedImages(): Promise<void>[] {
+    if (state.cancelled) return []
     const loads: Promise<void>[] = []
     for (const [idx, el] of mountedTiles) {
       const load = enqueueMountedImage(idx, el)
@@ -572,6 +711,7 @@ function runViewportFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
   }
 
   function startViewportRenderIfReady(): void {
+    if (state.cancelled) return
     if (viewportRenderStarted) return
     if (urls.length > 0 && placements.length === 0) return
     if (nextPlaceIndex < firstScreenTarget) return
@@ -581,12 +721,14 @@ function runViewportFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
     viewportRenderStarted = true
     const firstViewportLoads = enqueueMountedImages()
     void Promise.all(firstViewportLoads).then(() => {
+      if (state.cancelled) return
       normalRenderEnabled = true
       enqueueMountedImages()
     })
   }
 
   function placeReadyAspects(): void {
+    if (state.cancelled) return
     while (nextPlaceIndex < urls.length) {
       const aspect = readyAspects[nextPlaceIndex]
       if (aspect === null || aspect === undefined) break
@@ -598,11 +740,19 @@ function runViewportFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
         emit('first-placement')
       }
     }
-    if (placements.length > 0) scheduleRender(config, placements, pool)
+    if (placements.length > 0) scheduleRender(config, state, placements, pool)
     startViewportRenderIfReady()
   }
 
+  state.cleanup.push(() => {
+    for (const job of renderQueue.splice(0)) job.resolve()
+    for (const job of activeRenderJobs) job.resolve()
+    activeRenderJobs.clear()
+    imageLoads.clear()
+  })
+
   const pool = createPool(config, (idx, el, place) => {
+    if (state.cancelled) return
     config.renderSkeleton(el, idx, place)
     mountedTiles.set(idx, el)
     enqueueMountedImage(idx, el)
@@ -614,49 +764,50 @@ function runViewportFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
 
   let viewportBoostPending = false
   function scheduleViewportBoost(): void {
+    if (state.cancelled) return
     if (viewportBoostPending) return
     viewportBoostPending = true
     requestAnimationFrame(() => {
       viewportBoostPending = false
+      if (state.cancelled) return
       enqueueMountedImages()
     })
   }
   config.scrollContainer.addEventListener('scroll', scheduleViewportBoost, { passive: true })
+  state.cleanup.push(() => {
+    config.scrollContainer.removeEventListener('scroll', scheduleViewportBoost)
+  })
 
   if (config.aspects !== undefined) {
-    if (config.aspects.length !== urls.length) {
-      throw new Error("loadGallery: aspects[] must match urls.length")
-    }
-    const done = (async (): Promise<void> => {
+    validateAspects(config)
+    const work = (async (): Promise<void> => {
       for (let i = 0; i < urls.length; i++) readyAspects[i] = config.aspects![i]!
       placeReadyAspects()
+      if (state.cancelled) return
       config.contentContainer.style.height = `${packer.totalHeight()}px`
       pool.setPlacements(placements)
       emit('all-placements')
       startViewportRenderIfReady()
       await waitForVisibleLoads(mountedTiles, imageLoads)
+      if (state.cancelled) return
       emit('done')
     })()
-    return {
-      pool,
-      done,
-      destroy: () => {
-        config.scrollContainer.removeEventListener('scroll', scheduleViewportBoost)
-        pool.destroy()
-      },
-    }
+    return finishGallery(state, pool, work)
   }
 
-  const queue = getQueue(config)
-  const options = getProbeOptions(config)
-  const done = Promise.all(
+  const { queue, owned } = getQueue(config)
+  if (owned) clearQueueOnCancel(state, queue)
+  const options = getProbeOptions(config, state)
+  const work = Promise.all(
     urls.map((url, index) =>
       queue.enqueue(url, options).then((prepared) => {
+        if (state.cancelled) return
         readyAspects[index] = prepared.aspectRatio
         placeReadyAspects()
       }),
     ),
   ).then(async () => {
+    if (state.cancelled) return
     placeReadyAspects()
     config.contentContainer.style.height = `${packer.totalHeight()}px`
     pool.setPlacements(placements)
@@ -665,18 +816,12 @@ function runViewportFirst(config: GalleryConfig, emit: (p: GalleryPhase) => void
     normalRenderEnabled = true
     enqueueMountedImages()
     await waitForVisibleLoads(mountedTiles, imageLoads)
+    if (state.cancelled) return
     emit('done')
   })
 
   maybeBoost(queue, urls, config)
-  return {
-    pool,
-    done,
-    destroy: () => {
-      config.scrollContainer.removeEventListener('scroll', scheduleViewportBoost)
-      pool.destroy()
-    },
-  }
+  return finishGallery(state, pool, work)
 }
 
 // --- Shared helpers ---
@@ -698,12 +843,57 @@ function createPool(
   })
 }
 
-function getQueue(config: GalleryConfig): PrepareQueueLike {
-  return config.probe?.queue ?? new PrepareQueue()
+function validateAspects(config: GalleryConfig): void {
+  if (config.aspects === undefined || config.aspects.length !== config.urls.length) {
+    throw new Error('loadGallery: aspects[] must match urls.length')
+  }
 }
 
-function getProbeOptions(config: GalleryConfig): PrepareOptions {
-  return config.probe?.options ?? { dimsOnly: true }
+function getQueue(config: GalleryConfig): { queue: PrepareQueueLike; owned: boolean } {
+  if (config.probe?.queue !== undefined) return { queue: config.probe.queue, owned: false }
+  return { queue: new PrepareQueue(), owned: true }
+}
+
+function clearQueueOnCancel(state: GalleryState, queue: PrepareQueueLike): void {
+  const maybeClear = (queue as PrepareQueueLike & { clear?: () => void }).clear
+  if (typeof maybeClear === 'function') {
+    state.cleanup.push(() => {
+      maybeClear.call(queue)
+    })
+  }
+}
+
+function getProbeOptions(config: GalleryConfig, state: GalleryState): PrepareOptions {
+  const base = config.probe?.options ?? { dimsOnly: true }
+  return {
+    ...base,
+    signal: combineAbortSignals(base.signal, state.abortController.signal, state),
+  }
+}
+
+function combineAbortSignals(
+  external: AbortSignal | undefined,
+  internal: AbortSignal,
+  state: GalleryState,
+): AbortSignal {
+  if (external === undefined) return internal
+  if (external.aborted) return external
+  if (internal.aborted) return internal
+
+  const controller = new AbortController()
+  const abortFromExternal = (): void => {
+    controller.abort(external.reason)
+  }
+  const abortFromInternal = (): void => {
+    controller.abort(internal.reason)
+  }
+  external.addEventListener('abort', abortFromExternal, { once: true })
+  internal.addEventListener('abort', abortFromInternal, { once: true })
+  state.cleanup.push(() => {
+    external.removeEventListener('abort', abortFromExternal)
+    internal.removeEventListener('abort', abortFromInternal)
+  })
+  return controller.signal
 }
 
 function maybeBoost(queue: PrepareQueueLike, urls: readonly string[], config: GalleryConfig): void {
@@ -715,9 +905,11 @@ function maybeBoost(queue: PrepareQueueLike, urls: readonly string[], config: Ga
  *  collapse into one pool.setPlacements call + one height write. */
 function scheduleRender(
   config: GalleryConfig,
+  galleryState: GalleryState,
   placements: readonly Placement[],
   pool: VirtualTilePool,
 ): void {
+  if (galleryState.cancelled) return
   const state = renderState.get(pool)
   if (state !== undefined && state.pending) return
   const s = state ?? { pending: true }
@@ -725,6 +917,7 @@ function scheduleRender(
   renderState.set(pool, s)
   requestAnimationFrame(() => {
     s.pending = false
+    if (galleryState.cancelled) return
     config.contentContainer.style.height = `${config.packer.totalHeight()}px`
     pool.setPlacements(placements)
   })

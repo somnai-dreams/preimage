@@ -60,7 +60,7 @@ export type PreparedImage = {
    *  res, pick between a thumbnail and original, or show a download
    *  progress bar. `null` when the source didn't expose it — notably
    *  the `'img'` URL strategy, cache hits that were originally recorded
-   *  without it, and `prepareSync` / manifest-hydrated entries. */
+   *  without it, and `prepareSync` / manifest entries. */
   readonly byteLength: number | null
   /** True if the format header indicates a native alpha channel.
    *  Callers drawing a tinted skeleton background can skip the tint
@@ -186,8 +186,8 @@ export type PrepareOptions = MeasureOptions & {
    *  Defaults (from a 7500-URL corpus sweep; see
    *  `benchmarks/probe-byte-threshold-full.json`):
    *    png  256    gif   256    webp 256    bmp   256
-   *    avif 768    heic  768    svg  2048   jpeg  4096
-   *    unknown 4096
+   *    ico  256    apng  256    avif 768    heic  768
+   *    svg  2048   jpeg 4096    unknown 4096
    *
    *  JPEG needs the widest budget because EXIF and ICC-profile segments
    *  push the SOF marker past the typical small-header range; its p95
@@ -249,14 +249,23 @@ export const DEFAULT_RANGE_BYTES_BY_FORMAT: Readonly<Record<ImageFormat, number>
 
 const DEFAULT_RANGE_RETRY_BYTES = 24576
 
+function validateByteBudget(name: string, value: number, allowZero = false): number {
+  const min = allowZero ? 0 : 1
+  if (!Number.isFinite(value) || !Number.isInteger(value) || value < min) {
+    const adjective = allowZero ? 'a non-negative integer' : 'a positive integer'
+    throw new RangeError(`${name} must be ${adjective}, got ${value}.`)
+  }
+  return value
+}
+
 function rangeBytesFor(src: string, options: PrepareOptions): number {
   const format = detectImageFormat(src)
   const perFormat = options.rangeBytesByFormat
   if (perFormat !== undefined) {
     const override = perFormat[format]
-    if (override !== undefined) return override
+    if (override !== undefined) return validateByteBudget(`prepare: rangeBytesByFormat.${format}`, override)
   }
-  if (options.rangeBytes !== undefined) return options.rangeBytes
+  if (options.rangeBytes !== undefined) return validateByteBudget('prepare: rangeBytes', options.rangeBytes)
   return DEFAULT_RANGE_BYTES_BY_FORMAT[format]
 }
 
@@ -360,6 +369,19 @@ export function getMeasurement(prepared: PreparedImage): ImageMeasurement {
  *  between probe and paint. */
 export function getElement(prepared: PreparedImage): HTMLImageElement | null {
   return prepared.element
+}
+
+/** Release caller-owned resources attached to a prepared image. This is
+ *  mainly for `prepare(Blob)` results, where the library creates a
+ *  `blob:` URL so the caller can render the bytes without another
+ *  allocation. Call once the preview is gone. URL/cache/manifest
+ *  handles without retained resources are no-ops. */
+export function disposePreparedImage(prepared: PreparedImage): void {
+  const blobUrl = prepared.measurement.blobUrl
+  if (blobUrl !== undefined && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+    URL.revokeObjectURL(blobUrl)
+    delete prepared.measurement.blobUrl
+  }
 }
 
 // --- URL path dispatch ---
@@ -555,7 +577,11 @@ async function prepareFromUrlRange(
   // Only worth trying when the retry window is actually larger than
   // what we already have and when the full resource itself is larger
   // still — otherwise we already have the whole file.
-  const retryBytes = options.rangeRetryBytes ?? DEFAULT_RANGE_RETRY_BYTES
+  const retryBytes = validateByteBudget(
+    'prepare: rangeRetryBytes',
+    options.rangeRetryBytes ?? DEFAULT_RANGE_RETRY_BYTES,
+    true,
+  )
   if (probed === null && retryBytes > bytes.length && (byteLength === null || byteLength > bytes.length)) {
     const retry = await doRangeFetch(retryBytes)
     if (retry.status === 206 || retry.ok) {
@@ -713,22 +739,16 @@ async function prepareFromUrlImg(
   }
   img.decoding = 'async'
 
-  // Subscribe to abort BEFORE setting src so a same-tick abort lands.
   if (options.signal !== undefined) {
     if (options.signal.aborted) {
       throw options.signal.reason ?? new DOMException('Aborted', 'AbortError')
     }
-    options.signal.addEventListener(
-      'abort',
-      () => {
-        img.src = ''
-      },
-      { once: true },
-    )
   }
 
+  // Subscribe to abort BEFORE setting src so a same-tick abort lands.
+  const dimsPromise = pollForNaturalSize(img, options.signal)
   img.src = src
-  const dims = await pollForNaturalSize(img)
+  const dims = await dimsPromise
 
   if (options.dimsOnly === true) {
     // Abort the rest of the transfer. Some bytes between dims-known
@@ -759,7 +779,8 @@ async function prepareFromUrlImg(
 type PollWaiter = {
   img: HTMLImageElement
   resolve: (dims: { width: number; height: number }) => void
-  reject: (err: Error) => void
+  reject: (err: unknown) => void
+  cleanup: () => void
   done: boolean
 }
 
@@ -772,6 +793,19 @@ function schedulePollTick(): void {
   setTimeout(runPollTick, 0)
 }
 
+function settlePollWaiter(
+  waiter: PollWaiter,
+  result: { width: number; height: number } | null,
+  err?: unknown,
+): void {
+  if (waiter.done) return
+  waiter.done = true
+  pollWaiters.delete(waiter)
+  waiter.cleanup()
+  if (result !== null) waiter.resolve(result)
+  else waiter.reject(err)
+}
+
 function runPollTick(): void {
   pollScheduled = false
   for (const waiter of pollWaiters) {
@@ -781,18 +815,14 @@ function runPollTick(): void {
     }
     const img = waiter.img
     if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-      waiter.done = true
-      pollWaiters.delete(waiter)
-      waiter.resolve({ width: img.naturalWidth, height: img.naturalHeight })
+      settlePollWaiter(waiter, { width: img.naturalWidth, height: img.naturalHeight })
       continue
     }
     if (img.complete) {
       // Load finished but no dims — corrupt image, SVG without
       // intrinsic size, etc. (The `error` listener normally catches
       // outright load failures before we get here.)
-      waiter.done = true
-      pollWaiters.delete(waiter)
-      waiter.reject(new Error('preimage: image loaded with no dimensions'))
+      settlePollWaiter(waiter, null, new Error('preimage: image loaded with no dimensions'))
     }
   }
   if (pollWaiters.size > 0) schedulePollTick()
@@ -800,19 +830,35 @@ function runPollTick(): void {
 
 function pollForNaturalSize(
   img: HTMLImageElement,
+  signal?: AbortSignal,
 ): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
-    const waiter: PollWaiter = { img, resolve, reject, done: false }
-    img.addEventListener(
-      'error',
-      () => {
-        if (waiter.done) return
-        waiter.done = true
-        pollWaiters.delete(waiter)
-        reject(new Error('preimage: image load failed'))
+    let waiter!: PollWaiter
+    const onError = (): void => {
+      settlePollWaiter(waiter, null, new Error('preimage: image load failed'))
+    }
+    const onAbort = (): void => {
+      img.src = ''
+      settlePollWaiter(waiter, null, signal?.reason ?? new DOMException('Aborted', 'AbortError'))
+    }
+    waiter = {
+      img,
+      resolve,
+      reject,
+      done: false,
+      cleanup: () => {
+        img.removeEventListener('error', onError)
+        signal?.removeEventListener('abort', onAbort)
       },
-      { once: true },
-    )
+    }
+    img.addEventListener('error', onError)
+    if (signal !== undefined) {
+      if (signal.aborted) {
+        onAbort()
+        return
+      }
+      signal.addEventListener('abort', onAbort, { once: true })
+    }
     pollWaiters.add(waiter)
     schedulePollTick()
   })
@@ -855,8 +901,9 @@ async function fallbackFromBlobUrl(
   }
   const img = new Image()
   img.decoding = 'async'
+  const dimsPromise = pollForNaturalSize(img, options.signal)
   img.src = url
-  const dims = await pollForNaturalSize(img)
+  const dims = await dimsPromise
   return recordKnownMeasurement(url, dims.width, dims.height, {
     orientation: options.orientation ?? 1,
     decoded: true,

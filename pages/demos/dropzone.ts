@@ -1,4 +1,4 @@
-import { prepare } from '@somnai-dreams/preimage'
+import { disposePreparedImage, prepare, type PreparedImage } from '@somnai-dreams/preimage'
 import { setRowValue } from './demo-formatting.js'
 
 const dropArea = document.getElementById('dropArea')!
@@ -18,8 +18,11 @@ let naiveCount = 0
 let measuredCount = 0
 let naiveResized = 0 // imgs whose measured width changed post-insert
 let measuredResized = 0
+let measuredPrepared: PreparedImage[] = []
 
 function initFlows(): void {
+  for (const prepared of measuredPrepared) disposePreparedImage(prepared)
+  measuredPrepared = []
   for (const panel of [naivePanel, measuredPanel]) {
     panel.innerHTML = ''
     const span = document.createElement('span')
@@ -93,6 +96,8 @@ function addNaive(file: File): void {
   const img = document.createElement('img')
   img.alt = ''
   img.height = IMAGE_HEIGHT
+  img.addEventListener('load', () => URL.revokeObjectURL(url), { once: true })
+  img.addEventListener('error', () => URL.revokeObjectURL(url), { once: true })
   img.src = url
   naivePanel.appendChild(img)
   naivePanel.appendChild(document.createTextNode(' '))
@@ -110,12 +115,18 @@ async function addMeasured(file: File): Promise<void> {
   // <img> element's attrs before insert, so the browser reserves
   // the correct box from the first frame.
   const prepared = await prepare(file)
+  measuredPrepared.push(prepared)
   const displayWidth = prepared.aspectRatio * IMAGE_HEIGHT
   const img = document.createElement('img')
   img.alt = ''
   img.width = Math.round(displayWidth)
   img.height = IMAGE_HEIGHT
-  img.src = prepared.measurement.blobUrl ?? URL.createObjectURL(file)
+  const fallbackUrl = prepared.measurement.blobUrl === undefined ? URL.createObjectURL(file) : null
+  if (fallbackUrl !== null) {
+    img.addEventListener('load', () => URL.revokeObjectURL(fallbackUrl), { once: true })
+    img.addEventListener('error', () => URL.revokeObjectURL(fallbackUrl), { once: true })
+  }
+  img.src = prepared.measurement.blobUrl ?? fallbackUrl!
   measuredPanel.appendChild(img)
   measuredPanel.appendChild(document.createTextNode(' '))
   measuredCount++

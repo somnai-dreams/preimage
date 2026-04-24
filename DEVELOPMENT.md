@@ -15,7 +15,10 @@ npm install
 ```sh
 bun run check           # run tsc type-check (no emit)
 bun run check:all       # run all offline regression harnesses
-bun run build:package   # build dist/ (ESM + .d.ts)
+bun run build:package   # build packages/preimage/dist/ (ESM + .d.ts)
+bun run build:layout-algebra
+bun run build:all
+bun run build:demos     # static demo + bench output in dist-demos/
 bun start               # run the demo site locally on port 3000
 ```
 
@@ -30,29 +33,28 @@ One-time setup (~5 min):
 3. Production branch: `main`. Every other branch + PR gets a unique preview URL like `swing-1-preimage-sidecar--preimage.vercel.app`.
 4. Pushes update the preview within ~1 minute.
 
-**Branches that work as a static deploy out of the box**: `main`, swing-4 (glasspane), swing-5 (predict), loading-patterns. They're all dev-server-independent.
-
-**Branches that need additional work**:
-- **Sidecar (PR #5)**: the demo relies on the dev server synthesizing `.prei` text files on the fly. For static deploy, extend `build:demos` on that branch with a step that writes `.prei` next to each image at build time (run `preimage-sidecar --batch --inplace dist-demos/assets`).
-- **Batched probe (PR #3)**: the bench POSTs to `/preimage/probe`, which the dev server implements. Static deploy has no endpoint. Either port the handler to a Vercel Edge Function (`api/probe.ts`) or skip Vercel for that branch and run `bun run start` locally to test.
+Static deploys work for the demo and bench pages that run entirely in the browser. Pages that depend on `pages/server.ts` endpoints need a matching static build step or an edge/API endpoint before they can deploy as plain files.
 
 ## Layout
 
 | file | role |
 |---|---|
-| `src/analysis.ts` | format / declared-dim / normalized-src analysis |
-| `src/measurement.ts` | HTMLImageElement.decode()-based intrinsic-dim pass |
-| `src/orientation.ts` | EXIF orientation (codes 1–8) |
-| `src/fit.ts` | pure CSS object-fit math |
-| `src/prepare.ts` | single-image `prepare()` / `layout()` |
-| `src/pretext-float.ts` | pretext integration: `flowColumnWithFloats`, `solveFloat` |
-| `src/pretext-inline.ts` | pretext integration: `inlineImage`, `resolveMixedInlineItems` |
-| `src/index.ts` | main entry barrel |
-| `src/pretext.ts` | `./pretext` subpath barrel |
+| `packages/preimage/src/analysis.ts` | format / declared-dim / normalized-src analysis |
+| `packages/preimage/src/measurement.ts` | shared measurement cache records |
+| `packages/preimage/src/probe.ts` | DOM-free byte parsers for PNG/JPEG/GIF/BMP/WebP/SVG/AVIF/HEIC/APNG/ICO |
+| `packages/preimage/src/prepare.ts` | single-image `prepare()` / `layout()` / `disposePreparedImage()` |
+| `packages/preimage/src/prepare-queue.ts` | adaptive queueing, boost/deprioritize, option-aware dedupe |
+| `packages/preimage/src/decode-pool.ts` | off-main-thread bitmap decode cache |
+| `packages/preimage/src/virtual.ts` | DOM-recycled virtual tile pool |
+| `packages/preimage/src/loading.ts` | gallery image scheduling and `Gallery.done` orchestration |
+| `packages/preimage/src/manifest.ts` | build-time dimension manifest builder + CLI |
+| `packages/preimage/src/pretext-*.ts` | pretext float and inline integrations |
+| `packages/layout-algebra/src/index.ts` | DOM-free packers, cursors, visibility, first-screen estimates |
+| `pages/demos/virtual.ts` | reference consumer for async image work + DOM recycling + rAF-batched render |
 
 ## Dependencies
 
-- `@chenglou/pretext` is a `peerDependency`. The main entry does not import it; only the `src/pretext-*.ts` modules do. Callers that don't use the pretext integration do not need pretext installed.
+- `@chenglou/pretext` is a `peerDependency`. The main entry does not import it; only the `packages/preimage/src/pretext-*.ts` modules do. Callers that don't use the pretext integration do not need pretext installed.
 
 ## Releasing
 

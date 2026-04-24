@@ -121,6 +121,14 @@ function parsePositiveNumber(v: string | null): number | null {
   return n
 }
 
+function safeDecodeURIComponent(value: string): string | null {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return null
+  }
+}
+
 function readDeclaredFromQuery(src: string): { width: number | null; height: number | null } {
   const q = src.indexOf('?')
   if (q === -1) return { width: null, height: null }
@@ -132,10 +140,12 @@ function readDeclaredFromQuery(src: string): { width: number | null; height: num
   for (const pair of query.split('&')) {
     const eq = pair.indexOf('=')
     if (eq === -1) continue
-    const key = decodeURIComponent(pair.slice(0, eq)).toLowerCase()
-    const value = decodeURIComponent(pair.slice(eq + 1))
-    if (width === null && WIDTH_PARAM_KEYS.includes(key)) width = parsePositiveNumber(value)
-    else if (height === null && HEIGHT_PARAM_KEYS.includes(key)) height = parsePositiveNumber(value)
+    const key = safeDecodeURIComponent(pair.slice(0, eq))
+    const value = safeDecodeURIComponent(pair.slice(eq + 1))
+    if (key === null || value === null) continue
+    const normalizedKey = key.toLowerCase()
+    if (width === null && WIDTH_PARAM_KEYS.includes(normalizedKey)) width = parsePositiveNumber(value)
+    else if (height === null && HEIGHT_PARAM_KEYS.includes(normalizedKey)) height = parsePositiveNumber(value)
     if (width !== null && height !== null) break
   }
 

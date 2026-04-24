@@ -70,10 +70,19 @@ export type PackingCursor = {
  *  batch form. */
 export function shortestColumnCursor(config: ShortestColumnConfig): PackingCursor {
   const { columns, gap, panelWidth } = config
-  if (columns < 1 || !Number.isFinite(columns)) {
+  if (!Number.isInteger(columns) || columns < 1) {
     throw new RangeError(`shortestColumnCursor: columns must be a positive integer, got ${columns}.`)
   }
+  if (!Number.isFinite(panelWidth) || panelWidth <= 0) {
+    throw new RangeError(`shortestColumnCursor: panelWidth must be positive, got ${panelWidth}.`)
+  }
+  if (!Number.isFinite(gap) || gap < 0) {
+    throw new RangeError(`shortestColumnCursor: gap must be non-negative, got ${gap}.`)
+  }
   const colWidth = (panelWidth - gap * (columns - 1)) / columns
+  if (colWidth <= 0) {
+    throw new RangeError(`shortestColumnCursor: panelWidth must leave positive column width.`)
+  }
   let heights = new Array<number>(columns).fill(0)
   const placements: Placement[] = []
 
@@ -498,9 +507,33 @@ export function estimateFirstScreenCount(
       },
 ): number {
   if (params.mode === 'columns') {
+    if (!Number.isFinite(params.panelWidth) || params.panelWidth <= 0) {
+      throw new RangeError(`estimateFirstScreenCount: panelWidth must be positive, got ${params.panelWidth}.`)
+    }
+    if (!Number.isFinite(params.viewportHeight) || params.viewportHeight <= 0) {
+      throw new RangeError(`estimateFirstScreenCount: viewportHeight must be positive, got ${params.viewportHeight}.`)
+    }
+    if (!Number.isFinite(params.gap) || params.gap < 0) {
+      throw new RangeError(`estimateFirstScreenCount: gap must be non-negative, got ${params.gap}.`)
+    }
+    if (!Number.isInteger(params.columns) || params.columns < 1) {
+      throw new RangeError(`estimateFirstScreenCount: columns must be a positive integer, got ${params.columns}.`)
+    }
     const tileHeight = Math.max(1, (params.panelWidth - params.gap * (params.columns - 1)) / params.columns)
     const rowCount = Math.max(1, Math.ceil(params.viewportHeight / (tileHeight + params.gap)))
     return rowCount * params.columns
+  }
+  if (!Number.isFinite(params.panelWidth) || params.panelWidth <= 0) {
+    throw new RangeError(`estimateFirstScreenCount: panelWidth must be positive, got ${params.panelWidth}.`)
+  }
+  if (!Number.isFinite(params.viewportHeight) || params.viewportHeight <= 0) {
+    throw new RangeError(`estimateFirstScreenCount: viewportHeight must be positive, got ${params.viewportHeight}.`)
+  }
+  if (!Number.isFinite(params.gap) || params.gap < 0) {
+    throw new RangeError(`estimateFirstScreenCount: gap must be non-negative, got ${params.gap}.`)
+  }
+  if (!Number.isFinite(params.targetRowHeight) || params.targetRowHeight <= 0) {
+    throw new RangeError(`estimateFirstScreenCount: targetRowHeight must be positive, got ${params.targetRowHeight}.`)
   }
   const rowCount = Math.max(1, Math.ceil(params.viewportHeight / (params.targetRowHeight + params.gap)))
   const itemsPerRow = Math.max(2, Math.round(params.panelWidth / params.targetRowHeight))

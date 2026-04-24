@@ -2,7 +2,7 @@ import { PrepareQueue, recordKnownMeasurement } from '@somnai-dreams/preimage'
 import {
   loadGallery,
   type GalleryPhase,
-  type LoadingPattern,
+  type GalleryImageLoading,
   type PackerCursor,
 } from '@somnai-dreams/preimage/loading'
 import {
@@ -41,18 +41,17 @@ function getCount(): number {
   return Number(countSlider.value)
 }
 
-function getLoadingPattern(): LoadingPattern {
+function getImageLoading(): GalleryImageLoading {
   const checked = document.querySelector<HTMLInputElement>('input[name="loading"]:checked')
   const value = checked?.value
   switch (value) {
-    case 'streamed':
-    case 'skeleton-first':
-    case 'manifest-hydrated':
-    case 'throttled':
-    case 'viewport-first':
+    case 'visible-first':
+    case 'after-layout':
+    case 'queued':
+    case 'immediate':
       return value
   }
-  return 'viewport-first'
+  return 'visible-first'
 }
 
 function freshToken(): string {
@@ -192,7 +191,7 @@ async function runMeasured(): Promise<void> {
 
   const count = getCount()
   const token = freshToken()
-  const loadingPattern = getLoadingPattern()
+  const imageLoading = getImageLoading()
   const urls = cycledUrls(count, token)
   const aspects = cycledAspects(count)
   // The virtual demo owns this local photo manifest, so dimensions are
@@ -210,7 +209,7 @@ async function runMeasured(): Promise<void> {
   measuredScroll.scrollTop = 0
   resetStats(measuredStats)
 
-  setMeta(`${fmtCount(count)} tiles · measured building · ${loadingPattern}`)
+  setMeta(`${fmtCount(count)} tiles · measured building · ${imageLoading}`)
 
   const urlSet = new Set(
     urls.map((u) => new URL(u, location.href).pathname + new URL(u, location.href).search),
@@ -264,7 +263,7 @@ async function runMeasured(): Promise<void> {
     scrollContainer: measuredScroll,
     contentContainer: measuredPanel,
     packer,
-    pattern: loadingPattern,
+    imageLoading,
     overscan: OVERSCAN,
     probe: {
       queue: trackedQueue,
@@ -311,10 +310,6 @@ async function runMeasured(): Promise<void> {
   })
   activeMeasuredGallery = gallery
 
-  if (loadingPattern === 'manifest-hydrated') {
-    setRowValue(measuredStats, 2, '<b>manifest</b>')
-  }
-
   await gallery.done
   if (phaseTimes['first-placement'] === undefined) {
     setRowValue(measuredStats, 3, `<b>${fmtMs(performance.now() - t0)}</b>`)
@@ -329,7 +324,7 @@ async function runMeasured(): Promise<void> {
   await new Promise((r) => setTimeout(r, 500))
   setRowValue(measuredStats, 5, `<b>${fmtBytes(bytesMeter.stop())}</b>`)
 
-  setMeta(`${fmtCount(count)} tiles · measured done · ${loadingPattern} · scroll to load more tiles`)
+  setMeta(`${fmtCount(count)} tiles · measured done · ${imageLoading} · scroll to load more tiles`)
   runMeasuredBtn.disabled = false
   runMeasuredBtn.textContent = 'Run again'
 }

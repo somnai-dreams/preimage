@@ -18,6 +18,8 @@ dist-demos/
 # just churns the repo. Commit harness outputs by hand when a run
 # is worth archiving.
 benchmarks/fit-analysis-*.json
+benchmarks/decode-pool-*.json
+benchmarks/loading-gallery-*.json
 benchmarks/manifest-build-*.json
 benchmarks/orientation-corpus-*.json
 benchmarks/parser-robustness-*.json

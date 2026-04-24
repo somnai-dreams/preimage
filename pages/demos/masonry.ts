@@ -2,7 +2,7 @@ import { PrepareQueue, prepare, recordKnownMeasurement } from '@somnai-dreams/pr
 import {
   loadGallery,
   type GalleryPhase,
-  type LoadingPattern,
+  type GalleryImageLoading,
   type PackerCursor,
 } from '@somnai-dreams/preimage/loading'
 import {
@@ -53,18 +53,17 @@ function getLayout(): Layout {
   return checked?.value === 'rows' ? 'rows' : 'column'
 }
 
-function getLoadingPattern(): LoadingPattern {
+function getImageLoading(): GalleryImageLoading {
   const checked = document.querySelector<HTMLInputElement>('input[name="loading"]:checked')
   const value = checked?.value
   switch (value) {
-    case 'streamed':
-    case 'skeleton-first':
-    case 'manifest-hydrated':
-    case 'throttled':
-    case 'viewport-first':
+    case 'visible-first':
+    case 'after-layout':
+    case 'queued':
+    case 'immediate':
       return value
   }
-  return 'viewport-first'
+  return 'visible-first'
 }
 
 function getCacheBust(): string | null {
@@ -334,7 +333,7 @@ async function runMeasured(): Promise<void> {
   setMeta(count, cacheBust)
 
   if (layout === 'column') {
-    await runMeasuredLoadingPattern(urls, buildAspects(count), getLoadingPattern())
+    await runMeasuredLoadingMode(urls, buildAspects(count), getImageLoading())
   } else if (mode === 'batch') {
     await runMeasuredBatch(urls, layout)
   } else {
@@ -345,10 +344,10 @@ async function runMeasured(): Promise<void> {
   runMeasuredBtn.textContent = 'Run again'
 }
 
-async function runMeasuredLoadingPattern(
+async function runMeasuredLoadingMode(
   urls: readonly string[],
   aspects: readonly number[],
-  pattern: LoadingPattern,
+  imageLoading: GalleryImageLoading,
 ): Promise<void> {
   const t0 = performance.now()
   const dimTimes: number[] = []
@@ -386,7 +385,7 @@ async function runMeasuredLoadingPattern(
     scrollContainer: document.scrollingElement as HTMLElement,
     contentContainer: measuredPanel,
     packer,
-    pattern,
+    imageLoading,
     overscan: { ahead: 500, behind: 160 },
     probe: {
       queue: trackedQueue,

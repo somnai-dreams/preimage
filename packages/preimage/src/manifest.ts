@@ -31,14 +31,27 @@ export type BuildManifestOptions = {
   // Joined with forward slashes regardless of platform.
   base?: string
   // File extensions to include (lowercase, no dot). Defaults to the
-  // formats probeImageBytes supports.
+  // parser-supported raster/vector formats.
   extensions?: readonly string[]
   // Called for each file the probe skipped — unsupported format,
   // unreadable header, zero dims. Defaults to console.warn on stderr.
   onSkip?: (path: string, reason: string) => void
 }
 
-const DEFAULT_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'svg'] as const
+const DEFAULT_EXTENSIONS = [
+  'png',
+  'jpg',
+  'jpeg',
+  'webp',
+  'gif',
+  'bmp',
+  'svg',
+  'avif',
+  'heic',
+  'heif',
+  'ico',
+  'apng',
+] as const
 const JPEG_EXTENSIONS = new Set(['jpg', 'jpeg'])
 
 export async function buildManifest(options: BuildManifestOptions): Promise<Manifest> {

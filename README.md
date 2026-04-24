@@ -13,6 +13,8 @@ Two pretext adapters and a small set of adjacent utilities:
 - **`prepare`, `layout`, `fitRect`, `getElement`** — the primitives those adapters are built on, usable standalone.
 - **`PrepareQueue`** — application-level concurrency cap with `boost(url)` priority for "this just scrolled into view, jump the queue."
 - **`DecodePool`** — off-main-thread decode cache for canvas timelines and WebGL scenarios where you want `ctx.drawImage(bitmap, …)` to be a single blit, not a decode.
+- **`loadGallery` / `createVirtualTilePool`** — gallery loading and DOM recycling helpers for measured masonry surfaces.
+- **`buildManifest`** — build-time dimension manifests for PNG, JPEG, GIF, BMP, WebP, SVG, AVIF, HEIC/HEIF, APNG, and ICO.
 
 ## What `prepare()` actually does
 
@@ -33,9 +35,11 @@ const el = getElement(img)
 if (el !== null) container.appendChild(el)
 ```
 
-Under the hood: create an `<img>`, set `src`, poll `naturalWidth` on a `setTimeout(0)` tick until the browser exposes it, resolve. No custom byte parsing, no `fetch()`, no blob-URL shuffling. The browser does all the work; we just observe the handoff.
+Default URL behavior is still render-friendly: create an `<img>`, set `src`, poll `naturalWidth` on a shared `setTimeout(0)` tick until the browser exposes it, resolve. The returned handle keeps that warmed element so rendering can reuse the same request.
 
-For **File/Blob** inputs (upload previews), we do parse bytes ourselves — the standalone `probeImageBytes(bytes)` reads PNG, JPEG, WebP, GIF, BMP, and SVG headers without going through an `<img>`. Useful when you already have the bytes in JS and don't want the round trip.
+For bulk dimension probing, `dimsOnly: true` defaults to `strategy: 'auto'`: try a short HTTP Range request per origin, remember whether that origin supports Range or needs streaming, and skip the warmed element. Explicit strategies are `img`, `range`, `stream`, and `auto`.
+
+For **File/Blob** inputs (upload previews), we parse bytes directly — the standalone `probeImageBytes(bytes)` reads PNG, JPEG, WebP, GIF, BMP, SVG, AVIF, HEIC/HEIF, APNG, and ICO headers without going through the network. Blob preparations can carry a `measurement.blobUrl`; call `disposePreparedImage(prepared)` when the preview is gone.
 
 ### `dimsOnly` — measure without committing to load
 
@@ -88,7 +92,7 @@ Browsers cap parallel requests per origin (6 hardcoded for HTTP/1.1; HTTP/2 mult
 ```ts
 import { PrepareQueue } from '@somnai-dreams/preimage'
 
-const queue = new PrepareQueue({ concurrency: 20 })   // default is 20
+const queue = new PrepareQueue()   // adaptive default: 50, or 6 on save-data / slow links
 
 for (const tile of tiles) {
   tile.prepared = queue.enqueue(tile.src, { dimsOnly: true })
@@ -98,9 +102,9 @@ for (const tile of tiles) {
 queue.boost(tiles[50].src)
 ```
 
-**Default concurrency is 20**, sized for HTTP/2 origins (any modern CDN — GitHub Pages, Cloudflare, Vercel, Netlify, etc). On HTTP/1.1 origins the browser's 6-slot cap gatekeeps automatically: we fire 20, the browser accepts all, runs 6 in parallel, queues the rest. Same throughput as setting `concurrency: 6` would give you — no penalty, no manual tuning. Set a lower value if you're knowingly on H1 and want to leave slots free for render-side fetches.
+With no explicit `concurrency`, the queue reads `navigator.connection`: `6` on save-data / slow-2g / 2g / 3g, `50` otherwise. HTTP/2 origins usually benefit from the wider queue; HTTP/1.1 origins still gate at the browser's per-origin connection cap.
 
-Dedupes by normalized URL. `clear()` drops the pending backlog; in-flight work continues.
+Dedupes by normalized URL plus measurement-affecting options. Two callers asking for the same URL with different `dimsOnly`, strategy, range, CORS, fallback, orientation, or abort-signal semantics get separate promises. `clear()` drops the pending backlog; in-flight work continues.
 
 ## `DecodePool`
 
@@ -216,6 +220,7 @@ walkRichInlineLineRanges(prepared, maxWidth, (range) => {
 // Prepare
 prepare(src: string | Blob, options?): Promise<PreparedImage>
 prepareSync(src, width, height, { orientation? }?): PreparedImage
+disposePreparedImage(prepared): void
 
 // Handle readers
 getMeasurement(prepared): ImageMeasurement
@@ -246,9 +251,12 @@ readExifOrientation(buffer): OrientationCode | null
 applyOrientationToSize(w, h, orientation): { width, height }
 
 // Concurrency + decode pool
+pickAdaptiveConcurrency(): number
 new PrepareQueue({ concurrency? })
   queue.enqueue(src, options?): Promise<PreparedImage>
   queue.boost(src): boolean
+  queue.boostMany(srcs): void
+  queue.deprioritizeMany(srcs): void
   queue.clear(): void
   queue.pendingCount / queue.inflightCount
 
@@ -313,7 +321,13 @@ import { buildManifest } from '@somnai-dreams/preimage/manifest'
 const manifest = await buildManifest({ root: './public/photos', base: '/photos/' })
 ```
 
-Reads only `MAX_HEADER_BYTES` (4KB) per file; the full image is never decoded. Covers PNG/JPEG/GIF/BMP/WebP/SVG; AVIF/HEIC are skipped with a stderr warning.
+Reads only `MAX_HEADER_BYTES` (4KB) per file; the full image is never decoded except for the JPEG retry path when metadata pushes SOF past the header budget. Defaults cover PNG, JPEG, GIF, BMP, WebP, SVG, AVIF, HEIC/HEIF, APNG, and ICO.
+
+### Virtual pools and image loading
+
+`@somnai-dreams/preimage/virtual` exports `createVirtualTilePool`, the DOM-recycled tile pool used by the demos. Feed it `Placement[]`; it mounts only visible/overscan tiles and calls `unmount` so renderers can cancel image work.
+
+`@somnai-dreams/preimage/loading` exports `loadGallery`. Pass `aspects` when dimensions are already known; otherwise the helper probes dimensions through `PrepareQueue`. Separately, `imageLoading` controls when mounted tiles start visible image requests: `visible-first` prioritizes the current viewport, `after-layout` waits until the frame layer is complete, `queued` caps visible image fetches, and `immediate` starts image requests as tiles mount. The default is `visible-first`.
 
 ### Pretext integration (`@somnai-dreams/preimage/pretext`)
 

@@ -281,6 +281,24 @@ function checkPathological(): void {
     pass('pathological/sc-zero-columns')
   }
   try {
+    shortestColumnCursor({ panelWidth: 800, gap: 4, columns: 2.5 })
+    fail('pathological/sc-fractional-columns', 'did not throw on fractional columns')
+  } catch {
+    pass('pathological/sc-fractional-columns')
+  }
+  try {
+    shortestColumnCursor({ panelWidth: 800, gap: -1, columns: 3 })
+    fail('pathological/sc-negative-gap', 'did not throw on negative gap')
+  } catch {
+    pass('pathological/sc-negative-gap')
+  }
+  try {
+    shortestColumnCursor({ panelWidth: 800, gap: 500, columns: 3 })
+    fail('pathological/sc-impossible-column-width', 'did not throw on non-positive column width')
+  } catch {
+    pass('pathological/sc-impossible-column-width')
+  }
+  try {
     packJustifiedRows([1], { panelWidth: 0, gap: 4, targetRowHeight: 200 })
     fail('pathological/jr-zero-panelwidth', 'did not throw on panelWidth=0')
   } catch {
@@ -388,17 +406,6 @@ function checkEstimateFirstScreenCount(): void {
   if (cols !== 15) fail('estimate/columns-basic', `expected 15, got ${cols}`)
   else pass('estimate/columns-basic')
 
-  // Minimum: always at least `columns` (even at viewportHeight=0).
-  const colsMin = estimateFirstScreenCount({
-    mode: 'columns',
-    panelWidth: 800,
-    viewportHeight: 0,
-    gap: 4,
-    columns: 3,
-  })
-  if (colsMin !== 3) fail('estimate/columns-min', `expected 3, got ${colsMin}`)
-  else pass('estimate/columns-min')
-
   // Tiny viewport, one column wide — at least 1.
   const single = estimateFirstScreenCount({
     mode: 'columns',
@@ -435,6 +442,68 @@ function checkEstimateFirstScreenCount(): void {
   })
   if (rowsMin < 2) fail('estimate/rows-min', `expected >= 2, got ${rowsMin}`)
   else pass('estimate/rows-min', `${rowsMin} tiles`)
+
+  // Invalid inputs should fail before they produce bogus queue
+  // priorities or impossible column widths.
+  const invalidCases: Array<{ label: string; run: () => void }> = [
+    {
+      label: 'estimate/columns-fractional-columns',
+      run: () => {
+        estimateFirstScreenCount({
+          mode: 'columns',
+          panelWidth: 800,
+          viewportHeight: 600,
+          gap: 4,
+          columns: 2.5,
+        })
+      },
+    },
+    {
+      label: 'estimate/columns-zero-viewport',
+      run: () => {
+        estimateFirstScreenCount({
+          mode: 'columns',
+          panelWidth: 800,
+          viewportHeight: 0,
+          gap: 4,
+          columns: 3,
+        })
+      },
+    },
+    {
+      label: 'estimate/columns-negative-gap',
+      run: () => {
+        estimateFirstScreenCount({
+          mode: 'columns',
+          panelWidth: 800,
+          viewportHeight: 600,
+          gap: -1,
+          columns: 3,
+        })
+      },
+    },
+    {
+      label: 'estimate/rows-zero-target',
+      run: () => {
+        estimateFirstScreenCount({
+          mode: 'rows',
+          panelWidth: 800,
+          viewportHeight: 600,
+          gap: 4,
+          targetRowHeight: 0,
+        })
+      },
+    },
+  ]
+  for (const invalid of invalidCases) {
+    try {
+      invalid.run()
+      fail(invalid.label, 'did not throw')
+    } catch (err) {
+      if (err instanceof RangeError) pass(invalid.label)
+      else fail(invalid.label, `threw wrong error: ${(err as Error).message}`)
+    }
+  }
 }
 
 // --- Main ---

@@ -12,12 +12,13 @@
 //   BMP         — 26 bytes: BITMAPINFOHEADER (offsets 18-25 little-endian, height i32)
 //   WebP        — 30 bytes: VP8 / VP8L / VP8X chunk
 //   SVG         — regex scan of <svg ... width height viewBox> in the first 4KB
+//   ICO         — 22 bytes: header + first directory entry
 //   AVIF / HEIC — ISOBMFF `ftyp` sniff + scan for `ispe` (image spatial
 //                 extents) box. Empirically lands in the first <1KB for
 //                 sample corpora we measured; 4KB budget is comfortable.
 //
 // Intentionally NOT covered (v1):
-//   TIFF / ICO / JPEG 2000 — low-demand; add if someone asks.
+//   TIFF / JPEG 2000 — low-demand; add if someone asks.
 //
 // All parsers are pure over a Uint8Array and return null if the input is
 // too short, not the expected format, or has zero dimensions.
@@ -52,6 +53,7 @@ const JPEG_SIG = [0xFF, 0xD8, 0xFF]
 const GIF87_SIG = [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]
 const GIF89_SIG = [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]
 const BMP_SIG = [0x42, 0x4D]
+const ICO_SIG = [0x00, 0x00, 0x01, 0x00]
 const RIFF_SIG = [0x52, 0x49, 0x46, 0x46]
 const WEBP_SIG = [0x57, 0x45, 0x42, 0x50]
 const FTYP_SIG = [0x66, 0x74, 0x79, 0x70] // 'ftyp'
@@ -168,6 +170,21 @@ function probeBmp(bytes: Uint8Array): ProbedDimensions | null {
   const height = Math.abs(heightRaw) // negative = top-down DIB
   if (width <= 0 || height <= 0) return null
   return { width, height, format: 'bmp', hasAlpha: false, isProgressive: false }
+}
+
+// --- ICO ---
+
+function probeIco(bytes: Uint8Array): ProbedDimensions | null {
+  if (!matches(bytes, ICO_SIG)) return null
+  if (bytes.length < 22) return null
+  const count = u16le(bytes, 4)
+  if (count === 0) return null
+  const rawWidth = bytes[6]!
+  const rawHeight = bytes[7]!
+  const width = rawWidth === 0 ? 256 : rawWidth
+  const height = rawHeight === 0 ? 256 : rawHeight
+  if (width === 0 || height === 0) return null
+  return { width, height, format: 'ico', hasAlpha: true, isProgressive: false }
 }
 
 // --- WebP ---
@@ -325,6 +342,7 @@ export function probeImageBytes(bytes: Uint8Array): ProbedDimensions | null {
     probeGif(bytes) ??
     probeWebp(bytes) ??
     probeBmp(bytes) ??
+    probeIco(bytes) ??
     probeIsobmff(bytes) ??
     probeSvg(bytes) ??
     null

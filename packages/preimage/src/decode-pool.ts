@@ -51,6 +51,7 @@ export class DecodePool {
   private readonly inflight = new Map<string, Promise<ImageBitmap>>()
   private readonly queue: Array<() => void> = []
   private active = 0
+  private generation = 0
 
   constructor(options: DecodePoolOptions = {}) {
     const c = options.concurrency ?? 4
@@ -83,16 +84,17 @@ export class DecodePool {
     const inflight = this.inflight.get(key)
     if (inflight !== undefined) return inflight
 
+    const generation = this.generation
     const promise = this.runBounded(async () => {
       const bitmap = await this.decode(src)
-      this.store(key, bitmap)
+      if (generation === this.generation) this.store(key, bitmap)
       return bitmap
     })
     this.inflight.set(key, promise)
     try {
       return await promise
     } finally {
-      this.inflight.delete(key)
+      if (this.inflight.get(key) === promise) this.inflight.delete(key)
     }
   }
 
@@ -118,10 +120,12 @@ export class DecodePool {
   // Close every bitmap and clear the cache. In-flight decodes continue
   // to completion but their results are discarded on arrival.
   clear(): void {
+    this.generation++
     for (const entry of this.cache.values()) {
       if (typeof entry.bitmap.close === 'function') entry.bitmap.close()
     }
     this.cache.clear()
+    this.inflight.clear()
   }
 
   get cacheSize(): number {
