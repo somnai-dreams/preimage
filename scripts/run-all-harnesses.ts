@@ -36,6 +36,7 @@ const HARNESSES: Array<{ name: string; script: string; args?: string[] }> = [
   { name: 'predict', script: 'predict-test.ts' },
   { name: 'fit-analysis', script: 'fit-analysis-test.ts' },
   { name: 'parser-fuzz', script: 'parser-fuzz.ts' },
+  { name: 'benchmark-regression', script: 'benchmark-regression-test.ts' },
 ]
 
 type HarnessResult = {

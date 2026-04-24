@@ -68,6 +68,8 @@ bun run bench:remote-loading -- --runs 3 --n 68 --strategies visible-first,queue
 
 Every public value export and package subpath is assigned to an automated owner in `scripts/coverage-matrix-test.ts`. `bun run check:all` runs that matrix first, so adding a public API without a regression or benchmark surface fails locally and in CI. The human-readable policy lives in `docs/benchmark-regression-matrix.md`.
 
+`check:all` also ends with `benchmark-regression-test.ts`. It reads the JSON files emitted by the preceding harnesses and checks them against `benchmarks/baselines/check-all-regression-baselines.json`; per-run files stay ignored, but the baseline thresholds are committed.
+
 ## Dependencies
 
 - `@chenglou/pretext` is a `peerDependency`. The main entry does not import it; only the `packages/preimage/src/pretext-*.ts` modules do. Callers that don't use the pretext integration do not need pretext installed.

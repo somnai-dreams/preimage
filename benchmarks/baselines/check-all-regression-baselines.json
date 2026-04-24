@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "generatedAt": "2026-04-24T07:35:00.000Z",
+  "notes": "Coarse CI baselines for check:all outputs. Counts are strict; timing thresholds are broad enough to catch algorithmic regressions without depending on one machine.",
+  "benches": [
+    {
+      "bench": "coverage-matrix",
+      "pattern": "coverage-matrix-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "coverage case count", "path": "total", "op": "min", "value": 8 },
+        { "label": "coverage pass count", "path": "passed", "op": "min", "value": 8 }
+      ]
+    },
+    {
+      "bench": "parser-robustness",
+      "pattern": "parser-robustness-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 339 },
+        { "label": "pass count", "path": "passed", "op": "min", "value": 339 }
+      ]
+    },
+    {
+      "bench": "packer-sweep",
+      "pattern": "packer-sweep-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 35 },
+        { "label": "100k shortest-column avg", "path": "scaling[packer=shortestColumn,n=100000].avgMs", "op": "max", "value": 80 },
+        { "label": "100k justified-rows avg", "path": "scaling[packer=justifiedRows,n=100000].avgMs", "op": "max", "value": 80 }
+      ]
+    },
+    {
+      "bench": "url-pattern-corpus",
+      "pattern": "url-pattern-corpus-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 38 },
+        { "label": "pass count", "path": "passed", "op": "min", "value": 38 }
+      ]
+    },
+    {
+      "bench": "orientation-corpus",
+      "pattern": "orientation-corpus-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 55 },
+        { "label": "pass count", "path": "passed", "op": "min", "value": 55 }
+      ]
+    },
+    {
+      "bench": "manifest-build",
+      "pattern": "manifest-build-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 17 },
+        { "label": "large-dir perf count", "path": "perf.count", "op": "min", "value": 100 },
+        { "label": "large-dir perf wall", "path": "perf.wallMs", "op": "max", "value": 1000 }
+      ]
+    },
+    {
+      "bench": "stream-probe",
+      "pattern": "stream-probe-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 14 },
+        { "label": "pass count", "path": "passed", "op": "min", "value": 14 }
+      ]
+    },
+    {
+      "bench": "prepare-strategy",
+      "pattern": "prepare-strategy-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 7 },
+        { "label": "pass count", "path": "passed", "op": "min", "value": 7 }
+      ]
+    },
+    {
+      "bench": "prepare-queue",
+      "pattern": "prepare-queue-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 23 },
+        { "label": "pass count", "path": "passed", "op": "min", "value": 23 }
+      ]
+    },
+    {
+      "bench": "decode-pool",
+      "pattern": "decode-pool-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 1 },
+        { "label": "pass count", "path": "passed", "op": "min", "value": 1 }
+      ]
+    },
+    {
+      "bench": "pretext-integration",
+      "pattern": "pretext-integration-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 4 },
+        { "label": "pass count", "path": "passed", "op": "min", "value": 4 }
+      ]
+    },
+    {
+      "bench": "virtual-pool",
+      "pattern": "virtual-pool-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 5 },
+        { "label": "pass count", "path": "passed", "op": "min", "value": 5 }
+      ]
+    },
+    {
+      "bench": "loading-gallery",
+      "pattern": "loading-gallery-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 6 },
+        { "label": "pass count", "path": "passed", "op": "min", "value": 6 }
+      ]
+    },
+    {
+      "bench": "remote-loading-strategy",
+      "pattern": "remote-loading-strategy-*.json",
+      "checks": [
+        { "label": "check count", "path": "results.checks.length", "op": "min", "value": 20 },
+        { "label": "visible render errors", "path": "results.aggregate[strategy=visible-first].renderErrors", "op": "max", "value": 0 },
+        { "label": "queued render errors", "path": "results.aggregate[strategy=queued].renderErrors", "op": "max", "value": 0 },
+        { "label": "visible loaded images", "path": "results.aggregate[strategy=visible-first].renderLoads", "op": "min", "value": 1 },
+        { "label": "queued loaded images", "path": "results.aggregate[strategy=queued].renderLoads", "op": "min", "value": 1 }
+      ],
+      "every": [
+        { "label": "all remote checks passed", "arrayPath": "results.checks", "path": "ok", "op": "eq", "value": true }
+      ]
+    },
+    {
+      "bench": "predict",
+      "pattern": "predict-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 4 },
+        { "label": "pass count", "path": "passed", "op": "min", "value": 4 }
+      ]
+    },
+    {
+      "bench": "fit-analysis",
+      "pattern": "fit-analysis-*.json",
+      "checks": [
+        { "label": "no failures", "path": "failed", "op": "max", "value": 0 },
+        { "label": "case count", "path": "total", "op": "min", "value": 60 },
+        { "label": "pass count", "path": "passed", "op": "min", "value": 60 }
+      ]
+    },
+    {
+      "bench": "parser-fuzz",
+      "pattern": "parser-fuzz-*.json",
+      "checks": [
+        { "label": "byte fuzz iterations", "path": "targets[target=probeImageBytes].iterations", "op": "min", "value": 10000 },
+        { "label": "stream fuzz iterations", "path": "targets[target=probeImageStream].iterations", "op": "min", "value": 500 },
+        { "label": "orientation fuzz iterations", "path": "targets[target=readExifOrientation].iterations", "op": "min", "value": 10000 },
+        { "label": "url parser fuzz iterations", "path": "targets[target=url-parsers].iterations", "op": "min", "value": 10000 }
+      ],
+      "every": [
+        { "label": "no fuzz crashes", "arrayPath": "targets", "path": "crashes", "op": "max", "value": 0 },
+        { "label": "no fuzz invariant violations", "arrayPath": "targets", "path": "invariantViolations", "op": "max", "value": 0 }
+      ]
+    }
+  ]
+}

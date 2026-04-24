@@ -18,6 +18,7 @@ dist-demos/
 # locally for inspection, but committing every CI run's output
 # just churns the repo. Commit harness outputs by hand when a run
 # is worth archiving.
+benchmarks/benchmark-regression-*.json
 benchmarks/fit-analysis-*.json
 benchmarks/coverage-matrix-*.json
 benchmarks/decode-pool-*.json
