@@ -15,6 +15,7 @@ import { dirname, resolve } from 'node:path'
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 
 const HARNESSES: Array<{ name: string; script: string; args?: string[] }> = [
+  { name: 'coverage-matrix', script: 'coverage-matrix-test.ts' },
   { name: 'parser-robustness', script: 'parser-robustness-test.ts' },
   { name: 'packer-sweep', script: 'packer-sweep.ts' },
   { name: 'url-pattern-corpus', script: 'url-pattern-corpus.ts' },
@@ -24,6 +25,8 @@ const HARNESSES: Array<{ name: string; script: string; args?: string[] }> = [
   { name: 'prepare-strategy', script: 'prepare-strategy-test.ts' },
   { name: 'prepare-queue', script: 'prepare-queue-test.ts' },
   { name: 'decode-pool', script: 'decode-pool-test.ts' },
+  { name: 'pretext-integration', script: 'pretext-integration-test.ts' },
+  { name: 'virtual-pool', script: 'virtual-pool-test.ts' },
   { name: 'loading-gallery', script: 'loading-gallery-test.ts' },
   {
     name: 'remote-loading',

@@ -19,6 +19,7 @@ dist-demos/
 # just churns the repo. Commit harness outputs by hand when a run
 # is worth archiving.
 benchmarks/fit-analysis-*.json
+benchmarks/coverage-matrix-*.json
 benchmarks/decode-pool-*.json
 benchmarks/loading-gallery-*.json
 benchmarks/predict-*.json
@@ -28,9 +29,11 @@ benchmarks/parser-robustness-*.json
 benchmarks/parser-fuzz-*.json
 benchmarks/prepare-queue-*.json
 benchmarks/prepare-strategy-*.json
+benchmarks/pretext-integration-*.json
 benchmarks/remote-loading-strategy-*.json
 benchmarks/stream-probe-*.json
 benchmarks/url-pattern-corpus-*.json
+benchmarks/virtual-pool-*.json
 benchmarks/packer-sweep-*.json
 benchmarks/probe-byte-threshold-20*.json
 benchmarks/probe-sweep-20*.json

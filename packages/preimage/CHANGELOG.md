@@ -12,6 +12,7 @@
 - **Demo cleanup.** Removed the old scale demo now that the virtual demo covers the same bulk `dimsOnly` and bytes-transfer story with DOM recycling, loading controls, and optional manifest dimensions.
 - **Manifest demo keeps placeholders visible.** The hydrated panel still skips dimension probes, but its image slots now keep the same skeleton background while full image bytes arrive instead of rendering transparent gaps.
 - **Remote loading strategy harness.** `bun run bench:remote-loading` drives the real loading orchestrator in Chromium against hosted demo photos with cache-busted URLs, scripted scroll, first-image/done timings, render-concurrency counts, estimated loaded image bytes, and visible pending-tile ratios. `bun run check:all` now includes a small remote `visible-first` versus `queued` pass so loading regressions are caught outside the demo pages.
+- **Public coverage matrix.** `bun run check:all` now starts with `coverage-matrix-test.ts`, which fails when a public value export or package subpath is not assigned to an automated regression/benchmark surface. Added direct `virtual-pool` and `pretext-integration` harnesses so DOM recycling and the pretext adapter are covered without relying only on demos or downstream behavior.
 
 ## 0.11.0
 
