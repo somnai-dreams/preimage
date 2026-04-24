@@ -21,16 +21,15 @@
       overflow: hidden;
       border-radius: var(--radius-sm);
       background: #e4e7eb;
+      animation: tile-shimmer 1.3s ease-in-out infinite;
     }
-    /* Manifest-sourced tiles skip the gray skeleton box — the slot is
-       already correct, the image just needs to arrive. */
-    .grid .item.no-skeleton { background: transparent; }
+    .grid .item.has-image { animation: none; outline: var(--image-outline); outline-offset: -1px; }
     .grid .item img {
       position: absolute; inset: 0; width: 100%; height: 100%;
       object-fit: cover; display: block;
       opacity: 0; transition: opacity 20ms linear;
     }
-    .grid .item img.loaded { opacity: 1; outline: var(--image-outline); outline-offset: -1px; }
+    .grid .item img.loaded { opacity: 1; }
 
     .manifest-preview {
       font-family: var(--mono, ui-monospace, monospace);

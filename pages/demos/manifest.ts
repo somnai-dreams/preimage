@@ -75,12 +75,7 @@ function renderGrid(container: HTMLElement, preparedList: RenderableTile[]): voi
     const place = placements[i]!
     const p = preparedList[i]!
     const tile = document.createElement('div')
-    // Manifest-sourced tiles drop the light-gray skeleton background:
-    // the slot placement is already correct, so the only thing left to
-    // wait for is the image bytes themselves, and leaving a visible
-    // gray box behind them while they arrive looks like a load state
-    // that isn't there.
-    tile.className = p.source === 'manifest' ? 'item no-skeleton' : 'item'
+    tile.className = 'item'
     tile.style.left = `${place.x + GAP}px`
     tile.style.top = `${place.y + GAP}px`
     tile.style.width = `${place.width}px`
@@ -92,9 +87,17 @@ function renderGrid(container: HTMLElement, preparedList: RenderableTile[]): voi
     // network request happens once per image URL in the session.
     const img = p.element ?? new Image()
     img.alt = ''
+    let marked = false
+    const done = (): void => {
+      if (marked) return
+      marked = true
+      img.className = 'loaded'
+      tile.className = 'item has-image'
+    }
+    if (img.complete && img.naturalWidth > 0) done()
+    else img.addEventListener('load', done, { once: true })
     if (p.element === null) img.src = p.url
-    if (img.complete && img.naturalWidth > 0) img.classList.add('loaded')
-    else img.addEventListener('load', () => img.classList.add('loaded'), { once: true })
+    if (img.complete && img.naturalWidth > 0) done()
     tile.appendChild(img)
     frag.appendChild(tile)
   }
@@ -172,8 +175,8 @@ async function runHydrated(): Promise<void> {
   // Hydrate the measurement cache for every URL, then mint the
   // prepared handles directly via preparedFromMeasurement(m,
   // 'manifest'). The 'manifest' tag propagates through to
-  // prepared.source so the render layer can branch on it (skip
-  // skeleton, etc.) without tracking provenance separately.
+  // prepared.source so the render layer can display the provenance
+  // without tracking it separately.
   const tHydrate0 = performance.now()
   const prepared = entries.map((e) => {
     const measurement = recordKnownMeasurement(e.url, e.width, e.height)
