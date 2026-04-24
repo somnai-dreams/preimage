@@ -71,7 +71,7 @@
   <main class="page wide">
     <header class="page-header">
       <h1>Virtual — ten thousand tiles, DOM-recycled</h1>
-      <p>Windowing a grid of non-uniform-height tiles is the chicken-and-egg: you need heights to position items, but heights come from loading them. The left panel is the naive attempt — drop N <code>&lt;img&gt;</code> tags into a CSS column layout and let the browser fetch, decode, and reflow all at once. The right panel runs <code>@somnai-dreams/preimage/loading</code> over a DOM-recycled pool, so you can compare runtime dimension probing, optional manifest dimensions, and visible-first, after-layout, queued, or immediate image scheduling while scrolling.</p>
+      <p>Windowing a grid of non-uniform-height tiles is the chicken-and-egg: you need heights to position items, but heights come from loading them. The left panel is the naive attempt — drop N <code>&lt;img&gt;</code> tags into a CSS column layout and let the browser fetch, decode, and reflow all at once. The right panel runs <code>@somnai-dreams/preimage/loading</code> over a DOM-recycled pool, so you can compare runtime dimension probing, optional manifest dimensions, and queued, visible-first, after-layout, or immediate image scheduling while scrolling.</p>
     </header>
 
     <div class="controls">
@@ -83,9 +83,9 @@
         </div>
         <span class="controls-label">Measured loading</span>
         <div class="segmented loading-strategies" role="radiogroup" aria-label="Measured loading strategy">
-          <label><input type="radio" name="loading" value="visible-first" checked> Visible first</label>
+          <label><input type="radio" name="loading" value="queued" checked> Queued</label>
+          <label><input type="radio" name="loading" value="visible-first"> Visible first</label>
           <label><input type="radio" name="loading" value="after-layout"> After layout</label>
-          <label><input type="radio" name="loading" value="queued"> Queued</label>
           <label><input type="radio" name="loading" value="immediate"> Immediate</label>
         </div>
         <span class="controls-label">Dimensions</span>

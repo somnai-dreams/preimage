@@ -39,8 +39,8 @@ export type GalleryImageLoading =
   /** Place the skeleton layout first; start visible image requests
    *  only after every placement is known. */
   | 'after-layout'
-  /** Place skeletons as dimensions arrive, but send mounted images
-   *  through a bounded FIFO render queue. */
+  /** Place skeletons as dimensions arrive, then send mounted images
+   *  through a bounded queue that promotes viewport tiles. */
   | 'queued'
 
 export type GalleryPhase =
@@ -67,7 +67,7 @@ export type GalleryConfig = {
   contentContainer: HTMLElement
   packer: PackerCursor
   /** Controls when mounted tiles start visible image requests.
-   *  Defaults to `'visible-first'`. */
+   *  Defaults to `'queued'`. */
   imageLoading?: GalleryImageLoading
 
   renderSkeleton: RenderSkeleton
@@ -120,7 +120,7 @@ export function loadGallery(config: GalleryConfig): Gallery {
   }
   emit('start')
 
-  const imageLoading = config.imageLoading ?? 'visible-first'
+  const imageLoading = config.imageLoading ?? 'queued'
   switch (imageLoading) {
     case 'immediate':
       return runImmediate(config, state, emit)
@@ -429,13 +429,12 @@ function runQueued(
   let firstPlacementEmitted = false
   let firstImageEmitted = false
 
-  // Internal render queue: simple FIFO with a concurrency cap. We
-  // don't reuse PrepareQueue because its semantics (dedup by key,
-  // boost, etc.) don't match an image-render backlog — here we want
-  // plain FIFO with bounded in-flight.
+  // Internal render queue with a concurrency cap. We don't reuse
+  // PrepareQueue because render work is tile-element owned: a recycled
+  // node invalidates the queued job even when the URL matches.
   const renderCap = config.renderConcurrency ?? 8
-  const renderQueue: RenderJob[] = []
-  const activeRenderJobs = new Set<RenderJob>()
+  const renderQueue: PriorityRenderJob[] = []
+  const activeRenderJobs = new Set<PriorityRenderJob>()
   let renderInflight = 0
   function pumpRender(): void {
     if (state.cancelled) return
@@ -445,6 +444,7 @@ function runQueued(
         job.resolve()
         continue
       }
+      job.started = true
       const currentLoad = imageLoads.get(job.idx)
       const currentEl = mountedTiles.get(job.idx)
       if (
@@ -480,18 +480,47 @@ function runQueued(
       })
     }
   }
-  function enqueueRender(idx: number, el: HTMLElement, url: string): Promise<void> {
+  function enqueueRender(
+    idx: number,
+    el: HTMLElement,
+    url: string,
+    priority: RenderPriority,
+  ): Promise<void> {
     if (state.cancelled) return Promise.resolve()
     const existing = imageLoads.get(idx)
-    if (existing?.el === el) return existing.promise
+    if (existing?.el === el) {
+      if (priority === 'high') promoteRenderJob(renderQueue, idx, el, existing.promise)
+      return existing.promise
+    }
+    if (el.querySelector('img') !== null) return Promise.resolve()
+
     let resolveJob!: () => void
     const promise = new Promise<void>((resolve) => {
       resolveJob = resolve
     })
+    const job: PriorityRenderJob = { idx, el, url, priority, promise, resolve: resolveJob, started: false }
     imageLoads.set(idx, { el, promise })
-    renderQueue.push({ idx, el, url, promise, resolve: resolveJob })
+    pushRenderJob(renderQueue, job)
     pumpRender()
     return promise
+  }
+
+  function enqueueMountedImage(idx: number, el: HTMLElement): Promise<void> | null {
+    if (state.cancelled) return null
+    const url = indexUrl[idx]
+    const place = placements[idx]
+    if (url === undefined || place === undefined) return null
+    return enqueueRender(idx, el, url, isInViewport(config, place) ? 'high' : 'normal')
+  }
+
+  function enqueueMountedImages(): Promise<void>[] {
+    if (state.cancelled) return []
+    const loads: Promise<void>[] = []
+    for (const [idx, el] of mountedTiles) {
+      const load = enqueueMountedImage(idx, el)
+      if (load !== null) loads.push(load)
+    }
+    return loads
   }
 
   function placeReadyAspects(): void {
@@ -521,12 +550,27 @@ function runQueued(
     if (state.cancelled) return
     config.renderSkeleton(el, idx, place)
     mountedTiles.set(idx, el)
-    const url = indexUrl[idx]
-    if (url !== undefined) enqueueRender(idx, el, url)
+    enqueueMountedImage(idx, el)
   }, (idx, _el) => {
     mountedTiles.delete(idx)
     const load = imageLoads.get(idx)
     if (load?.el === _el) imageLoads.delete(idx)
+  })
+
+  let viewportBoostPending = false
+  function scheduleViewportBoost(): void {
+    if (state.cancelled) return
+    if (viewportBoostPending) return
+    viewportBoostPending = true
+    requestAnimationFrame(() => {
+      viewportBoostPending = false
+      if (state.cancelled) return
+      enqueueMountedImages()
+    })
+  }
+  config.scrollContainer.addEventListener('scroll', scheduleViewportBoost, { passive: true })
+  state.cleanup.push(() => {
+    config.scrollContainer.removeEventListener('scroll', scheduleViewportBoost)
   })
 
   async function finishQueuedLayout(): Promise<void> {
@@ -539,16 +583,7 @@ function runQueued(
     // without an in-flight render get queued. mount fires before
     // indexUrl is set if probe resolution order differs from pool
     // mount order; guard against that by sweeping here.
-    const visibleLoads: Promise<void>[] = []
-    for (const [idx, el] of mountedTiles) {
-      const url = indexUrl[idx]
-      if (url !== undefined && el.querySelector('img') === null) {
-        visibleLoads.push(enqueueRender(idx, el, url))
-      } else {
-        const load = imageLoads.get(idx)
-        if (load?.el === el) visibleLoads.push(load.promise)
-      }
-    }
+    const visibleLoads = enqueueMountedImages()
     await Promise.all(visibleLoads)
     if (state.cancelled) return
     emit('done')
@@ -650,19 +685,6 @@ function runVisibleFirst(
     }
   }
 
-  function promoteQueuedJob(idx: number, el: HTMLElement, promise: Promise<void>): void {
-    if (state.cancelled) return
-    const queuedIndex = renderQueue.findIndex(
-      (job) => !job.started && job.idx === idx && job.el === el && job.promise === promise,
-    )
-    if (queuedIndex <= 0) return
-    const [job] = renderQueue.splice(queuedIndex, 1)
-    if (job !== undefined) {
-      job.priority = 'high'
-      renderQueue.unshift(job)
-    }
-  }
-
   function enqueueRender(
     idx: number,
     el: HTMLElement,
@@ -672,7 +694,7 @@ function runVisibleFirst(
     if (state.cancelled) return Promise.resolve()
     const existing = imageLoads.get(idx)
     if (existing?.el === el) {
-      if (priority === 'high') promoteQueuedJob(idx, el, existing.promise)
+      if (priority === 'high') promoteRenderJob(renderQueue, idx, el, existing.promise)
       return existing.promise
     }
     if (el.querySelector('img') !== null) return Promise.resolve()
@@ -683,8 +705,7 @@ function runVisibleFirst(
     })
     const job: PriorityRenderJob = { idx, el, url, priority, promise, resolve: resolveJob, started: false }
     imageLoads.set(idx, { el, promise })
-    if (priority === 'high') renderQueue.unshift(job)
-    else renderQueue.push(job)
+    pushRenderJob(renderQueue, job)
     pumpRender()
     return promise
   }
@@ -942,6 +963,34 @@ type RenderPriority = 'high' | 'normal'
 type PriorityRenderJob = RenderJob & {
   priority: RenderPriority
   started: boolean
+}
+
+function pushRenderJob(renderQueue: PriorityRenderJob[], job: PriorityRenderJob): void {
+  if (job.priority === 'normal') {
+    renderQueue.push(job)
+    return
+  }
+
+  const firstNormal = renderQueue.findIndex((queued) => queued.priority === 'normal')
+  if (firstNormal === -1) renderQueue.push(job)
+  else renderQueue.splice(firstNormal, 0, job)
+}
+
+function promoteRenderJob(
+  renderQueue: PriorityRenderJob[],
+  idx: number,
+  el: HTMLElement,
+  promise: Promise<void>,
+): void {
+  const queuedIndex = renderQueue.findIndex(
+    (job) => !job.started && job.idx === idx && job.el === el && job.promise === promise,
+  )
+  if (queuedIndex < 0) return
+  const job = renderQueue[queuedIndex]!
+  if (job.priority === 'high') return
+  renderQueue.splice(queuedIndex, 1)
+  job.priority = 'high'
+  pushRenderJob(renderQueue, job)
 }
 
 function isInViewport(config: GalleryConfig, place: Placement): boolean {

@@ -37,6 +37,9 @@ class FakeElement {
   scrollTop = 0
   clientHeight = 1000
   clientWidth = 300
+  rectTop = 0
+  complete = false
+  naturalWidth = 0
   private readonly children: FakeElement[] = []
   private readonly listeners = new Map<string, Set<() => void>>()
 
@@ -68,14 +71,18 @@ class FakeElement {
     this.listeners.get(type)?.delete(cb)
   }
 
+  dispatch(type: string): void {
+    for (const cb of this.listeners.get(type) ?? []) cb()
+  }
+
   getBoundingClientRect(): DOMRect {
     return {
       x: 0,
-      y: 0,
-      top: 0,
+      y: this.rectTop,
+      top: this.rectTop,
       left: 0,
       right: this.clientWidth,
-      bottom: this.clientHeight,
+      bottom: this.rectTop + this.clientHeight,
       width: this.clientWidth,
       height: this.clientHeight,
       toJSON: () => ({}),
@@ -165,6 +172,20 @@ function makePacker(): PackerCursor {
     add(aspect: number) {
       const placement = { x: 0, y, width: aspect, height: 1 }
       y += 1
+      return placement
+    },
+    totalHeight() {
+      return y
+    },
+  }
+}
+
+function makeSpacedPacker(): PackerCursor {
+  let y = 0
+  return {
+    add() {
+      const placement = { x: 0, y, width: 100, height: 40 }
+      y += 100
       return placement
     },
     totalHeight() {
@@ -282,6 +303,58 @@ async function caseDestroySettlesAndIgnoresLateProbe(): Promise<void> {
   }
 }
 
+async function caseQueuedPromotesScrolledViewport(): Promise<void> {
+  const restore = installFakeDom()
+  try {
+    const scrollContainer = new FakeElement()
+    const contentContainer = new FakeElement()
+    scrollContainer.clientHeight = 40
+    const starts: number[] = []
+    const activeImgs = new Map<number, FakeElement>()
+    const gallery = loadGallery({
+      urls: ['/a.png', '/b.png', '/c.png', '/d.png'],
+      scrollContainer,
+      contentContainer,
+      packer: makeSpacedPacker(),
+      imageLoading: 'queued',
+      aspects: [1, 1, 1, 1],
+      overscan: 400,
+      renderConcurrency: 1,
+      renderSkeleton: () => {},
+      renderImage: (el, idx) => {
+        starts.push(idx)
+        const img = new FakeElement('IMG')
+        const tile = el as unknown as FakeElement
+        tile.appendChild(img)
+        activeImgs.set(idx, img)
+      },
+    })
+    await tick()
+    scrollContainer.scrollTop = 220
+    contentContainer.rectTop = -scrollContainer.scrollTop
+    scrollContainer.dispatch('scroll')
+    await tick()
+    const firstImg = activeImgs.get(0)
+    if (firstImg === undefined) {
+      fail('queued-promotion/started-first', `starts=${JSON.stringify(starts)}`)
+      gallery.destroy()
+      return
+    }
+    firstImg.complete = true
+    firstImg.naturalWidth = 100
+    firstImg.dispatch('load')
+    await tick()
+    if (JSON.stringify(starts.slice(0, 2)) !== JSON.stringify([0, 2])) {
+      fail('queued-promotion/visible-jumps-queue', `starts=${JSON.stringify(starts)}`)
+    } else {
+      pass('queued-promotion/visible-jumps-queue')
+    }
+    gallery.destroy()
+  } finally {
+    restore()
+  }
+}
+
 async function main(): Promise<void> {
   const t0 = performance.now()
   await caseImageLoadingOrder('immediate')
@@ -290,6 +363,7 @@ async function main(): Promise<void> {
   await caseImageLoadingOrder('visible-first')
   await caseKnownAspectsSkipProbe()
   await caseDestroySettlesAndIgnoresLateProbe()
+  await caseQueuedPromotesScrolledViewport()
   const wallMs = performance.now() - t0
 
   const total = results.length

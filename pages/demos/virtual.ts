@@ -51,7 +51,7 @@ function getImageLoading(): GalleryImageLoading {
     case 'immediate':
       return value
   }
-  return 'visible-first'
+  return 'queued'
 }
 
 function getUseManifestDims(): boolean {

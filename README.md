@@ -328,7 +328,7 @@ Reads only `MAX_HEADER_BYTES` (4KB) per file; the full image is never decoded ex
 
 `@somnai-dreams/preimage/virtual` exports `createVirtualTilePool`, the DOM-recycled tile pool used by the demos. Feed it `Placement[]`; it mounts only visible/overscan tiles and calls `unmount` so renderers can cancel image work.
 
-`@somnai-dreams/preimage/loading` exports `loadGallery`. Pass `aspects` when dimensions are already known; otherwise the helper probes dimensions through `PrepareQueue`. Separately, `imageLoading` controls when mounted tiles start visible image requests: `visible-first` prioritizes the current viewport, `after-layout` waits until the frame layer is complete, `queued` caps visible image fetches, and `immediate` starts image requests as tiles mount. The default is `visible-first`.
+`@somnai-dreams/preimage/loading` exports `loadGallery`. Pass `aspects` when dimensions are already known; otherwise the helper probes dimensions through `PrepareQueue`. Separately, `imageLoading` controls when mounted tiles start visible image requests: `queued` caps visible image fetches and promotes newly visible tiles, `visible-first` gates overscan work until the first viewport has loaded, `after-layout` waits until the frame layer is complete, and `immediate` starts image requests as tiles mount. The default is `queued`.
 
 ### Scroll prediction baselines
 
