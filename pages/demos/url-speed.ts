@@ -1,6 +1,7 @@
 import {
   clearCache,
   clearOriginStrategyCache,
+  getOriginStrategy,
   prepare,
   type PreparedImage,
 } from '@somnai-dreams/preimage'
@@ -19,8 +20,11 @@ type RowDom = {
   note: HTMLElement
   dims: HTMLElement
   image: HTMLElement
+  ttfb: HTMLElement
+  download: HTMLElement
   total: HTMLElement
   bytes: HTMLElement
+  strategy: HTMLElement
   source: HTMLElement
 }
 
@@ -28,8 +32,16 @@ type RowResult = {
   state: 'queued' | 'measuring' | 'loaded' | 'error' | 'cancelled'
   dimsMs: number | null
   imageMs: number | null
+  ttfbMs: number | null
+  downloadMs: number | null
   totalMs: number | null
   error: string | null
+}
+
+type ResourceTimingSummary = {
+  ttfbMs: number | null
+  downloadMs: number | null
+  bytes: number | null
 }
 
 type ActiveRun = {
@@ -135,6 +147,8 @@ async function runSpeedTest(): Promise<void> {
     raw: item.raw,
     url: cacheBustInput.checked ? withCacheBust(item.url, index) : item.url,
   }))
+  performance.clearResourceTimings()
+  performance.setResourceTimingBufferSize?.(Math.max(3000, urls.length * 6))
   const rows = urls.map((item, index) => createRow(index, item.raw, item.url))
   const run: ActiveRun = {
     id: ++nextRunId,
@@ -145,6 +159,8 @@ async function runSpeedTest(): Promise<void> {
       state: 'queued',
       dimsMs: null,
       imageMs: null,
+      ttfbMs: null,
+      downloadMs: null,
       totalMs: null,
       error: null,
     })),
@@ -196,9 +212,10 @@ async function measureOne(run: ActiveRun, row: RowDom, url: string, index: numbe
     const prepared = preparedResult.prepared
     run.results[index]!.dimsMs = dimsAt
     row.dims.textContent = fmtMs(dimsAt)
-    row.note.textContent = `${prepared.width}×${prepared.height}${preparedResult.fallback ? ' · img fallback' : ''}`
-    row.source.textContent = preparedResult.fallback ? 'img fallback' : prepared.source
-    row.bytes.textContent = fmtBytes(prepared.byteLength ?? resourceBytes(url))
+    row.note.textContent = `${prepared.width}×${prepared.height}`
+    row.strategy.textContent = strategyLabel(strategy, url, prepared, preparedResult.fallback)
+    row.source.textContent = prepared.source
+    applyTiming(row, run.results[index]!, url, prepared.byteLength)
 
     img = prepared.element ?? new Image()
     img.alt = ''
@@ -215,7 +232,7 @@ async function measureOne(run: ActiveRun, row: RowDom, url: string, index: numbe
     const totalAt = performance.now() - run.startedAt
     row.image.textContent = fmtMs(imageAt)
     row.total.textContent = fmtMs(totalAt)
-    row.bytes.textContent = fmtBytes(prepared.byteLength ?? resourceBytes(url))
+    applyTiming(row, run.results[index]!, url, prepared.byteLength)
     setRowState(run, index, row, 'loaded', `${prepared.width}×${prepared.height}`)
     run.results[index]!.imageMs = imageAt
     run.results[index]!.totalMs = totalAt
@@ -283,18 +300,35 @@ function createRow(index: number, rawUrl: string, measuredUrl: string): RowDom {
 
   const dims = metric('Dims')
   const image = metric('Image')
+  const ttfb = metric('TTFB')
+  const download = metric('Download')
   const total = metric('Total')
   const bytes = metric('Size')
+  const strategy = metric('Strategy')
   const source = metric('Source')
-  row.append(preview, urlCell, dims.host, image.host, total.host, bytes.host, source.host)
+  row.append(
+    preview,
+    urlCell,
+    dims.host,
+    image.host,
+    ttfb.host,
+    download.host,
+    total.host,
+    bytes.host,
+    strategy.host,
+    source.host,
+  )
   return {
     row,
     preview,
     note,
     dims: dims.value,
     image: image.value,
+    ttfb: ttfb.value,
+    download: download.value,
     total: total.value,
     bytes: bytes.value,
+    strategy: strategy.value,
     source: source.value,
   }
 }
@@ -369,12 +403,73 @@ function withCacheBust(url: string, index: number): string {
   return parsed.href
 }
 
-function resourceBytes(url: string): number | null {
-  let bytes = 0
-  for (const entry of performance.getEntriesByName(url)) {
-    const resource = entry as PerformanceResourceTiming
-    bytes = Math.max(bytes, resource.transferSize || 0, resource.encodedBodySize || 0)
+function strategyLabel(
+  selected: ProbeStrategy,
+  url: string,
+  prepared: PreparedImage,
+  fallback: boolean,
+): string {
+  if (fallback) return `${selected} → img`
+  if (selected !== 'auto') return selected
+  const actual = getOriginStrategy(originOf(url))
+  if (actual !== null) return `auto → ${actual}`
+  if (prepared.source === 'cache') return 'auto · cache'
+  if (prepared.source === 'url-pattern') return 'auto · URL'
+  return 'auto'
+}
+
+function originOf(url: string): string {
+  try {
+    return new URL(url, location.href).origin
+  } catch {
+    return ''
   }
+}
+
+function applyTiming(
+  row: RowDom,
+  result: RowResult,
+  url: string,
+  preparedByteLength: number | null,
+): void {
+  const timing = resourceTiming(url)
+  result.ttfbMs = timing.ttfbMs
+  result.downloadMs = timing.downloadMs
+  row.ttfb.textContent = fmtMs(timing.ttfbMs)
+  row.download.textContent = fmtMs(timing.downloadMs)
+  row.bytes.textContent = fmtBytes(preparedByteLength ?? timing.bytes)
+}
+
+function resourceTiming(url: string): ResourceTimingSummary {
+  const entries = performance.getEntriesByName(url)
+    .filter((entry): entry is PerformanceResourceTiming => entry.entryType === 'resource')
+  const preferred = latestResource(entries.filter((entry) => entry.initiatorType === 'img'))
+  const resource = preferred ?? latestResource(entries)
+  if (resource === null) {
+    return { ttfbMs: null, downloadMs: null, bytes: null }
+  }
+  return {
+    ttfbMs: timingDelta(resource.requestStart, resource.responseStart),
+    downloadMs: timingDelta(resource.responseStart, resource.responseEnd),
+    bytes: resourceBytes(resource),
+  }
+}
+
+function latestResource(entries: PerformanceResourceTiming[]): PerformanceResourceTiming | null {
+  let latest: PerformanceResourceTiming | null = null
+  for (const entry of entries) {
+    if (latest === null || entry.startTime > latest.startTime) latest = entry
+  }
+  return latest
+}
+
+function timingDelta(start: number, end: number): number | null {
+  if (start <= 0 || end <= 0 || end < start) return null
+  return end - start
+}
+
+function resourceBytes(resource: PerformanceResourceTiming): number | null {
+  const bytes = Math.max(resource.transferSize || 0, resource.encodedBodySize || 0)
   return bytes > 0 ? bytes : null
 }
 

@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="./demo-styles.css" />
   <style>
-    .page { max-width: 1120px; }
+    .page { max-width: 1280px; }
     .url-lab { display: grid; gap: 14px; }
     .url-input {
       display: block;
@@ -76,7 +76,7 @@
     .result-head,
     .speed-row {
       display: grid;
-      grid-template-columns: 72px minmax(160px, 1fr) repeat(5, minmax(78px, 94px));
+      grid-template-columns: 72px minmax(180px, 1fr) repeat(8, minmax(64px, 84px));
       gap: 10px;
       align-items: center;
     }
@@ -204,7 +204,7 @@
   <main class="page">
     <header class="page-header">
       <h1>URL speed — paste image URLs</h1>
-      <p>Run arbitrary image URLs through the same <code>prepare()</code> path the demos use, then load each preview and compare dimension time, image time, source, and bytes when the browser exposes them.</p>
+      <p>Run arbitrary image URLs through the same <code>prepare()</code> path the demos use, then load each preview and compare dimension time, image time, TTFB, download time, source, and bytes when the browser exposes them.</p>
     </header>
 
     <section class="url-lab">
@@ -232,8 +232,11 @@
         <span>URL</span>
         <span>Dims</span>
         <span>Image</span>
+        <span>TTFB</span>
+        <span>Download</span>
         <span>Total</span>
         <span>Size</span>
+        <span>Strategy</span>
         <span>Source</span>
       </div>
       <div id="results" class="result-list">
