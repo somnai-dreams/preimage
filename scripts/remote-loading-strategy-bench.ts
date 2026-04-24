@@ -37,6 +37,7 @@ type Args = {
   timeoutMs: number
   settleMs: number
   save: boolean
+  warmupRun: boolean
   failOnComparison: boolean
 }
 
@@ -83,6 +84,23 @@ type StrategyMetrics = {
   droppedFrames: number
 }
 
+type WarmupMetrics = {
+  range: {
+    ok: boolean
+    status: number | null
+    ms: number | null
+    bytes: number
+  }
+  run: {
+    enabled: boolean
+    strategy: Strategy | null
+    n: number
+    wallMs: number | null
+    firstImageMs: number | null
+    doneMs: number | null
+  }
+}
+
 type Check =
   | { ok: true; case: string; notes?: string }
   | { ok: false; case: string; reason: string }
@@ -111,6 +129,7 @@ function parseArgs(argv: string[]): Args {
     timeoutMs: Number(process.env.PREIMAGE_REMOTE_TIMEOUT_MS ?? 45000),
     settleMs: Number(process.env.PREIMAGE_REMOTE_SETTLE_MS ?? 250),
     save: process.env.PREIMAGE_REMOTE_NO_SAVE !== '1',
+    warmupRun: process.env.PREIMAGE_REMOTE_NO_WARMUP_RUN !== '1',
     failOnComparison: process.env.PREIMAGE_REMOTE_FAIL_ON_COMPARISON === '1',
   }
 
@@ -160,6 +179,9 @@ function parseArgs(argv: string[]): Args {
         break
       case '--no-save':
         args.save = false
+        break
+      case '--no-warmup-run':
+        args.warmupRun = false
         break
       case '--fail-on-comparison':
         args.failOnComparison = true
@@ -227,6 +249,7 @@ Options:
   --scroll-ms MS               Scripted scroll duration (default: 1400)
   --scroll-distance PX         Scripted scroll distance (default: 2600)
   --timeout-ms MS              Per-strategy timeout (default: 45000)
+  --no-warmup-run              Skip the untimed one-image app warmup
   --no-save                    Do not write benchmarks/*.json
   --fail-on-comparison         Fail if queued trails visible-first by the soft UX guard
 `)
@@ -339,7 +362,7 @@ async function runBrowserSweep(
   photos: PhotoEntry[],
   bundlePath: string,
   byteLengthByPath: Record<string, number>,
-): Promise<StrategyMetrics[]> {
+): Promise<{ runs: StrategyMetrics[]; warmup: WarmupMetrics }> {
   return await withServer(bundlePath, async (baseUrl) => {
     const browser = await openBrowser()
     try {
@@ -359,7 +382,8 @@ async function runBrowserSweep(
       })
       await page.goto(baseUrl, { waitUntil: 'load' })
       await page.waitForFunction(() => typeof (window as Window & { __runRemoteLoadingBench?: unknown }).__runRemoteLoadingBench === 'function')
-      await warmBrowserImageOrigin(page, `${args.origin}/assets/demos/photos/${photos[0]!.file}`)
+      const rangeWarmup = await warmBrowserImageOrigin(page, `${args.origin}/assets/demos/photos/${photos[0]!.file}`)
+      const runWarmup = await runUntimedWarmup(page, args, photos, byteLengthByPath)
 
       const runs: StrategyMetrics[] = []
       for (let run = 1; run <= args.runs; run++) {
@@ -390,26 +414,81 @@ async function runBrowserSweep(
         }
       }
       await page.close()
-      return runs
+      return {
+        runs,
+        warmup: {
+          range: rangeWarmup,
+          run: runWarmup,
+        },
+      }
     } finally {
       await browser.close()
     }
   })
 }
 
-async function warmBrowserImageOrigin(page: Page, url: string): Promise<void> {
-  await page.evaluate(async (warmupUrl) => {
+async function warmBrowserImageOrigin(page: Page, url: string): Promise<WarmupMetrics['range']> {
+  return await page.evaluate(async (warmupUrl) => {
+    const t0 = performance.now()
     try {
       const response = await fetch(`${warmupUrl}?warmup=${Date.now()}`, {
         cache: 'no-store',
         headers: { Range: 'bytes=0-0' },
       })
-      await response.arrayBuffer()
+      const body = await response.arrayBuffer()
+      return {
+        ok: response.ok,
+        status: response.status,
+        ms: performance.now() - t0,
+        bytes: body.byteLength,
+      }
     } catch {
       // The sweep itself reports real failures. Warmup only removes
       // first-run connection bias from comparisons, so it stays best-effort.
+      return { ok: false, status: null, ms: null, bytes: 0 }
     }
   }, url)
+}
+
+async function runUntimedWarmup(
+  page: Page,
+  args: Args,
+  photos: PhotoEntry[],
+  byteLengthByPath: Record<string, number>,
+): Promise<WarmupMetrics['run']> {
+  if (!args.warmupRun) {
+    return { enabled: false, strategy: null, n: 0, wallMs: null, firstImageMs: null, doneMs: null }
+  }
+  const strategy = args.strategies.includes('queued') ? 'queued' : args.strategies[0]!
+  const config: BrowserRunConfig = {
+    strategy,
+    urls: urlsForRun(photos, { ...args, n: 1 }, 0, strategy),
+    byteLengthByPath,
+    origin: args.origin,
+    n: 1,
+    concurrency: args.concurrency,
+    renderConcurrency: args.renderConcurrency,
+    panelWidth: args.panelWidth,
+    viewportHeight: args.viewportHeight,
+    scrollMs: 0,
+    scrollDistance: 0,
+    timeoutMs: args.timeoutMs,
+    settleMs: 0,
+  }
+  const result = await page.evaluate(async (runConfig) => {
+    const runner = (window as Window & {
+      __runRemoteLoadingBench: (config: BrowserRunConfig) => Promise<StrategyMetrics>
+    }).__runRemoteLoadingBench
+    return await runner(runConfig)
+  }, config)
+  return {
+    enabled: true,
+    strategy,
+    n: 1,
+    wallMs: result.wallMs,
+    firstImageMs: result.firstImageMs,
+    doneMs: result.doneMs,
+  }
 }
 
 function browserEntrySource(): string {
@@ -816,6 +895,17 @@ function printMetrics(runs: StrategyMetrics[]): void {
   }
 }
 
+function printWarmup(warmup: WarmupMetrics): void {
+  const rangeMs = warmup.range.ms === null ? '-' : formatMs(warmup.range.ms)
+  const status = warmup.range.status === null ? 'error' : String(warmup.range.status)
+  const runBit = warmup.run.enabled && warmup.run.strategy !== null
+    ? `app ${warmup.run.strategy} n=${warmup.run.n} firstImg=${formatMs(warmup.run.firstImageMs)} done=${formatMs(warmup.run.doneMs)}`
+    : 'app skipped'
+  process.stdout.write(
+    `\nwarmup: range status=${status} bytes=${formatBytes(warmup.range.bytes)} ms=${rangeMs}; ${runBit}\n`,
+  )
+}
+
 function checkResults(runs: StrategyMetrics[], args: Args): Check[] {
   const checks: Check[] = []
   for (const run of runs) {
@@ -871,6 +961,7 @@ async function saveRun(
   checks: Check[],
   wallMs: number,
   byteLengthByPath: Record<string, number>,
+  warmup: WarmupMetrics,
 ): Promise<string | null> {
   if (!args.save) return null
   const outDir = resolve(repoRoot, 'benchmarks')
@@ -897,8 +988,10 @@ async function saveRun(
           scrollMs: args.scrollMs,
           scrollDistance: args.scrollDistance,
           timeoutMs: args.timeoutMs,
+          warmupRun: args.warmupRun,
           failOnComparison: args.failOnComparison,
         },
+        warmup,
         results: {
           aggregate: aggregateByStrategy(runs),
           runs,
@@ -919,12 +1012,13 @@ async function main(): Promise<void> {
     const photos = await loadPhotos()
     const byteLengthByPath = await loadRemoteByteLengths(photos, args)
     const bundlePath = await buildBrowserBundle()
-    const runs = await runBrowserSweep(args, photos, bundlePath, byteLengthByPath)
+    const { runs, warmup } = await runBrowserSweep(args, photos, bundlePath, byteLengthByPath)
     const wallMs = performance.now() - t0
     const checks = checkResults(runs, args)
     const passed = checks.filter((check) => check.ok).length
     const failed = checks.filter((check) => !check.ok)
 
+    printWarmup(warmup)
     printMetrics(runs)
     process.stdout.write(`\n=== remote-loading-strategy: ${passed}/${checks.length} passed in ${wallMs.toFixed(0)}ms ===\n`)
     if (failed.length > 0) {
@@ -933,7 +1027,7 @@ async function main(): Promise<void> {
         if (!check.ok) process.stdout.write(`  x ${check.case}: ${check.reason}\n`)
       }
     }
-    const outPath = await saveRun(args, runs, checks, wallMs, byteLengthByPath)
+    const outPath = await saveRun(args, runs, checks, wallMs, byteLengthByPath, warmup)
     if (outPath !== null) process.stdout.write(`=== Saved ${outPath} ===\n`)
     if (failed.length > 0) process.exit(1)
   } finally {

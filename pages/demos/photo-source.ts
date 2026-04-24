@@ -61,6 +61,18 @@ export function assetUrl(rel: string): string {
   return assetsRoot() + rel
 }
 
+export function photoAssetOrigin(): string {
+  return new URL(assetsRoot()).origin
+}
+
+export function installPhotoResourceHints(): void {
+  if (typeof document === 'undefined') return
+  const origin = photoAssetOrigin()
+  if (origin === window.location.origin) return
+  ensureResourceHint('preconnect', origin, true)
+  ensureResourceHint('dns-prefetch', origin, false)
+}
+
 export function photoUrl(p: Photo, cacheBust: string | null): string {
   const base = assetUrl(`assets/demos/photos/${p.file}`)
   return cacheBust === null ? base : `${base}?v=${cacheBust}`
@@ -94,6 +106,20 @@ export function cycledUrls(count: number, baseToken: string): string[] {
   }
   return out
 }
+
+function ensureResourceHint(rel: string, href: string, crossOrigin: boolean): void {
+  const selector = `link[data-preimage-photo-hint="${rel}"][data-preimage-photo-origin="${href}"]`
+  if (document.head.querySelector(selector) !== null) return
+  const link = document.createElement('link')
+  link.rel = rel
+  link.href = href
+  link.dataset.preimagePhotoHint = rel
+  link.dataset.preimagePhotoOrigin = href
+  if (crossOrigin) link.crossOrigin = ''
+  document.head.appendChild(link)
+}
+
+installPhotoResourceHints()
 
 // Manifest shape as emitted by the `preimage-manifest` CLI: a flat
 // `{ [urlPath]: { width, height } }` map. The manifest demo consumes
