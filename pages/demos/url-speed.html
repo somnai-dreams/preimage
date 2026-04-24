@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Preimage · URL speed</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="./demo-styles.css" />
+  <style>
+    .page { max-width: 1120px; }
+    .url-lab { display: grid; gap: 14px; }
+    .url-input {
+      display: block;
+      width: 100%;
+      min-height: 170px;
+      resize: vertical;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      color: var(--text);
+      font: 12.5px/1.55 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      outline: none;
+    }
+    .url-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+    .controls .secondary {
+      font: inherit;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      background: var(--surface);
+      cursor: pointer;
+    }
+    .controls .secondary:hover:not(:disabled) { border-color: var(--accent); }
+    .controls .secondary:disabled { cursor: not-allowed; color: var(--text-soft); background: var(--surface-muted); }
+    .controls .checkbox-control {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      font-size: 12.5px;
+      white-space: nowrap;
+    }
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 1px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      background: var(--border);
+    }
+    .summary-item {
+      min-width: 0;
+      padding: 10px 12px;
+      background: var(--surface);
+      font-variant-numeric: tabular-nums;
+    }
+    .summary-label {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--text-soft);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .summary-value {
+      display: block;
+      overflow: hidden;
+      color: var(--text);
+      font-weight: 600;
+      font-size: 15px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .result-head,
+    .speed-row {
+      display: grid;
+      grid-template-columns: 72px minmax(160px, 1fr) repeat(5, minmax(78px, 94px));
+      gap: 10px;
+      align-items: center;
+    }
+    .result-head {
+      padding: 0 10px;
+      color: var(--text-soft);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .result-list { display: grid; gap: 8px; }
+    .speed-row {
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      box-shadow: var(--shadow-sm);
+    }
+    .preview {
+      position: relative;
+      width: 72px;
+      aspect-ratio: 1;
+      overflow: hidden;
+      border-radius: var(--radius-sm);
+      background: var(--surface-muted);
+      outline: var(--image-outline);
+      outline-offset: -1px;
+    }
+    .preview img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .preview-index {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--text-soft);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    .url-cell { min-width: 0; }
+    .url-cell a {
+      display: block;
+      overflow: hidden;
+      color: var(--text);
+      text-decoration: none;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .url-cell a:hover { color: var(--accent); }
+    .row-note {
+      display: block;
+      overflow: hidden;
+      color: var(--text-soft);
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .metric { min-width: 0; font-variant-numeric: tabular-nums; }
+    .metric-label { display: none; }
+    .metric-value {
+      display: block;
+      overflow: hidden;
+      color: var(--text);
+      font-weight: 600;
+      text-align: right;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .speed-row.is-error .row-note { color: var(--reflow); }
+    .empty-state {
+      padding: 28px;
+      border: 1px dashed var(--border-strong);
+      border-radius: var(--radius-md);
+      color: var(--text-muted);
+      text-align: center;
+      background: var(--surface-muted);
+    }
+    @media (max-width: 900px) {
+      .summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .result-head { display: none; }
+      .speed-row {
+        grid-template-columns: 64px minmax(0, 1fr);
+        align-items: start;
+      }
+      .preview { width: 64px; }
+      .metric {
+        grid-column: 2;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 20px;
+      }
+      .metric-label {
+        display: inline;
+        color: var(--text-soft);
+        font-size: 12px;
+      }
+      .metric-value { text-align: right; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="demo-nav">
+    <a class="brand" href="./">preimage demos</a>
+    <a href="./packing.html">Packing</a>
+    <a href="./editorial.html">Editorial</a>
+    <a href="./ttfs.html">TTFS</a>
+    <a href="./decode-pool.html">Decode pool</a>
+    <a href="./virtual.html">Virtual</a>
+    <a href="./manifest.html">Manifest</a>
+    <a href="./stream.html">Stream</a>
+    <a href="./dropzone.html">Drop zone</a>
+    <a href="./chat.html">Chat</a>
+    <a href="./instant.html">Instant</a>
+    <a href="./url-speed.html" aria-current="page">URL speed</a>
+    <span class="spacer"></span>
+    <button type="button" id="warmCdn" class="warm-btn">Warm CDN</button>
+    <a class="gh" href="https://github.com/somnai-dreams/preimage">github</a>
+  </nav>
+
+  <main class="page">
+    <header class="page-header">
+      <h1>URL speed — paste image URLs</h1>
+      <p>Run arbitrary image URLs through the same <code>prepare()</code> path the demos use, then load each preview and compare dimension time, image time, source, and bytes when the browser exposes them.</p>
+    </header>
+
+    <section class="url-lab">
+      <textarea id="urls" class="url-input" spellcheck="false" placeholder="https://example.com/image.jpg&#10;https://example.com/another.png"></textarea>
+
+      <div class="controls">
+        <button id="run" class="primary" type="button">Run</button>
+        <button id="stop" class="secondary" type="button" disabled>Stop</button>
+        <button id="sample" class="secondary" type="button">Sample URLs</button>
+        <button id="clearCache" class="secondary" type="button">Clear cache</button>
+        <label class="checkbox-control"><input id="cacheBust" type="checkbox"> Cache-bust</label>
+        <span id="meta" class="meta">0 URLs</span>
+      </div>
+
+      <div class="summary-strip" aria-live="polite">
+        <div class="summary-item"><span class="summary-label">Complete</span><span id="sumComplete" class="summary-value">&mdash;</span></div>
+        <div class="summary-item"><span class="summary-label">First dims</span><span id="sumDims" class="summary-value">&mdash;</span></div>
+        <div class="summary-item"><span class="summary-label">First image</span><span id="sumImage" class="summary-value">&mdash;</span></div>
+        <div class="summary-item"><span class="summary-label">Total</span><span id="sumTotal" class="summary-value">&mdash;</span></div>
+        <div class="summary-item"><span class="summary-label">Errors</span><span id="sumErrors" class="summary-value">&mdash;</span></div>
+      </div>
+
+      <div class="result-head" aria-hidden="true">
+        <span>Preview</span>
+        <span>URL</span>
+        <span>Dims</span>
+        <span>Image</span>
+        <span>Total</span>
+        <span>Size</span>
+        <span>Source</span>
+      </div>
+      <div id="results" class="result-list">
+        <div class="empty-state">Paste image URLs and run the speed test.</div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./url-speed.ts"></script>
+  <script type="module" src="./nav-concurrency.ts"></script>
+  <script type="module" src="./warm-cdn.ts"></script>
+</body>
+</html>

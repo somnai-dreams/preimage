@@ -104,6 +104,16 @@ if (nav !== null) {
     nav.appendChild(strategyKnob)
   }
 
+  // Also inject the URL speed lab so it is reachable from older demo
+  // navs without editing every HTML file.
+  if (nav.querySelector('a[href$="url-speed.html"]') === null) {
+    const speedLink = document.createElement('a')
+    speedLink.href = './url-speed.html'
+    speedLink.textContent = 'URL speed'
+    if (anchor !== null) nav.insertBefore(speedLink, anchor)
+    else nav.appendChild(speedLink)
+  }
+
   // Also inject a "benchmarks" link so the bench pages are reachable
   // from any demo nav without editing every HTML file.
   if (nav.querySelector('a[href$="/bench/"]') === null) {

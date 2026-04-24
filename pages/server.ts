@@ -17,6 +17,7 @@ import streamHtml from './demos/stream.html'
 import dropzoneHtml from './demos/dropzone.html'
 import chatHtml from './demos/chat.html'
 import instantHtml from './demos/instant.html'
+import urlSpeedHtml from './demos/url-speed.html'
 import benchIndexHtml from './bench/index.html'
 import benchProbeHtml from './bench/probe.html'
 import benchSweepHtml from './bench/sweep.html'
@@ -46,6 +47,7 @@ const routes = {
   '/dropzone.html': dropzoneHtml,
   '/chat.html': chatHtml,
   '/instant.html': instantHtml,
+  '/url-speed.html': urlSpeedHtml,
   '/bench/': benchIndexHtml,
   '/bench/index.html': benchIndexHtml,
   '/bench/probe.html': benchProbeHtml,
