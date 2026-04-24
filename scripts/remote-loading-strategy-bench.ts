@@ -102,7 +102,7 @@ function parseArgs(argv: string[]): Args {
     runs: Number(process.env.PREIMAGE_REMOTE_RUNS ?? 1),
     strategies: DEFAULT_STRATEGIES.slice(),
     concurrency: Number(process.env.PREIMAGE_REMOTE_CONCURRENCY ?? 12),
-    renderConcurrency: Number(process.env.PREIMAGE_REMOTE_RENDER_CONCURRENCY ?? 8),
+    renderConcurrency: Number(process.env.PREIMAGE_REMOTE_RENDER_CONCURRENCY ?? 4),
     panelWidth: Number(process.env.PREIMAGE_REMOTE_PANEL_WIDTH ?? 840),
     viewportHeight: Number(process.env.PREIMAGE_REMOTE_VIEWPORT_HEIGHT ?? 620),
     scrollMs: Number(process.env.PREIMAGE_REMOTE_SCROLL_MS ?? 1400),
@@ -222,7 +222,7 @@ Options:
   --runs COUNT                 Repeats per strategy (default: 1)
   --strategies LIST            Comma list: ${DEFAULT_STRATEGIES.join(',')}
   --concurrency COUNT          PrepareQueue concurrency (default: 12)
-  --render-concurrency COUNT   Visible image render concurrency (default: 8)
+  --render-concurrency COUNT   Visible image render concurrency (default: 4)
   --scroll-ms MS               Scripted scroll duration (default: 1400)
   --scroll-distance PX         Scripted scroll distance (default: 2600)
   --timeout-ms MS              Per-strategy timeout (default: 45000)

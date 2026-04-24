@@ -436,7 +436,7 @@ function runQueued(
   // Internal render queue with a concurrency cap. We don't reuse
   // PrepareQueue because render work is tile-element owned: a recycled
   // node invalidates the queued job even when the URL matches.
-  const renderCap = config.renderConcurrency ?? 8
+  const renderCap = config.renderConcurrency ?? DEFAULT_RENDER_CONCURRENCY
   const renderQueue: PriorityRenderJob[] = []
   const activeRenderJobs = new Set<PriorityRenderJob>()
   const priorityTracker = createVirtualPriorityTracker({
@@ -650,7 +650,7 @@ function runVisibleFirst(
   let normalRenderEnabled = false
 
   const firstScreenTarget = Math.min(config.probe?.boostFirstScreen ?? 0, urls.length)
-  const renderCap = config.renderConcurrency ?? 8
+  const renderCap = config.renderConcurrency ?? DEFAULT_RENDER_CONCURRENCY
   const renderQueue: PriorityRenderJob[] = []
   const activeRenderJobs = new Set<PriorityRenderJob>()
   let renderInflight = 0
@@ -975,6 +975,7 @@ type RenderJob = {
 
 const RENDER_PRIORITY_VISIBLE = 400_000
 const RENDER_PRIORITY_NORMAL = 0
+const DEFAULT_RENDER_CONCURRENCY = 4
 
 type PriorityRenderJob = RenderJob & {
   priority: number
