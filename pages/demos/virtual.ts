@@ -178,7 +178,7 @@ async function runNaive(): Promise<void> {
 // Vibescript-shaped: transient state lives in a few locals, probe
 // resolves mutate state and schedule a frame, the frame does all DOM
 // writes in one pass. Per-probe DOM writes were re-doing style.height,
-// pool.setPlacements, and two stat rows on every one of up to 2000
+// pool.setPlacements, and two stat rows on every one of thousands of
 // microtasks — rAF-batching collapses them to one pass per frame.
 
 function markTileLoaded(el: HTMLElement, img: HTMLImageElement): void {

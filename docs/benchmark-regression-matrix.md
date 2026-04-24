@@ -24,7 +24,7 @@ Every public value export and package subpath needs an automated owner. The sour
 | prepare scheduling and decode cache | `prepare-queue-test.ts`, `decode-pool-test.ts` | `/bench/probe.html`, `/bench/range-sizing.html` |
 | build-time manifest | `manifest-build-test.ts` | manifest JSON output |
 | layout algebra | `packer-sweep.ts` | `/bench/packing.html`, `/bench/first-screen.html` |
-| virtualized tile pool | `virtual-pool-test.ts`, `loading-gallery-test.ts` | `/bench/virtual-scroll.html` |
+| virtualized tile pool | `virtual-pool-test.ts`, `loading-gallery-test.ts` | `/bench/virtual-scroll.html`, virtual priority helpers |
 | gallery loading orchestration | `loading-gallery-test.ts` | `remote-loading-strategy-bench.ts`, `bench:remote-loading`, `/bench/loading-pattern.html` |
 | scroll prediction | `predict-test.ts` | `/bench/predict.html` |
 | pretext integration | `pretext-integration-test.ts` | pretext demo consumers |

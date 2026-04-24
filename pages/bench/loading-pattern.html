@@ -53,7 +53,7 @@
   <main class="page">
     <header class="page-header">
       <h1>Loading modes</h1>
-      <p>Runs the same gallery workload with two independent choices: whether aspect ratios are probed or already known, and when mounted tiles start visible image requests. Visible-first prioritizes the current viewport, after-layout waits until the frame layer is complete, queued caps image fetches, and immediate starts image requests as soon as tiles mount.</p>
+      <p>Runs the same gallery workload with two independent choices: whether aspect ratios are probed or already known, and when mounted tiles start visible image requests. Queued caps image fetches and follows virtual priority, visible-first gates overscan work until the first viewport has loaded, after-layout waits until the frame layer is complete, and immediate starts image requests as soon as tiles mount.</p>
     </header>
 
     <div class="bench-controls">
@@ -62,9 +62,9 @@
 
       <label>Image loading</label>
       <div class="option-row">
-        <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="imageLoading" value="visible-first" checked /> visible-first</label>
+        <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="imageLoading" value="queued" checked /> queued (render cap 8)</label>
+        <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="imageLoading" value="visible-first" /> visible-first</label>
         <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="imageLoading" value="after-layout" /> after-layout</label>
-        <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="imageLoading" value="queued" /> queued (render cap 8)</label>
         <label style="text-transform: none; color: var(--text); letter-spacing: 0;"><input type="radio" name="imageLoading" value="immediate" /> immediate</label>
       </div>
 

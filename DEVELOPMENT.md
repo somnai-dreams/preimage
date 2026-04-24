@@ -48,7 +48,7 @@ Vercel previews redirect `/assets/demos/photos/*` to the GitHub Pages deployment
 | `packages/preimage/src/prepare.ts` | single-image `prepare()` / `layout()` / `disposePreparedImage()` |
 | `packages/preimage/src/prepare-queue.ts` | adaptive queueing, boost/deprioritize, option-aware dedupe |
 | `packages/preimage/src/decode-pool.ts` | off-main-thread bitmap decode cache |
-| `packages/preimage/src/virtual.ts` | DOM-recycled virtual tile pool |
+| `packages/preimage/src/virtual.ts` | DOM-recycled virtual tile pool + mounted-work priority helpers |
 | `packages/preimage/src/loading.ts` | gallery image scheduling and `Gallery.done` orchestration |
 | `packages/preimage/src/predict.ts` | scroll prediction baselines for virtual pre-render experiments |
 | `packages/preimage/src/manifest.ts` | build-time dimension manifest builder + CLI |
@@ -60,7 +60,7 @@ Vercel previews redirect `/assets/demos/photos/*` to the GitHub Pages deployment
 
 `bun run bench:remote-loading` starts a temporary local page, drives Chromium with Playwright, and loads the hosted demo photos from `https://somnai-dreams.github.io/preimage/assets/demos/photos/*.png`. It is not a demo bench: it lives under `scripts/` so it can serve as a local strategy sweep while still exercising real browser image requests.
 
-The default local run compares `visible-first`, `queued`, `after-layout`, and `immediate` with remote cache-busted URLs, scripted scroll, first-image/done timings, max render concurrency, and visible pending-tile ratios. The default `check:all` stays offline so CI and routine local checks do not spend hosted image bandwidth. To deliberately include the small remote pass, run `PREIMAGE_CHECK_REMOTE_LOADING=1 bun run check:all`; tune larger experiments with flags such as:
+The default local run compares `visible-first`, `queued`, `after-layout`, and `immediate` with remote cache-busted URLs, scripted scroll, first-image/done timings, max render concurrency, and visible pending-tile ratios. The browser does a tiny ranged warmup before timed strategy runs, and repeated sweeps alternate strategy order so the first strategy does not pay connection/cache setup alone. The default `check:all` stays offline so CI and routine local checks do not spend hosted image bandwidth. To deliberately include the small remote pass, run `PREIMAGE_CHECK_REMOTE_LOADING=1 bun run check:all`; tune larger experiments with flags such as:
 
 ```sh
 bun run bench:remote-loading -- --runs 3 --n 68 --strategies visible-first,queued

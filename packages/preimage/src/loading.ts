@@ -15,13 +15,13 @@
 import { PrepareQueue } from './prepare-queue.js'
 import type { PrepareOptions, PreparedImage } from './prepare.js'
 import {
-  createLinearPredictor,
-  type ScrollPredictor,
-  type ScrollSample,
-} from './predict.js'
-import {
+  createVirtualPriorityTracker,
   createVirtualTilePool,
+  getVirtualViewportRange,
+  placementIntersectsRange,
+  scoreVirtualPlacement,
   type Placement,
+  type VirtualPriorityContext,
   type VirtualTilePool,
 } from './virtual.js'
 
@@ -260,7 +260,7 @@ function runImmediate(
     emit('all-placements')
     config.contentContainer.style.height = `${packer.totalHeight()}px`
     pool.setPlacements(placements)
-    await waitForVisibleLoads(mountedTiles, imageLoads)
+    await waitForViewportLoads(config, placements, mountedTiles, imageLoads)
     if (state.cancelled) return
     emit('done')
   })
@@ -337,12 +337,10 @@ function runAfterLayout(
     pool.setPlacements(placements)
     emit('all-placements')
     renderPhase = true
-    const visibleLoads: Promise<void>[] = []
     for (const [idx, el] of mountedTiles) {
-      const load = attachImage(idx, el)
-      if (load !== null) visibleLoads.push(load)
+      attachImage(idx, el)
     }
-    await Promise.all(visibleLoads)
+    await waitForViewportLoads(config, placements, mountedTiles, imageLoads)
     if (state.cancelled) return
     emit('done')
   }
@@ -410,7 +408,7 @@ function runKnownAspectsImmediate(
 
   config.contentContainer.style.height = `${packer.totalHeight()}px`
   pool.setPlacements(placements)
-  const work = waitForVisibleLoads(mountedTiles, imageLoads).then(() => {
+  const work = waitForViewportLoads(config, placements, mountedTiles, imageLoads).then(() => {
     if (state.cancelled) return
     emit('done')
   })
@@ -441,20 +439,11 @@ function runQueued(
   const renderCap = config.renderConcurrency ?? 8
   const renderQueue: PriorityRenderJob[] = []
   const activeRenderJobs = new Set<PriorityRenderJob>()
-  const scrollSamples: ScrollSample[] = []
-  const scrollPredictor = createLinearPredictor({ smoothingWindow: 2 })
+  const priorityTracker = createVirtualPriorityTracker({
+    scrollContainer: config.scrollContainer,
+    contentContainer: config.contentContainer,
+  })
   let renderInflight = 0
-
-  function recordScrollSample(force = false): void {
-    const y = config.scrollContainer.scrollTop
-    const now = performance.now()
-    const last = scrollSamples[scrollSamples.length - 1]
-    if (!force && last !== undefined && last.y === y && now - last.t < QUEUED_LOOKAHEAD_MS) return
-    const t = last !== undefined && now <= last.t ? last.t + 0.001 : now
-    scrollSamples.push({ t, y })
-    while (scrollSamples.length > QUEUED_MAX_SCROLL_SAMPLES) scrollSamples.shift()
-  }
-  recordScrollSample(true)
 
   function pumpRender(): void {
     if (state.cancelled) return
@@ -528,19 +517,18 @@ function runQueued(
   function enqueueMountedImage(
     idx: number,
     el: HTMLElement,
-    priorityContext: RenderPriorityContext,
+    priorityContext: VirtualPriorityContext,
   ): Promise<void> | null {
     if (state.cancelled) return null
     const url = indexUrl[idx]
     const place = placements[idx]
     if (url === undefined || place === undefined) return null
-    return enqueueRender(idx, el, url, scoreRenderPriority(place, priorityContext))
+    return enqueueRender(idx, el, url, scoreVirtualPlacement(place, priorityContext))
   }
 
   function enqueueMountedImages(): Promise<void>[] {
     if (state.cancelled) return []
-    recordScrollSample()
-    const priorityContext = makeRenderPriorityContext(config, scrollPredictor, scrollSamples)
+    const priorityContext = priorityTracker.context()
     const loads: Promise<void>[] = []
     for (const [idx, el] of mountedTiles) {
       const load = enqueueMountedImage(idx, el, priorityContext)
@@ -576,8 +564,7 @@ function runQueued(
     if (state.cancelled) return
     config.renderSkeleton(el, idx, place)
     mountedTiles.set(idx, el)
-    recordScrollSample()
-    enqueueMountedImage(idx, el, makeRenderPriorityContext(config, scrollPredictor, scrollSamples))
+    enqueueMountedImage(idx, el, priorityTracker.context())
   }, (idx, _el) => {
     mountedTiles.delete(idx)
     const load = imageLoads.get(idx)
@@ -587,7 +574,7 @@ function runQueued(
   let viewportBoostPending = false
   function scheduleViewportBoost(): void {
     if (state.cancelled) return
-    recordScrollSample(true)
+    priorityTracker.sample(true)
     if (viewportBoostPending) return
     viewportBoostPending = true
     requestAnimationFrame(() => {
@@ -611,8 +598,8 @@ function runQueued(
     // without an in-flight render get queued. mount fires before
     // indexUrl is set if probe resolution order differs from pool
     // mount order; guard against that by sweeping here.
-    const visibleLoads = enqueueMountedImages()
-    await Promise.all(visibleLoads)
+    enqueueMountedImages()
+    await waitForViewportLoads(config, placements, mountedTiles, imageLoads)
     if (state.cancelled) return
     emit('done')
   }
@@ -837,7 +824,7 @@ function runVisibleFirst(
       pool.setPlacements(placements)
       emit('all-placements')
       startViewportRenderIfReady()
-      await waitForVisibleLoads(mountedTiles, imageLoads)
+      await waitForViewportLoads(config, placements, mountedTiles, imageLoads)
       if (state.cancelled) return
       emit('done')
     })()
@@ -864,7 +851,7 @@ function runVisibleFirst(
     startViewportRenderIfReady()
     normalRenderEnabled = true
     enqueueMountedImages()
-    await waitForVisibleLoads(mountedTiles, imageLoads)
+    await waitForViewportLoads(config, placements, mountedTiles, imageLoads)
     if (state.cancelled) return
     emit('done')
   })
@@ -987,29 +974,7 @@ type RenderJob = {
 }
 
 const RENDER_PRIORITY_VISIBLE = 400_000
-const RENDER_PRIORITY_PREDICTED = 300_000
-const RENDER_PRIORITY_AHEAD = 200_000
-const RENDER_PRIORITY_NEAR = 100_000
 const RENDER_PRIORITY_NORMAL = 0
-const RENDER_PRIORITY_DISTANCE_CAP = 99_999
-const QUEUED_LOOKAHEAD_MS = 250
-const QUEUED_MAX_SCROLL_SAMPLES = 12
-const QUEUED_MIN_PREDICTION_DELTA_PX = 8
-const QUEUED_MIN_PREDICTION_CONFIDENCE = 0.2
-const QUEUED_MIN_SCROLL_VELOCITY_PX_PER_MS = 0.02
-
-type ViewportRange = {
-  top: number
-  bottom: number
-  height: number
-  center: number
-}
-
-type RenderPriorityContext = {
-  current: ViewportRange
-  predicted: ViewportRange | null
-  direction: -1 | 0 | 1
-}
 
 type PriorityRenderJob = RenderJob & {
   priority: number
@@ -1041,106 +1006,23 @@ function updateRenderJobPriority(
 }
 
 function isInViewport(config: GalleryConfig, place: Placement): boolean {
-  return gapToRange(place, getViewportRange(config)) === 0
+  return placementIntersectsRange(
+    place,
+    getVirtualViewportRange(config.scrollContainer, config.contentContainer),
+  )
 }
 
-function makeRenderPriorityContext(
+function waitForViewportLoads(
   config: GalleryConfig,
-  predictor: ScrollPredictor,
-  samples: readonly ScrollSample[],
-): RenderPriorityContext {
-  const current = getViewportRange(config)
-  const prediction = predictor.predict(samples, QUEUED_LOOKAHEAD_MS)
-  const delta = prediction.y - config.scrollContainer.scrollTop
-  const velocity = latestVelocity(samples)
-  const direction = scrollDirection(delta, velocity)
-  const predicted =
-    prediction.confidence > QUEUED_MIN_PREDICTION_CONFIDENCE &&
-    Math.abs(delta) >= QUEUED_MIN_PREDICTION_DELTA_PX
-      ? shiftRange(current, delta)
-      : null
-  return { current, predicted, direction }
-}
-
-function scoreRenderPriority(place: Placement, context: RenderPriorityContext): number {
-  const visibleGap = gapToRange(place, context.current)
-  if (visibleGap === 0) {
-    return RENDER_PRIORITY_VISIBLE - cappedDistance(distanceToRangeCenter(place, context.current))
-  }
-
-  if (context.predicted !== null && gapToRange(place, context.predicted) === 0) {
-    return RENDER_PRIORITY_PREDICTED - cappedDistance(distanceToRangeCenter(place, context.predicted))
-  }
-
-  const aheadDistance = distanceAhead(place, context.current, context.direction)
-  if (aheadDistance !== null) {
-    return RENDER_PRIORITY_AHEAD - cappedDistance(aheadDistance)
-  }
-
-  if (context.direction === 0) {
-    return RENDER_PRIORITY_NEAR - cappedDistance(visibleGap)
-  }
-
-  return RENDER_PRIORITY_NORMAL - cappedDistance(visibleGap)
-}
-
-function getViewportRange(config: GalleryConfig): ViewportRange {
-  const scrollTop = config.scrollContainer.scrollTop
-  const scrollRect = config.scrollContainer.getBoundingClientRect()
-  const contentRect = config.contentContainer.getBoundingClientRect()
-  const contentOffsetTop = contentRect.top - scrollRect.top + scrollTop
-  const top = scrollTop - contentOffsetTop
-  const bottom = scrollTop + config.scrollContainer.clientHeight - contentOffsetTop
-  return { top, bottom, height: bottom - top, center: (top + bottom) / 2 }
-}
-
-function shiftRange(range: ViewportRange, delta: number): ViewportRange {
-  const top = range.top + delta
-  const bottom = range.bottom + delta
-  return { top, bottom, height: range.height, center: range.center + delta }
-}
-
-function gapToRange(place: Placement, range: ViewportRange): number {
-  const placeBottom = place.y + place.height
-  if (placeBottom < range.top) return range.top - placeBottom
-  if (place.y > range.bottom) return place.y - range.bottom
-  return 0
-}
-
-function distanceToRangeCenter(place: Placement, range: ViewportRange): number {
-  return Math.abs(place.y + place.height / 2 - range.center)
-}
-
-function distanceAhead(place: Placement, range: ViewportRange, direction: -1 | 0 | 1): number | null {
-  if (direction > 0 && place.y >= range.bottom) return place.y - range.bottom
-  if (direction < 0 && place.y + place.height <= range.top) return range.top - (place.y + place.height)
-  return null
-}
-
-function scrollDirection(delta: number, velocity: number): -1 | 0 | 1 {
-  if (Math.abs(delta) >= QUEUED_MIN_PREDICTION_DELTA_PX) return delta > 0 ? 1 : -1
-  if (Math.abs(velocity) >= QUEUED_MIN_SCROLL_VELOCITY_PX_PER_MS) return velocity > 0 ? 1 : -1
-  return 0
-}
-
-function cappedDistance(distance: number): number {
-  return Math.min(distance, RENDER_PRIORITY_DISTANCE_CAP)
-}
-
-function latestVelocity(samples: readonly ScrollSample[]): number {
-  if (samples.length < 2) return 0
-  const a = samples[samples.length - 2]!
-  const b = samples[samples.length - 1]!
-  const dt = b.t - a.t
-  return dt > 0 ? (b.y - a.y) / dt : 0
-}
-
-function waitForVisibleLoads(
+  placements: readonly Placement[],
   mountedTiles: ReadonlyMap<number, HTMLElement>,
   imageLoads: ReadonlyMap<number, ImageLoad>,
 ): Promise<void> {
+  const viewportRange = getVirtualViewportRange(config.scrollContainer, config.contentContainer)
   const visibleLoads: Promise<void>[] = []
   for (const [idx, el] of mountedTiles) {
+    const place = placements[idx]
+    if (place === undefined || !placementIntersectsRange(place, viewportRange)) continue
     const load = imageLoads.get(idx)
     if (load?.el === el) visibleLoads.push(load.promise)
   }

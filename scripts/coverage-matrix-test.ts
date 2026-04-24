@@ -165,10 +165,19 @@ const COVERAGE: CoverageArea[] = [
   },
   {
     area: 'virtualized tile pool',
-    exports: ['createVirtualTilePool'],
+    exports: [
+      'createVirtualTilePool',
+      'createVirtualPriorityTracker',
+      'createVirtualPriorityContext',
+      'getVirtualViewportRange',
+      'placementGapToRange',
+      'placementIntersectsRange',
+      'scoreVirtualPlacement',
+      'virtualPlacementPriority',
+    ],
     ciScripts: ['virtual-pool-test.ts', 'loading-gallery-test.ts'],
     benchPages: ['virtual-scroll.html'],
-    notes: 'DOM recycling, directional overscan, content offset, destroy cleanup, indirect gallery integration',
+    notes: 'DOM recycling, directional overscan, content offset, priority scoring, destroy cleanup, indirect gallery integration',
   },
   {
     area: 'gallery loading orchestration',

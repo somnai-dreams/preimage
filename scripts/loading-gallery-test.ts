@@ -264,6 +264,60 @@ async function caseKnownAspectsSkipProbe(): Promise<void> {
   }
 }
 
+async function caseDoneIgnoresOverscanLoads(imageLoading: GalleryImageLoading): Promise<void> {
+  const restore = installFakeDom()
+  try {
+    const scrollContainer = new FakeElement()
+    const contentContainer = new FakeElement()
+    scrollContainer.clientHeight = 40
+    const activeImgs = new Map<number, FakeElement>()
+    const gallery = loadGallery({
+      urls: ['/a.png', '/b.png', '/c.png'],
+      scrollContainer,
+      contentContainer,
+      packer: makeSpacedPacker(),
+      imageLoading,
+      aspects: [1, 1, 1],
+      overscan: 400,
+      renderConcurrency: 3,
+      renderSkeleton: () => {},
+      renderImage: (el, idx) => {
+        const img = new FakeElement('IMG')
+        const tile = el as unknown as FakeElement
+        tile.appendChild(img)
+        activeImgs.set(idx, img)
+      },
+    })
+    await tick()
+    if (activeImgs.size < 2) {
+      fail(`loading-done-visible-only/${imageLoading}/mounted-overscan`, `imgs=${activeImgs.size}`)
+      gallery.destroy()
+      return
+    }
+    const firstImg = activeImgs.get(0)
+    if (firstImg === undefined) {
+      fail(`loading-done-visible-only/${imageLoading}/visible-started`, `imgs=${activeImgs.size}`)
+      gallery.destroy()
+      return
+    }
+    firstImg.complete = true
+    firstImg.naturalWidth = 100
+    firstImg.dispatch('load')
+    const settled = await Promise.race([
+      gallery.done.then(() => 'done'),
+      new Promise<string>((resolve) => setTimeout(() => resolve('timeout'), 50)),
+    ])
+    if (settled !== 'done') {
+      fail(`loading-done-visible-only/${imageLoading}/settles`, `got ${settled}`)
+    } else {
+      pass(`loading-done-visible-only/${imageLoading}`)
+    }
+    gallery.destroy()
+  } finally {
+    restore()
+  }
+}
+
 async function caseDestroySettlesAndIgnoresLateProbe(): Promise<void> {
   const restore = installFakeDom()
   try {
@@ -415,6 +469,9 @@ async function main(): Promise<void> {
   await caseImageLoadingOrder('queued')
   await caseImageLoadingOrder('visible-first')
   await caseKnownAspectsSkipProbe()
+  await caseDoneIgnoresOverscanLoads('immediate')
+  await caseDoneIgnoresOverscanLoads('after-layout')
+  await caseDoneIgnoresOverscanLoads('queued')
   await caseDestroySettlesAndIgnoresLateProbe()
   await caseQueuedPromotesScrolledViewport()
   await caseQueuedPromotesPredictedViewport()

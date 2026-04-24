@@ -13,7 +13,7 @@ import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { chromium, type Browser } from 'playwright'
+import { chromium, type Browser, type Page } from 'playwright'
 
 type Strategy = 'visible-first' | 'queued' | 'after-layout' | 'immediate'
 
@@ -267,9 +267,10 @@ async function loadRemoteByteLengths(photos: PhotoEntry[], args: Args): Promise<
   for (let i = 0; i < args.n; i++) files.add(photos[i % photos.length]!.file)
   const byPath: Record<string, number> = {}
   for (const file of files) {
-    const pathname = `/assets/demos/photos/${file}`
+    const remoteUrl = `${args.origin}/assets/demos/photos/${file}`
+    const pathname = new URL(remoteUrl).pathname
     try {
-      byPath[pathname] = await fetchContentLength(`${args.origin}${pathname}`, 10_000)
+      byPath[pathname] = await fetchContentLength(remoteUrl, 10_000)
     } catch {
       byPath[pathname] = 0
     }
@@ -357,10 +358,12 @@ async function runBrowserSweep(
       })
       await page.goto(baseUrl, { waitUntil: 'load' })
       await page.waitForFunction(() => typeof (window as Window & { __runRemoteLoadingBench?: unknown }).__runRemoteLoadingBench === 'function')
+      await warmBrowserImageOrigin(page, `${args.origin}/assets/demos/photos/${photos[0]!.file}`)
 
       const runs: StrategyMetrics[] = []
       for (let run = 1; run <= args.runs; run++) {
-        for (const strategy of args.strategies) {
+        const strategiesForRun = run % 2 === 0 ? args.strategies.slice().reverse() : args.strategies
+        for (const strategy of strategiesForRun) {
           const config: BrowserRunConfig = {
             strategy,
             urls: urlsForRun(photos, args, run, strategy),
@@ -391,6 +394,21 @@ async function runBrowserSweep(
       await browser.close()
     }
   })
+}
+
+async function warmBrowserImageOrigin(page: Page, url: string): Promise<void> {
+  await page.evaluate(async (warmupUrl) => {
+    try {
+      const response = await fetch(`${warmupUrl}?warmup=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { Range: 'bytes=0-0' },
+      })
+      await response.arrayBuffer()
+    } catch {
+      // The sweep itself reports real failures. Warmup only removes
+      // first-run connection bias from comparisons, so it stays best-effort.
+    }
+  }, url)
 }
 
 function browserEntrySource(): string {

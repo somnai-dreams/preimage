@@ -8,6 +8,8 @@
 //   - a rAF-throttled scroll listener on the scroll container
 //   - a Map of currently-mounted tiles keyed by placement index
 //   - mount/unmount callbacks where the caller does their rendering
+//   - optional priority helpers for deciding which mounted resources
+//     should load first
 //
 // It is intentionally headless about content: the caller's `mount`
 // callback receives an absolutely-positioned `<div>` plus the index
@@ -37,6 +39,12 @@
 //
 //   // When the page unmounts:
 //   pool.destroy()
+
+import {
+  createLinearPredictor,
+  type ScrollPredictor,
+  type ScrollSample,
+} from './predict.js'
 
 export type Placement = {
   x: number
@@ -88,6 +96,65 @@ export type VirtualTilePool = {
   readonly activeCount: number
 }
 
+export type VirtualScrollDirection = -1 | 0 | 1
+
+export type VirtualViewportRange = {
+  top: number
+  bottom: number
+  height: number
+  center: number
+}
+
+export type VirtualPriorityBand =
+  | 'visible'
+  | 'predicted'
+  | 'ahead'
+  | 'near'
+  | 'behind'
+
+export type VirtualPriorityContext = {
+  current: VirtualViewportRange
+  predicted: VirtualViewportRange | null
+  direction: VirtualScrollDirection
+}
+
+export type VirtualPlacementPriority = {
+  band: VirtualPriorityBand
+  score: number
+  distance: number
+}
+
+export type VirtualPriorityTrackerOptions = {
+  scrollContainer: HTMLElement
+  contentContainer: HTMLElement
+  predictor?: ScrollPredictor
+  horizonMs?: number
+  maxSamples?: number
+  sampleDedupeMs?: number
+  minPredictionDeltaPx?: number
+  minPredictionConfidence?: number
+  minScrollVelocityPxPerMs?: number
+}
+
+export type VirtualPriorityTracker = {
+  sample(force?: boolean): ScrollSample
+  context(): VirtualPriorityContext
+  priority(placement: Placement): VirtualPlacementPriority
+  score(placement: Placement): number
+}
+
+const VIRTUAL_PRIORITY_VISIBLE = 400_000
+const VIRTUAL_PRIORITY_PREDICTED = 300_000
+const VIRTUAL_PRIORITY_AHEAD = 200_000
+const VIRTUAL_PRIORITY_NEAR = 100_000
+const VIRTUAL_PRIORITY_BEHIND = 0
+const VIRTUAL_PRIORITY_DISTANCE_CAP = 99_999
+const DEFAULT_PRIORITY_HORIZON_MS = 250
+const DEFAULT_PRIORITY_MAX_SAMPLES = 12
+const DEFAULT_PRIORITY_MIN_DELTA_PX = 8
+const DEFAULT_PRIORITY_MIN_CONFIDENCE = 0.2
+const DEFAULT_PRIORITY_MIN_VELOCITY_PX_PER_MS = 0.02
+
 function rafThrottle(fn: () => void): () => void {
   let pending = false
   return () => {
@@ -98,6 +165,262 @@ function rafThrottle(fn: () => void): () => void {
       fn()
     })
   }
+}
+
+export function createVirtualPriorityTracker(
+  options: VirtualPriorityTrackerOptions,
+): VirtualPriorityTracker {
+  const predictor = options.predictor ?? createLinearPredictor({ smoothingWindow: 2 })
+  const horizonMs = positiveFiniteOption('horizonMs', options.horizonMs, DEFAULT_PRIORITY_HORIZON_MS)
+  const maxSamples = positiveIntegerOption('maxSamples', options.maxSamples, DEFAULT_PRIORITY_MAX_SAMPLES)
+  const sampleDedupeMs = nonNegativeFiniteOption('sampleDedupeMs', options.sampleDedupeMs, horizonMs)
+  const minPredictionDeltaPx = nonNegativeFiniteOption(
+    'minPredictionDeltaPx',
+    options.minPredictionDeltaPx,
+    DEFAULT_PRIORITY_MIN_DELTA_PX,
+  )
+  const minPredictionConfidence = confidenceOption(
+    'minPredictionConfidence',
+    options.minPredictionConfidence,
+    DEFAULT_PRIORITY_MIN_CONFIDENCE,
+  )
+  const minScrollVelocityPxPerMs =
+    nonNegativeFiniteOption(
+      'minScrollVelocityPxPerMs',
+      options.minScrollVelocityPxPerMs,
+      DEFAULT_PRIORITY_MIN_VELOCITY_PX_PER_MS,
+    )
+  const samples: ScrollSample[] = []
+
+  function sample(force = false): ScrollSample {
+    const y = options.scrollContainer.scrollTop
+    const now = performance.now()
+    const last = samples[samples.length - 1]
+    if (!force && last !== undefined && last.y === y && now - last.t < sampleDedupeMs) {
+      return last
+    }
+    const t = last !== undefined && now <= last.t ? last.t + 0.001 : now
+    samples.push({ t, y })
+    while (samples.length > maxSamples) samples.shift()
+    return samples[samples.length - 1]!
+  }
+
+  function context(): VirtualPriorityContext {
+    sample()
+    return createVirtualPriorityContext({
+      scrollContainer: options.scrollContainer,
+      contentContainer: options.contentContainer,
+      predictor,
+      samples,
+      horizonMs,
+      minPredictionDeltaPx,
+      minPredictionConfidence,
+      minScrollVelocityPxPerMs,
+    })
+  }
+
+  sample(true)
+
+  return {
+    sample,
+    context,
+    priority(placement) {
+      return virtualPlacementPriority(placement, context())
+    },
+    score(placement) {
+      return scoreVirtualPlacement(placement, context())
+    },
+  }
+}
+
+export function createVirtualPriorityContext(options: {
+  scrollContainer: HTMLElement
+  contentContainer: HTMLElement
+  predictor: ScrollPredictor
+  samples: readonly ScrollSample[]
+  horizonMs?: number
+  minPredictionDeltaPx?: number
+  minPredictionConfidence?: number
+  minScrollVelocityPxPerMs?: number
+}): VirtualPriorityContext {
+  const horizonMs = positiveFiniteOption('horizonMs', options.horizonMs, DEFAULT_PRIORITY_HORIZON_MS)
+  const minPredictionDeltaPx = nonNegativeFiniteOption(
+    'minPredictionDeltaPx',
+    options.minPredictionDeltaPx,
+    DEFAULT_PRIORITY_MIN_DELTA_PX,
+  )
+  const minPredictionConfidence = confidenceOption(
+    'minPredictionConfidence',
+    options.minPredictionConfidence,
+    DEFAULT_PRIORITY_MIN_CONFIDENCE,
+  )
+  const minScrollVelocityPxPerMs =
+    nonNegativeFiniteOption(
+      'minScrollVelocityPxPerMs',
+      options.minScrollVelocityPxPerMs,
+      DEFAULT_PRIORITY_MIN_VELOCITY_PX_PER_MS,
+    )
+  const current = getVirtualViewportRange(options.scrollContainer, options.contentContainer)
+  const prediction = options.predictor.predict(options.samples, horizonMs)
+  const delta = prediction.y - options.scrollContainer.scrollTop
+  const velocity = latestVelocity(options.samples)
+  const direction = virtualScrollDirection(delta, velocity, minPredictionDeltaPx, minScrollVelocityPxPerMs)
+  const predicted =
+    prediction.confidence > minPredictionConfidence &&
+    Math.abs(delta) >= minPredictionDeltaPx
+      ? shiftRange(current, delta)
+      : null
+  return { current, predicted, direction }
+}
+
+export function getVirtualViewportRange(
+  scrollContainer: HTMLElement,
+  contentContainer: HTMLElement,
+): VirtualViewportRange {
+  const scrollTop = scrollContainer.scrollTop
+  const scrollRect = scrollContainer.getBoundingClientRect()
+  const contentRect = contentContainer.getBoundingClientRect()
+  const contentOffsetTop = contentRect.top - scrollRect.top + scrollTop
+  const top = scrollTop - contentOffsetTop
+  const bottom = scrollTop + scrollContainer.clientHeight - contentOffsetTop
+  return { top, bottom, height: bottom - top, center: (top + bottom) / 2 }
+}
+
+export function placementGapToRange(place: Placement, range: VirtualViewportRange): number {
+  const placeBottom = place.y + place.height
+  if (placeBottom < range.top) return range.top - placeBottom
+  if (place.y > range.bottom) return place.y - range.bottom
+  return 0
+}
+
+export function placementIntersectsRange(place: Placement, range: VirtualViewportRange): boolean {
+  return placementGapToRange(place, range) === 0
+}
+
+export function scoreVirtualPlacement(place: Placement, context: VirtualPriorityContext): number {
+  return virtualPlacementPriority(place, context).score
+}
+
+export function virtualPlacementPriority(
+  place: Placement,
+  context: VirtualPriorityContext,
+): VirtualPlacementPriority {
+  const visibleGap = placementGapToRange(place, context.current)
+  if (visibleGap === 0) {
+    const distance = distanceToRangeCenter(place, context.current)
+    return {
+      band: 'visible',
+      distance,
+      score: VIRTUAL_PRIORITY_VISIBLE - cappedDistance(distance),
+    }
+  }
+
+  if (context.predicted !== null && placementGapToRange(place, context.predicted) === 0) {
+    const distance = distanceToRangeCenter(place, context.predicted)
+    return {
+      band: 'predicted',
+      distance,
+      score: VIRTUAL_PRIORITY_PREDICTED - cappedDistance(distance),
+    }
+  }
+
+  const aheadDistance = distanceAhead(place, context.current, context.direction)
+  if (aheadDistance !== null) {
+    return {
+      band: 'ahead',
+      distance: aheadDistance,
+      score: VIRTUAL_PRIORITY_AHEAD - cappedDistance(aheadDistance),
+    }
+  }
+
+  if (context.direction === 0) {
+    return {
+      band: 'near',
+      distance: visibleGap,
+      score: VIRTUAL_PRIORITY_NEAR - cappedDistance(visibleGap),
+    }
+  }
+
+  return {
+    band: 'behind',
+    distance: visibleGap,
+    score: VIRTUAL_PRIORITY_BEHIND - cappedDistance(visibleGap),
+  }
+}
+
+function shiftRange(range: VirtualViewportRange, delta: number): VirtualViewportRange {
+  const top = range.top + delta
+  const bottom = range.bottom + delta
+  return { top, bottom, height: range.height, center: range.center + delta }
+}
+
+function distanceToRangeCenter(place: Placement, range: VirtualViewportRange): number {
+  return Math.abs(place.y + place.height / 2 - range.center)
+}
+
+function distanceAhead(
+  place: Placement,
+  range: VirtualViewportRange,
+  direction: VirtualScrollDirection,
+): number | null {
+  if (direction > 0 && place.y >= range.bottom) return place.y - range.bottom
+  if (direction < 0 && place.y + place.height <= range.top) return range.top - (place.y + place.height)
+  return null
+}
+
+function virtualScrollDirection(
+  delta: number,
+  velocity: number,
+  minPredictionDeltaPx: number,
+  minScrollVelocityPxPerMs: number,
+): VirtualScrollDirection {
+  if (Math.abs(delta) >= minPredictionDeltaPx) return delta > 0 ? 1 : -1
+  if (Math.abs(velocity) >= minScrollVelocityPxPerMs) return velocity > 0 ? 1 : -1
+  return 0
+}
+
+function cappedDistance(distance: number): number {
+  return Math.min(distance, VIRTUAL_PRIORITY_DISTANCE_CAP)
+}
+
+function positiveFiniteOption(name: string, value: number | undefined, fallback: number): number {
+  const resolved = value ?? fallback
+  if (!Number.isFinite(resolved) || resolved <= 0) {
+    throw new RangeError(`virtual priority: ${name} must be positive, got ${resolved}.`)
+  }
+  return resolved
+}
+
+function nonNegativeFiniteOption(name: string, value: number | undefined, fallback: number): number {
+  const resolved = value ?? fallback
+  if (!Number.isFinite(resolved) || resolved < 0) {
+    throw new RangeError(`virtual priority: ${name} must be non-negative, got ${resolved}.`)
+  }
+  return resolved
+}
+
+function positiveIntegerOption(name: string, value: number | undefined, fallback: number): number {
+  const resolved = value ?? fallback
+  if (!Number.isInteger(resolved) || resolved < 1) {
+    throw new RangeError(`virtual priority: ${name} must be a positive integer, got ${resolved}.`)
+  }
+  return resolved
+}
+
+function confidenceOption(name: string, value: number | undefined, fallback: number): number {
+  const resolved = value ?? fallback
+  if (!Number.isFinite(resolved) || resolved < 0 || resolved > 1) {
+    throw new RangeError(`virtual priority: ${name} must be between 0 and 1, got ${resolved}.`)
+  }
+  return resolved
+}
+
+function latestVelocity(samples: readonly ScrollSample[]): number {
+  if (samples.length < 2) return 0
+  const a = samples[samples.length - 2]!
+  const b = samples[samples.length - 1]!
+  const dt = b.t - a.t
+  return dt > 0 ? (b.y - a.y) / dt : 0
 }
 
 export function createVirtualTilePool(options: VirtualTilePoolOptions): VirtualTilePool {

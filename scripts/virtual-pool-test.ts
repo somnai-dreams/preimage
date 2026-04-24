@@ -8,7 +8,13 @@ import { writeFile, mkdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { createVirtualTilePool, type Placement } from '../packages/preimage/src/virtual.ts'
+import {
+  createVirtualPriorityContext,
+  createVirtualPriorityTracker,
+  createVirtualTilePool,
+  virtualPlacementPriority,
+  type Placement,
+} from '../packages/preimage/src/virtual.ts'
 
 type Check =
   | { ok: true; case: string; notes?: string }
@@ -201,10 +207,80 @@ function caseContentOffset(): void {
   }
 }
 
+function caseVirtualPriorityBands(): void {
+  const restore = installFakeDom()
+  try {
+    const scroll = new FakeElement()
+    scroll.clientHeight = 40
+    scroll.clientWidth = 100
+    const content = new FakeElement()
+    content.clientWidth = 100
+    const context = createVirtualPriorityContext({
+      scrollContainer: scroll as unknown as HTMLElement,
+      contentContainer: content as unknown as HTMLElement,
+      predictor: {
+        name: 'fixture',
+        predict: () => ({ y: 120, confidence: 1 }),
+      },
+      samples: [{ t: 0, y: 0 }, { t: 100, y: 40 }],
+    })
+    const visible = virtualPlacementPriority({ x: 0, y: 0, width: 100, height: 40 }, context)
+    const predicted = virtualPlacementPriority({ x: 0, y: 120, width: 100, height: 40 }, context)
+    const ahead = virtualPlacementPriority({ x: 0, y: 220, width: 100, height: 40 }, context)
+    const behind = virtualPlacementPriority({ x: 0, y: -100, width: 100, height: 40 }, context)
+
+    const stationary = createVirtualPriorityContext({
+      scrollContainer: scroll as unknown as HTMLElement,
+      contentContainer: content as unknown as HTMLElement,
+      predictor: {
+        name: 'stationary',
+        predict: () => ({ y: 0, confidence: 1 }),
+      },
+      samples: [{ t: 0, y: 0 }],
+    })
+    const near = virtualPlacementPriority({ x: 0, y: 80, width: 100, height: 40 }, stationary)
+
+    const bands = [visible.band, predicted.band, ahead.band, behind.band, near.band]
+    const scores = [visible.score, predicted.score, ahead.score, behind.score]
+    if (JSON.stringify(bands) !== JSON.stringify(['visible', 'predicted', 'ahead', 'behind', 'near'])) {
+      fail('virtual/priority-bands', `bands=${JSON.stringify(bands)}`)
+    } else if (!(scores[0]! > scores[1]! && scores[1]! > scores[2]! && scores[2]! > scores[3]!)) {
+      fail('virtual/priority-order', `scores=${JSON.stringify(scores)}`)
+    } else {
+      pass('virtual/priority-bands')
+    }
+  } finally {
+    restore()
+  }
+}
+
+function caseVirtualPriorityValidation(): void {
+  const restore = installFakeDom()
+  try {
+    const scroll = new FakeElement()
+    const content = new FakeElement()
+    try {
+      createVirtualPriorityTracker({
+        scrollContainer: scroll as unknown as HTMLElement,
+        contentContainer: content as unknown as HTMLElement,
+        maxSamples: 0,
+      })
+      fail('virtual/priority-validation', 'accepted maxSamples=0')
+    } catch (err) {
+      if (err instanceof RangeError) pass('virtual/priority-validation')
+      else fail('virtual/priority-validation', String(err))
+    }
+  } finally {
+    restore()
+  }
+}
+
 async function main(): Promise<void> {
   const t0 = performance.now()
   await caseDirectionalOverscanAndReuse()
   caseContentOffset()
+  caseVirtualPriorityBands()
+  caseVirtualPriorityValidation()
   const wallMs = performance.now() - t0
 
   const total = results.length

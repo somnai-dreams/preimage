@@ -80,7 +80,7 @@ async function run(): Promise<void> {
   const n = Number(nInput.value)
   const concurrency = Number(concInput.value)
   const imageLoadingEl = document.querySelector<HTMLInputElement>('input[name="imageLoading"]:checked')
-  const imageLoading = (imageLoadingEl?.value ?? 'visible-first') as GalleryImageLoading
+  const imageLoading = (imageLoadingEl?.value ?? 'queued') as GalleryImageLoading
   const knownAspects = (document.getElementById('knownAspects') as HTMLInputElement).checked
 
   const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
