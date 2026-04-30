@@ -1,20 +1,51 @@
 # Preimage
 
-Image utilities for [pretext](https://github.com/chenglou/pretext)-flowed layouts and canvas/WebGL renderers. Measure images once, lay them out many times — no DOM reflow, no `await img.onload` before layout runs. Plus opt-in utilities for common "I have a lot of images" problems: concurrency capping, off-main-thread decode caching, `object-fit` math for canvas, URL-pattern dimension shortcuts.
+Fast image size probing for earlier, accurate layout paint.
 
-## What it does
+Preimage is for JS-owned image layouts: [pretext](https://github.com/chenglou/pretext)-flowed articles, canvas/WebGL renderers, masonry grids, virtualized galleries, upload previews. It gets the image's intrinsic width and height early, then lets the layout paint the correct boxes before the full image bytes finish loading and decoding.
 
-Pretext's variable-width cursor loop — `layoutNextLineRange(prepared, cursor, maxWidth)` — is built for the case where a figure sits beside a column of text and each line has to know how wide it's allowed to be. Pretext takes `{ width, height, bottom }` as input and leaves the question of *how you got those numbers* to the caller. Preimage answers that question.
+This is not an "images load faster" library. Images still download at network speed and decode at browser speed. The win is that text flow, card placement, canvas draw rects, and virtual scroll geometry do not need to wait for `img.onload` or a full decode just to know the right shape.
 
-Two pretext adapters and a small set of adjacent utilities:
+## Core idea
 
+If JS owns the layout, JS needs the image dimensions before it can paint the right geometry.
+
+```ts
+import { prepare, layout, getElement } from '@somnai-dreams/preimage'
+
+const image = await prepare('/hero.jpg')
+const rect = layout(image, 640, 480, 'contain')
+
+// The layout can now paint an accurate box. The image element is still
+// loading, and can be reused for the final pixels when they arrive.
+const el = getElement(image)
+if (el !== null) container.appendChild(el)
+```
+
+`prepare()` resolves at dimensions-known time, not image-loaded time. The returned `PreparedImage` is the reusable fact: width, height, aspect ratio, source provenance, and often the warmed `<img>` element already in flight.
+
+There are several ways to get that fact:
+
+- `prepare(url)` — browser `<img>` path for render-friendly single images.
+- `prepare(url, { dimsOnly: true })` — bulk URL dimension probing, usually via a short Range request or stream-abort path.
+- `prepare(blob)` / `probeImageBytes(bytes)` — byte-level File/Blob probing for upload previews and workers.
+- `prepareSync(src, w, h)` / `recordKnownMeasurement(...)` — no-network path when dimensions came from HTML attrs, a CMS, SSR, or a manifest.
+- URL dimension parsers — zero-network dimensions when a CDN encodes size in the URL.
+- `preimage-manifest` / `buildManifest()` — build-time dimension manifests for static assets.
+
+The rest of the package is supporting machinery around that first fact: small adapters and draft utilities for using early dimensions in fast layouts without turning every app into a custom image loader.
+
+## What it gives you
+
+- **Fast dimension facts** — parse or infer width/height before the full image paints.
+- **Earlier accurate layout paint** — flow text, place cards, size canvas/WebGL draw rects, and mount virtual rows with real geometry.
 - **`flowColumnWithFloats`** — drives pretext's cursor loop, reserves horizontal space for floated images, yields placed lines and placed figures with absolute `(x, y, w, h)`.
 - **`inlineImage` / `resolveMixedInlineItems`** — return pretext `RichInlineItem` values whose `extraWidth` reserves the measured image's rendered width. Pretext treats them as atomic pills that wrap with surrounding text.
 - **`prepare`, `layout`, `fitRect`, `getElement`** — the primitives those adapters are built on, usable standalone.
-- **`PrepareQueue`** — application-level concurrency cap with `boost(url)` priority for "this just scrolled into view, jump the queue."
-- **`DecodePool`** — off-main-thread decode cache for canvas timelines and WebGL scenarios where you want `ctx.drawImage(bitmap, …)` to be a single blit, not a decode.
-- **`loadGallery` / `createVirtualTilePool`** — gallery loading and DOM recycling helpers for measured image grids.
-- **`createScrollObserver` / scroll predictors** — cheap predictive pre-rendering baselines for virtualized surfaces.
+- **Draft utility: `PrepareQueue`** — application-level concurrency cap with `boost(url)` priority for "this just scrolled into view, jump the queue."
+- **Draft utility: `DecodePool`** — off-main-thread decode cache for canvas timelines and WebGL scenarios where you want `ctx.drawImage(bitmap, …)` to be a single blit, not a decode.
+- **Draft utility: `loadGallery` / `createVirtualTilePool`** — gallery loading and DOM recycling helpers for measured image grids.
+- **Draft utility: `createScrollObserver` / scroll predictors** — cheap predictive pre-rendering baselines for virtualized surfaces.
 - **`buildManifest`** — build-time dimension manifests for PNG, JPEG, GIF, BMP, WebP, SVG, AVIF, HEIC/HEIF, APNG, and ICO.
 
 ## What `prepare()` actually does
@@ -25,7 +56,8 @@ import { prepare, getMeasurement, getElement, layout } from '@somnai-dreams/prei
 const img = await prepare('/hero.jpg')
 // Resolves once the browser has parsed the header bytes and set
 // naturalWidth on the underlying <img>. ~5-10ms typical for URLs.
-// The same <img> is still fetching the rest of the bytes.
+// The same <img> is still fetching the rest of the bytes. Layout can
+// paint now; final pixels arrive later.
 
 const { naturalWidth, naturalHeight, aspectRatio } = getMeasurement(img)
 const rect = layout(img, 640, 480, 'contain')
@@ -36,7 +68,7 @@ const el = getElement(img)
 if (el !== null) container.appendChild(el)
 ```
 
-Default URL behavior is still render-friendly: create an `<img>`, set `src`, poll `naturalWidth` on a shared `setTimeout(0)` tick until the browser exposes it, resolve. The returned handle keeps that warmed element so rendering can reuse the same request.
+Default URL behavior is render-friendly: create an `<img>`, set `src`, poll `naturalWidth` on a shared `setTimeout(0)` tick until the browser exposes it, resolve. The returned handle keeps that warmed element so rendering can reuse the same request.
 
 For bulk dimension probing, `dimsOnly: true` defaults to `strategy: 'auto'`: try a short HTTP Range request per origin, remember whether that origin supports Range or needs streaming, and skip the warmed element. Explicit strategies are `img`, `range`, `stream`, and `auto`.
 
@@ -51,7 +83,7 @@ const prepared = await prepare(url, { dimsOnly: true })
 // later decide to render.
 ```
 
-For "I need to plan a layout from 200 URLs but only render the visible 30" scenarios: catalogs, above-the-fold precompute, bandwidth-metered contexts. Abort isn't free — browsers cancel lazily once bytes are in flight, so some header-adjacent bytes land before the cancel takes effect — but it's meaningfully cheaper than a full load.
+For "I need to plan a layout from 200 URLs but only render the visible 30" scenarios: catalogs, above-the-fold precompute, bandwidth-metered contexts. The point is early geometry. Abort isn't free — browsers cancel lazily once bytes are in flight, so some header-adjacent bytes land before the cancel takes effect — but it avoids committing every probed URL to a full image load.
 
 ### `prepareSync(src, w, h)` — no-network-path
 
@@ -86,7 +118,7 @@ const prepared = await prepare(cloudinaryUrl)   // zero network
 
 Parsers are `(url: string) => { width, height } | null` functions — register as many as you need.
 
-## `PrepareQueue`
+## Draft utility: `PrepareQueue`
 
 Browsers cap parallel requests per origin (6 hardcoded for HTTP/1.1; HTTP/2 multiplexes many streams over one connection, typically ~100). Firing `prepare()` for 200 tiles means the later tiles queue inside the browser's network stack where you can't reorder them.
 
@@ -107,7 +139,9 @@ With no explicit `concurrency`, the queue reads `navigator.connection`: `6` on s
 
 Dedupes by normalized URL plus measurement-affecting options. Two callers asking for the same URL with different `dimsOnly`, strategy, range, CORS, fallback, orientation, or abort-signal semantics get separate promises. `clear()` drops the pending backlog; in-flight work continues.
 
-## `DecodePool`
+This is a lightweight helper around dimension work, not a claim that image bytes load faster. It keeps dimension probes reorderable before they enter the browser's opaque network queue.
+
+## Draft utility: `DecodePool`
 
 `createImageBitmap(element-or-blob)` decodes off the main thread. For canvas/WebGL scenarios — scrubbable timelines, map tiles, photo editors — drawing from a cached `ImageBitmap` is a single blit with no decode cost on the hot path.
 
@@ -125,11 +159,11 @@ function paint() {
 }
 ```
 
-Internally uses `prepare()` to get dims and the warmed `<img>` element, then `createImageBitmap(img)` directly — one fetch shared between measurement, cache, and the bitmap decode. Bitmaps evicted by LRU have `.close()` called to release GPU memory.
+Internally uses `prepare()` to get dimensions and the warmed `<img>` element, then `createImageBitmap(img)` directly — one fetch shared between measurement, cache, and the bitmap decode. Bitmaps evicted by LRU have `.close()` called to release GPU memory.
 
 ## Demos
 
-Browser demos live at [the demos page](./pages/demos/). Most panels have their own Run button so you feel the click-to-layout delay for each strategy:
+Browser demos live at [the demos page](./pages/demos/). Most panels have their own Run button so you feel the click-to-accurate-layout delay for each strategy:
 
 - **Packing** — runtime-probed local PNGs packed through shortest columns and justified rows.
 - **Editorial** — pretext + native `<img>` (re-flows on every figure's `onload`) vs pretext + preimage (flows once with measured dims).
@@ -324,13 +358,15 @@ const manifest = await buildManifest({ root: './public/photos', base: '/photos/'
 
 Reads only `MAX_HEADER_BYTES` (4KB) per file; the full image is never decoded except for the JPEG retry path when metadata pushes SOF past the header budget. Defaults cover PNG, JPEG, GIF, BMP, WebP, SVG, AVIF, HEIC/HEIF, APNG, and ICO.
 
-### Virtual pools and image loading
+### Draft utility subpaths: virtual pools and image loading
 
 `@somnai-dreams/preimage/virtual` exports `createVirtualTilePool`, the DOM-recycled tile pool used by the demos. Feed it `Placement[]`; it mounts only visible/overscan tiles and calls `unmount` so renderers can cancel image work. The same subpath also exports virtual priority helpers (`createVirtualPriorityTracker`, `virtualPlacementPriority`, `scoreVirtualPlacement`) so resource schedulers can rank mounted work as visible, predicted, ahead, near, or behind without reimplementing viewport math.
 
 `@somnai-dreams/preimage/loading` exports `loadGallery`. Pass `aspects` when dimensions are already known; otherwise the helper probes dimensions through `PrepareQueue`. Separately, `imageLoading` controls when mounted tiles start visible image requests: `queued` caps visible image fetches and uses the virtual priority helpers to score mounted work by visible tiles, short-horizon predicted tiles, then scroll-direction distance; `visible-first` gates overscan work until the first viewport has loaded; `after-layout` waits until the frame layer is complete; and `immediate` starts image requests as tiles mount. The default is `queued`: render work starts at concurrency 2 while dimensions are still probing, rises to 4 for viewport work after layout completes, then can rise to 6 after the viewport has no pending image and scrolling has gone idle.
 
-### Scroll prediction baselines
+These helpers are intentionally draft-shaped: small, fast approaches for using early dimensions in virtualized surfaces. Treat them as orchestration helpers around the core dimension fact, not as the main reason to adopt the package.
+
+### Draft utility subpath: scroll prediction baselines
 
 `@somnai-dreams/preimage/predict` exports the phase-0 pieces for predictive pre-render experiments: `createScrollObserver(container)`, `createStationaryPredictor()`, `createLinearPredictor()`, `createMomentumPredictor()`, and `evaluatePrediction(predictor, samples, { horizonMs })`. The bench at `/bench/predict.html` runs scripted scroll traces before this touches the virtual pool.
 
@@ -375,9 +411,9 @@ type InlineImageItem = RichInlineItem & {
 
 ## Why this exists
 
-Pretext solves a sharp problem: "measure text without triggering reflow, then do line breaking with pure arithmetic." Preimage's job is to deliver the *one other input* pretext needs to cover the scenarios its own README describes: editorial article layout with floated figures, rich-note with inline icon images, chat bubbles with inline attachments, masonry layouts mixing text and image cards.
+Pretext solves a sharp problem: "measure text without triggering reflow, then do line breaking with pure arithmetic." Preimage's job is to deliver the *one other input* those layouts need before first accurate paint: image width and height.
 
-For anything else images do in a browser, the platform has better answers: `aspect-ratio` handles CLS, `object-fit` handles single-image fitting inside a CSS box, `<picture>` handles responsive sources. Preimage doesn't reinvent those. It fills the specific gap where a JS layout engine — pretext, a canvas renderer, a WebGL scene — needs numeric dimensions *before* paint.
+For anything else images do in a browser, the platform has better answers: `aspect-ratio` handles CLS, `object-fit` handles single-image fitting inside a CSS box, `<picture>` handles responsive sources, and native image loading still owns the final pixels. Preimage doesn't reinvent those. It fills the specific gap where a JS layout engine — pretext, a canvas renderer, a WebGL scene, a measured masonry layout — needs numeric dimensions before it can paint the right geometry.
 
 ## Caveats
 
@@ -385,7 +421,7 @@ For anything else images do in a browser, the platform has better answers: `aspe
 - `flowColumnWithFloats` handles any number of floats, but a line's available width is `columnWidth - (widest active left float) - (widest active right float) - gaps`. Side-by-side floats on the same side stack to the width of the larger one, not sum — matching CSS float behavior.
 - EXIF orientations 1–8 are respected for measurement axes; canvas rendering still needs to apply the transform manually. Browser `<img>` rendering applies it automatically.
 - SVG without an intrinsic size returns `(0, 0)` on most browsers; use `measureFromSvgText(svgText)` to extract the viewBox.
-- `dimsOnly: true` cancel isn't instantaneous — browsers let the in-flight request settle a bit before aborting. Bandwidth savings are real but not surgical.
+- `dimsOnly: true` cancel isn't instantaneous — browsers let the in-flight request settle a bit before aborting. The main win is earlier layout geometry; bandwidth savings are useful but not surgical.
 
 ## Develop
 
