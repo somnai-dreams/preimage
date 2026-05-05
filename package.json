@@ -26,7 +26,9 @@
     "manifest": "bun scripts/rename-and-manifest.ts",
     "screenshots": "bun scripts/screenshots.mjs",
     "bench:probe-node": "bun scripts/bench-probe-node.ts",
-    "bench:remote-loading": "bun scripts/remote-loading-strategy-bench.ts"
+    "bench:remote-loading": "bun scripts/remote-loading-strategy-bench.ts",
+    "bench:full-page": "bun scripts/full-page-loading-bench.ts",
+    "bench:captured-page": "bun scripts/captured-page-bench.ts"
   },
   "devDependencies": {
     "@chenglou/pretext": "^0.0.5",

@@ -66,6 +66,86 @@ The default local run compares `visible-first`, `queued`, `after-layout`, and `i
 bun run bench:remote-loading -- --runs 3 --n 68 --strategies visible-first,queued
 ```
 
+## Full-page loading probes
+
+`bun run bench:full-page` opens real websites in Chromium and injects a document-start shim that can observe image geometry, run preimage dimension probes, and optionally apply probed dimensions to unknown-size `<img>` elements. This is for the "does probing help inside a whole page load?" question: other scripts, CSS, fonts, API calls, native lazy loading, and the browser network scheduler all stay in play.
+
+```sh
+bun run bench:full-page -- --url https://example.com --modes control,probe,apply
+```
+
+Modes:
+
+- `control` observes image and performance timing without probing.
+- `probe` calls `prepare(url, { dimsOnly: true, fallbackToImgOnFetchError: true })` for matching images and records success/failure/timing.
+- `apply` does the same probe, then applies the found shape to missing-geometry images with `style.aspectRatio` by default.
+
+Useful flags:
+
+```sh
+bun run bench:full-page -- \
+  --urls-file ./wild-pages.txt \
+  --runs 3 \
+  --scroll-distance 2400 \
+  --scroll-ms 1200 \
+  --probe-scope unknown \
+  --image-scope page \
+  --apply-shape aspect-ratio \
+  --record-har-dir .tmp/full-page-hars
+```
+
+For an above-the-fold pass, target only images that are in the viewport when first discovered and skip scripted scrolling:
+
+```sh
+bun run bench:full-page -- \
+  --url https://www.apple.com/ \
+  --modes control,apply \
+  --wait-until commit \
+  --image-scope viewport \
+  --no-save
+```
+
+For a visual browser pass, add `--headed --inspect-ms 5000`. The same URL opens once per mode, so use a single page and one or two modes while eyeballing:
+
+```sh
+bun run bench:full-page -- \
+  --url https://www.apple.com/ \
+  --modes control,apply \
+  --wait-until commit \
+  --image-scope viewport \
+  --headed \
+  --inspect-ms 5000 \
+  --no-save
+```
+
+The report is saved under `benchmarks/full-page-loading-*.json` unless `--no-save` is passed. Treat these as explicit, environment-shaped benchmarks, not CI truth. The useful columns are missing-geometry image counts, `firstDims`, `aboveDims`, `aboveImgs`, `allDims`, `allImgs`, CLS, LCP, image bytes, and Range-fetch bytes. `*Dims` is when dimensions became known by either a successful preimage probe or native image load. `*Imgs` is native image load only. If a site needs real product integration, write a site adapter after this generic shim proves the page is worth studying.
+
+### Captured-page replay
+
+`bench:full-page` is a live shim: it arrives after the page's own image strategy has already started. To test the proper integration shape, use `bench:captured-page`: capture the rendered document once, freeze third-party scripts, rewrite missing-geometry target images so they start inert, and replay two local variants:
+
+- `control` restores each target image's `src` at document start.
+- `preimage` restores the same `src` and runs a same-origin preimage dimension probe in parallel through the local fixture proxy.
+
+```sh
+bun run bench:captured-page -- capture \
+  --url https://www.ikea.com/us/en/ \
+  --name ikea-us \
+  --target-scope viewport
+
+bun run bench:captured-page -- run \
+  --fixture benchmarks/captured-pages/ikea-us \
+  --modes control,preimage \
+  --runs 3 \
+  --no-save
+```
+
+Captured fixtures contain `source.html`, `control.html`, `preimage.html`, and `manifest.json`. The replay server proxies captured image URLs back through `http://127.0.0.1` so Range probes are same-origin and measure the integration path instead of browser CORS policy. Target images start inert; non-target images still load through the same proxy so the page keeps surrounding image-load pressure without live-site variance. Replay blocks external non-document requests because scripts are frozen. Use this when the question is "does a controlled, preimage-aware loader get dimensions before native image load?" rather than "can a late browser shim patch a random site?"
+
+Replay runs start with a cold `control` warmup by default, then measure three warm repeats per mode in seeded random order and print warm-only averages. This warms connection state through Chromium, the local proxy, and the origin without using cached image bytes; the fixture still sends `no-store` and disables Chromium cache so the measured comparison stays about earlier dimensions, not already-cached images. Pass `--seed` to reproduce a run order, `--order fixed` when debugging a specific sequence, and `--no-warmup-control` only when deliberately measuring the first cold page load.
+
+Good captured-page candidates are not polished commercial homepages. Start with pages where real-user CLS is already poor, then check whether missing image geometry is a plausible cause before capturing. CrUX can find origins with poor field CLS, PageSpeed Insights or Lighthouse can flag pages with unsized image elements, and the final proof is still this harness: `control` should shift while target images are unresolved, and `preimage` should move `aboveDims` earlier without pretending images loaded faster.
+
 ## Coverage Matrix
 
 Every public value export and package subpath is assigned to an automated owner in `scripts/coverage-matrix-test.ts`. `bun run check:all` runs that matrix first, so adding a public API without a regression or benchmark surface fails locally and in CI. The human-readable policy lives in `docs/benchmark-regression-matrix.md`.
