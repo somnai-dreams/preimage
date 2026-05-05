@@ -40,3 +40,4 @@ benchmarks/probe-byte-threshold-20*.json
 benchmarks/probe-sweep-20*.json
 benchmarks/svg-sniff-20*.json
 benchmarks/first-screen-20*.json
+/.crosstalk
